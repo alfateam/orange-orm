@@ -25,6 +25,7 @@ function newPool(connectionString, poolOptions) {
 	c.__orangeAcquireDatabaseAccess = acquireDatabaseAccess;
 	c.__orangeSuspendDatabase = suspendDatabase;
 	c.__orangeCloneDatabaseTo = cloneDatabaseTo;
+	c.__orangeConnectWorkerPort = connectWorkerPort;
 
 	if (client.ready && typeof client.ready.then === 'function') {
 		client.ready.then((result) => {
@@ -130,6 +131,12 @@ function newPool(connectionString, poolOptions) {
 		else if (readClient && readClient !== client && typeof readClient.release === 'function')
 			closes.push(readClient.release());
 		return Promise.all(closes).then(() => undefined);
+	}
+
+	function connectWorkerPort() {
+		if (!client || typeof client.connectPort !== 'function')
+			throw new Error('sqliteOPFS worker does not support shared connections.');
+		return client.connectPort();
 	}
 
 	function cloneDatabaseTo(targetConnectionString, targetOptions = {}) {

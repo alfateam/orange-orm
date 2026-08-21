@@ -1069,6 +1069,12 @@ export interface SyncPushOverrideConfig extends Omit<SyncPushConfig, 'url'> {
 export interface SyncConfig<M extends Record<string, any> = any> extends Partial<SyncEndpointConfig> {
   tables?: SyncTableName<M>[];
   initialReadyMaxAgeMs?: number;
+  /** Runs sync orchestration in an Orange ORM managed worker. */
+  worker?: boolean | {
+    url?: string | URL;
+    requestTimeoutMs?: number;
+    createWorker?: () => Worker | MessagePort;
+  };
   dual?: {
     bootstrap?: 'data-first';
   };

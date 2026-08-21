@@ -4,6 +4,7 @@ const hono = require('../hostHono');
 const randomUuid = require('../randomUuid');
 const stringify = require('../client/stringify');
 const createHttpInterceptor = require('../client/httpInterceptor');
+const createManagedSyncWorkerClient = require('../client/managedSyncWorkerClient');
 const newSyncClient = require('../client/syncClient');
 const { createSyncAuto, syncAutoStartSymbol } = require('../client/syncAuto');
 const {
@@ -78,6 +79,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	let cacheSchemaPromise;
 	let externalSyncUnsubscribe;
 	let externalSyncClient;
+	let managedSyncClient;
 	const manifestChannel = createManifestChannel();
 	let roleClientFactory;
 	let roleHttpInterceptor;
@@ -190,6 +192,16 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	}
 
 	async function end() {
+		if (managedSyncClient) {
+			try {
+				await managedSyncClient.stop();
+			}
+			catch (_e) {
+				// Continue closing the SQLite workers after a failed or already closed sync worker.
+			}
+			if (typeof managedSyncClient.close === 'function')
+				managedSyncClient.close();
+		}
 		const closes = [];
 		for (const db of dbByRole.values()) {
 			if (db && typeof db.end === 'function')
@@ -209,6 +221,22 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	}
 
 	function __createSyncClient(rootClient, _getDb, httpInterceptor) {
+		if (isManagedSyncWorkerEnabled(poolOptions && poolOptions.sync)) {
+			if (!managedSyncClient) {
+				managedSyncClient = createManagedSyncWorkerClient({
+					client: rootClient,
+					connectionString,
+					poolOptions,
+					syncConfig: poolOptions.sync,
+					databases: [
+						{ connectionString: roleConnectionStrings[roleA], db: getRoleDb(roleA) },
+						{ connectionString: roleConnectionStrings[roleB], db: getRoleDb(roleB) },
+						{ connectionString: cacheConnectionString, db: getCacheDb() }
+					]
+				});
+			}
+			return managedSyncClient;
+		}
 		roleClientFactory = rootClient;
 		roleHttpInterceptor = httpInterceptor;
 		const auto = createSyncAuto(
@@ -2239,7 +2267,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		});
 	}
 
-	async function getCacheDb() {
+	function getCacheDb() {
 		if (!cacheDb)
 			cacheDb = createSingleDatabase(cacheConnectionString, cachePoolOptions);
 		return cacheDb;
@@ -2620,6 +2648,8 @@ function toDataPoolOptions(poolOptions = {}) {
 		...poolOptions,
 		sync: stripDualSyncOption(poolOptions.sync)
 	};
+	if (isManagedSyncWorkerEnabled(poolOptions.sync))
+		options.singleWorker = true;
 	if (!options.vfs)
 		options.vfs = 'opfs-wl';
 	return options;
@@ -2682,9 +2712,14 @@ function stripDualSyncOption(sync) {
 	const {
 		dualDataDb,
 		dual,
+		worker,
 		...rest
 	} = sync;
 	return rest;
+}
+
+function isManagedSyncWorkerEnabled(sync) {
+	return !!sync && sync === Object(sync) && !Array.isArray(sync) && !!sync.worker;
 }
 
 function isDataFirstBootstrapEnabled(sync) {

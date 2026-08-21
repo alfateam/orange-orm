@@ -1,11 +1,7 @@
-void !function() {
-	typeof self === 'undefined' && typeof global === 'object'
-		? global.self = global : null;
-}();import * as fastJsonPatch from 'fast-json-patch';
+import * as fastJsonPatch from 'fast-json-patch';
 import * as _default from 'rfdc/default';
 import * as ajv from 'ajv';
 import * as onChange from '@lroal/on-change';
-import * as connectionString from '@tediousjs/connection-string';
 
 function getDefaultExportFromCjs (x) {
 	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
@@ -14,6 +10,8 @@ function getDefaultExportFromCjs (x) {
 function getDefaultExportFromNamespaceIfPresent (n) {
 	return n && Object.prototype.hasOwnProperty.call(n, 'default') ? n['default'] : n;
 }
+
+var managedSyncWorkerEntry$1 = {};
 
 var getTSDefinition_1;
 var hasRequiredGetTSDefinition;
@@ -2101,7 +2099,7 @@ function requireHostHono () {
 	return hostHono_1;
 }
 
-var require$$0$2 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(fastJsonPatch);
+var require$$0$1 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(fastJsonPatch);
 
 var newMemoryId;
 var hasRequiredNewMemoryId;
@@ -2123,7 +2121,7 @@ var hasRequiredCreatePatch;
 function requireCreatePatch () {
 	if (hasRequiredCreatePatch) return createPatch;
 	hasRequiredCreatePatch = 1;
-	const jsonpatch = require$$0$2;
+	const jsonpatch = require$$0$1;
 	let dateToIsoString = requireDateToISOString();
 	let stringify = requireStringify();
 	let newMemoryId = requireNewMemoryId();
@@ -3658,12 +3656,12 @@ function requireNegotiateParameters () {
 	return negotiateParameters_1;
 }
 
-var wrapQuery_1$b;
-var hasRequiredWrapQuery$b;
+var wrapQuery_1$3;
+var hasRequiredWrapQuery$3;
 
-function requireWrapQuery$b () {
-	if (hasRequiredWrapQuery$b) return wrapQuery_1$b;
-	hasRequiredWrapQuery$b = 1;
+function requireWrapQuery$3 () {
+	if (hasRequiredWrapQuery$3) return wrapQuery_1$3;
+	hasRequiredWrapQuery$3 = 1;
 	var negotiateSql = requireNegotiateSql();
 	var negotiateParameters = requireNegotiateParameters();
 
@@ -3680,8 +3678,8 @@ function requireWrapQuery$b () {
 	}
 
 
-	wrapQuery_1$b = wrapQuery;
-	return wrapQuery_1$b;
+	wrapQuery_1$3 = wrapQuery;
+	return wrapQuery_1$3;
 }
 
 var query;
@@ -3691,7 +3689,7 @@ function requireQuery () {
 	if (hasRequiredQuery) return query;
 	hasRequiredQuery = 1;
 	var executeQueries = requireExecuteQueries();
-	var wrapQuery = requireWrapQuery$b();
+	var wrapQuery = requireWrapQuery$3();
 
 	function doQuery(context, query) {
 		var wrappedQuery = wrapQuery(query);
@@ -12187,11 +12185,11 @@ function requireEncodeFilterArg () {
 }
 
 var quote_1;
-var hasRequiredQuote$6;
+var hasRequiredQuote$2;
 
-function requireQuote$6 () {
-	if (hasRequiredQuote$6) return quote_1;
-	hasRequiredQuote$6 = 1;
+function requireQuote$2 () {
+	if (hasRequiredQuote$2) return quote_1;
+	hasRequiredQuote$2 = 1;
 	let tryGetSessionContext = requireTryGetSessionContext();
 
 	function quote(context, name) {
@@ -12215,7 +12213,7 @@ function requireEqual () {
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
 	var encodeFilterArg = requireEncodeFilterArg();
-	var quote = requireQuote$6();
+	var quote = requireQuote$2();
 
 	function equal(context, column,arg,alias) {
 		var operator = '=';
@@ -12240,7 +12238,7 @@ function requireNotEqual () {
 	var newBoolean = requireNewBoolean();
 	var encodeFilterArg = requireEncodeFilterArg();
 	var nullOperator = ' is not ';
-	var quote = requireQuote$6();
+	var quote = requireQuote$2();
 
 	function notEqual(context, column,arg,alias) {
 		var operator = '<>';
@@ -12264,7 +12262,7 @@ function requireLessThan () {
 	hasRequiredLessThan = 1;
 	var newBoolean = requireNewBoolean();
 	var encodeFilterArg = requireEncodeFilterArg();
-	var quote = requireQuote$6();
+	var quote = requireQuote$2();
 
 	function lessThanOrEqual(context, column,arg,alias) {
 		var operator = '<';
@@ -12286,7 +12284,7 @@ function requireLessThanOrEqual () {
 	hasRequiredLessThanOrEqual = 1;
 	var newBoolean = requireNewBoolean();
 	var encodeFilterArg = requireEncodeFilterArg();
-	var quote = requireQuote$6();
+	var quote = requireQuote$2();
 
 	function lessThanOrEqual(context, column,arg,alias) {
 		var operator = '<=';
@@ -12308,7 +12306,7 @@ function requireGreaterThan () {
 	hasRequiredGreaterThan = 1;
 	var newBoolean = requireNewBoolean();
 	var encodeFilterArg = requireEncodeFilterArg();
-	var quote = requireQuote$6();
+	var quote = requireQuote$2();
 
 	function greaterThan(context, column,arg,alias) {
 		var operator = '>';
@@ -12330,7 +12328,7 @@ function requireGreaterThanOrEqual () {
 	hasRequiredGreaterThanOrEqual = 1;
 	var newBoolean = requireNewBoolean();
 	var encodeFilterArg = requireEncodeFilterArg();
-	var quote = requireQuote$6();
+	var quote = requireQuote$2();
 
 	function greaterThanOrEqual(context, column,arg,alias) {
 		var operator = '>=';
@@ -12352,7 +12350,7 @@ function require_in () {
 	hasRequired_in = 1;
 	const newParameterized = requireNewParameterized();
 	const newBoolean = requireNewBoolean();
-	const quote = requireQuote$6();
+	const quote = requireQuote$2();
 
 	function _in(context, column,values,alias) {
 		let filter;
@@ -12581,7 +12579,7 @@ function requireNewColumn () {
 	const greaterThanOrEqual = requireGreaterThanOrEqual();
 	const _in = require_in();
 	const _extractAlias = requireExtractAlias();
-	const quote = requireQuote$6();
+	const quote = requireQuote$2();
 	const aggregate = requireColumnAggregate$1();
 	const aggregateGroup = requireColumnAggregateGroup$1();
 	const newParameterized = requireNewParameterized();
@@ -12698,7 +12696,7 @@ function requireNewColumn () {
 	return newColumn;
 }
 
-var require$$0$1 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(ajv);
+var require$$0 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(ajv);
 
 var purify_1$5;
 var hasRequiredPurify$6;
@@ -12833,7 +12831,7 @@ function requireStartsWithCore () {
 	hasRequiredStartsWithCore = 1;
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
-	var quote = requireQuote$6();
+	var quote = requireQuote$2();
 	var encodeFilterArg = requireEncodeFilterArg();
 	var newLikeColumnArg = requireNewLikeColumnArg();
 
@@ -12873,7 +12871,7 @@ var hasRequiredEndsWithCore;
 function requireEndsWithCore () {
 	if (hasRequiredEndsWithCore) return endsWithCore_1;
 	hasRequiredEndsWithCore = 1;
-	const quote = requireQuote$6();
+	const quote = requireQuote$2();
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
 	var encodeFilterArg = requireEncodeFilterArg();
@@ -12916,7 +12914,7 @@ var hasRequiredContainsCore;
 function requireContainsCore () {
 	if (hasRequiredContainsCore) return containsCore_1;
 	hasRequiredContainsCore = 1;
-	const quote = requireQuote$6();
+	const quote = requireQuote$2();
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
 	var encodeFilterArg = requireEncodeFilterArg();
@@ -12998,7 +12996,7 @@ function requireIEqual () {
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
 	var encodeFilterArg = requireEncodeFilterArg();
-	const quote = requireQuote$6();
+	const quote = requireQuote$2();
 
 	function iEqual(context, column,arg,alias) {
 		var operator = ' ILIKE ';
@@ -13188,7 +13186,7 @@ function requireFormatOutGeneric () {
 	if (hasRequiredFormatOutGeneric) return formatOutGeneric_1;
 	hasRequiredFormatOutGeneric = 1;
 	var getSessionSingleton = requireGetSessionSingleton();
-	const quote = requireQuote$6();
+	const quote = requireQuote$2();
 
 	function formatOutGeneric(context, column, fnName, alias) {
 		var formatColumn = getSessionSingleton(context, fnName);
@@ -13483,7 +13481,7 @@ function requireFormatOut$1 () {
 	if (hasRequiredFormatOut$1) return formatOut_1$1;
 	hasRequiredFormatOut$1 = 1;
 	var getSessionSingleton = requireGetSessionSingleton();
-	const quote = requireQuote$6();
+	const quote = requireQuote$2();
 
 	function formatOut(context, column, alias) {
 		var formatColumn = getSessionSingleton(context, 'formatDateOut');
@@ -13586,7 +13584,7 @@ function requireFormatOut () {
 	if (hasRequiredFormatOut) return formatOut_1;
 	hasRequiredFormatOut = 1;
 	var getSessionSingleton = requireGetSessionSingleton();
-	const quote = requireQuote$6();
+	const quote = requireQuote$2();
 
 	function formatOut(context, column, alias) {
 		var formatColumn = getSessionSingleton(context, 'formatDateTzOut') ||  getSessionSingleton(context, 'formatDateOut');
@@ -14096,7 +14094,7 @@ var hasRequiredColumn;
 function requireColumn () {
 	if (hasRequiredColumn) return column;
 	hasRequiredColumn = 1;
-	const Ajv = require$$0$1;
+	const Ajv = require$$0;
 
 	function defineColumn(column, table) {
 		var c = {};
@@ -14873,7 +14871,7 @@ function requireNewSingleQuery$1 () {
 	var negotiateLimit = requireNegotiateLimit();
 	var lockSql = requireLockSql();
 	var newParameterized = requireNewParameterized();
-	var quote = requireQuote$6();
+	var quote = requireQuote$2();
 
 	function _new(context, table, filter, span, alias, innerJoin, orderBy, limit, offset, exclusive) {
 
@@ -15954,7 +15952,7 @@ function requireSelectSql$1 () {
 	hasRequiredSelectSql$1 = 1;
 	const newParameterized = requireNewParameterized();
 	const newBoolean = requireNewBoolean();
-	const quote = requireQuote$6();
+	const quote = requireQuote$2();
 
 	function newSelectSql(context, table, alias) {
 		const colName = quote(context, table._primaryColumns[0]._dbName);
@@ -17944,7 +17942,7 @@ function requireChildColumn () {
 	var getSessionContext = requireGetSessionContext();
 	var newJoinCore = requireNewShallowJoinSqlCore();
 	const getSessionSingleton = requireGetSessionSingleton();
-	const _quote = requireQuote$6();
+	const _quote = requireQuote$2();
 
 
 	function childColumn(context, column, relations) {
@@ -18018,7 +18016,7 @@ function requireNewFilterArg () {
 	var newJoin = requireJoinSql();
 	var newWhere = requireWhereSql();
 	var newParameterized = requireNewParameterized();
-	var quote = requireQuote$6();
+	var quote = requireQuote$2();
 
 	function newFilterArg(context, column, relations, depth = 0) {
 		var relationCount = relations.length;
@@ -19451,7 +19449,7 @@ function requireCount () {
 	const negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
 	const extractFilter = requireExtractFilter();
 	const newWhereSql = requireNewWhereSql();
-	const quote = requireQuote$6();
+	const quote = requireQuote$2();
 
 	async function count(context, table, filter) {
 		let alias = table._dbName;
@@ -20172,12 +20170,12 @@ function requireNewRow () {
 	return newRow_1;
 }
 
-var insert_1$1;
-var hasRequiredInsert$6;
+var insert_1;
+var hasRequiredInsert$2;
 
-function requireInsert$6 () {
-	if (hasRequiredInsert$6) return insert_1$1;
-	hasRequiredInsert$6 = 1;
+function requireInsert$2 () {
+	if (hasRequiredInsert$2) return insert_1;
+	hasRequiredInsert$2 = 1;
 	let getSessionContext = requireGetSessionContext();
 	let newRow = requireNewRow();
 
@@ -20265,8 +20263,8 @@ function requireInsert$6 () {
 		return true;
 	}
 
-	insert_1$1 = insert;
-	return insert_1$1;
+	insert_1 = insert;
+	return insert_1;
 }
 
 var fromCompareObject_1;
@@ -20485,7 +20483,7 @@ var hasRequiredApplyPatch;
 function requireApplyPatch () {
 	if (hasRequiredApplyPatch) return applyPatch_1;
 	hasRequiredApplyPatch = 1;
-	const fastjson = require$$0$2;
+	const fastjson = require$$0$1;
 	let fromCompareObject = requireFromCompareObject();
 	let toCompareObject = requireToCompareObject();
 	let getSessionSingleton = requireGetSessionSingleton();
@@ -21571,7 +21569,7 @@ function requireTable () {
 	const tryGetFirst = requireTryGetFirstFromDb();
 	const newCache = requireNewRowCache();
 	const newContext = requireNewObject();
-	const insert = requireInsert$6();
+	const insert = requireInsert$2();
 	const insertAndForget = requireInsertAndForget();
 	const _delete = require_delete();
 	const cascadeDelete = requireCascadeDelete();
@@ -22100,39 +22098,6 @@ function requireMap () {
 
 	map_1 = mapRoot;
 	return map_1;
-}
-
-var runtimes;
-var hasRequiredRuntimes;
-
-function requireRuntimes () {
-	if (hasRequiredRuntimes) return runtimes;
-	hasRequiredRuntimes = 1;
-	// @ts-ignore
-	// eslint-disable-next-line no-undef
-	const deno = typeof Deno !== 'undefined' && Deno.version?.deno;
-	// @ts-ignore
-	// eslint-disable-next-line no-undef
-	const bun = typeof Bun !== 'undefined' && Bun.version;
-	const node = (typeof process !== 'undefined' && process.versions?.node && !deno && !bun) ? process.versions.node : false;
-
-	function parseVersion(version) {
-		if (version) {
-			const versionArray = version.split('.');
-			return {
-				version,
-				major: parseInt(versionArray[0]),
-				minor: parseInt(versionArray[1]),
-				patch: parseInt(versionArray[2])
-			};
-		}
-		else
-			return false;
-	}
-
-
-	runtimes = { deno: parseVersion(deno), bun: parseVersion(bun), node: parseVersion(node) };
-	return runtimes;
 }
 
 var syncWorkerProtocol;
@@ -25479,80 +25444,136 @@ function requireCreateDomain () {
 	return createDomain_1;
 }
 
-var wrapQuery_1$a;
-var hasRequiredWrapQuery$a;
+var wrapQuery_1$2;
+var hasRequiredWrapQuery$2;
 
-function requireWrapQuery$a () {
-	if (hasRequiredWrapQuery$a) return wrapQuery_1$a;
-	hasRequiredWrapQuery$a = 1;
+function requireWrapQuery$2 () {
+	if (hasRequiredWrapQuery$2) return wrapQuery_1$2;
+	hasRequiredWrapQuery$2 = 1;
 	var log = requireLog();
 
-	function wrapQuery(_context, connection) {
-		var runOriginalQuery = connection.query;
+	function wrapQuery(_context, client) {
+
 		return runQuery;
 
 		function runQuery(query, onCompleted) {
+
 			var params = query.parameters;
 			var sql = query.sql();
 			var completeQuery = log.startQuery({sql, parameters: params});
-			return runOriginalQuery.call(connection, sql, params, function(err, result) {
-				completeQuery(err);
-				onCompleted(err, result);
-			});
+			client.d1.prepare(sql, params).bind(...params).all().then(onInnerCompleted, onError);
+
+			function onInnerCompleted(response) {
+				completeQuery();
+				onCompleted(null, response.results);
+			}
+
+			function onError(e) {
+				completeQuery(e);
+				onCompleted(e);
+			}
+
 		}
 
 	}
 
-	wrapQuery_1$a = wrapQuery;
-	return wrapQuery_1$a;
+	wrapQuery_1$2 = wrapQuery;
+	return wrapQuery_1$2;
 }
 
-var wrapCommand_1$a;
-var hasRequiredWrapCommand$a;
+var wrapCommand_1$2;
+var hasRequiredWrapCommand$2;
 
-function requireWrapCommand$a () {
-	if (hasRequiredWrapCommand$a) return wrapCommand_1$a;
-	hasRequiredWrapCommand$a = 1;
+function requireWrapCommand$2 () {
+	if (hasRequiredWrapCommand$2) return wrapCommand_1$2;
+	hasRequiredWrapCommand$2 = 1;
 	var log = requireLog();
 
-	function wrapCommand(_context, connection) {
-		var runOriginalQuery = connection.query;
+	function wrapCommand(_context, client) {
 		return runQuery;
 
 		function runQuery(query, onCompleted) {
-			var params = query.parameters;
+			var params = Array.isArray(query.parameters) ? query.parameters : [];
 			var sql = query.sql();
-			var completeQuery = log.startQuery({sql, parameters: params});
-			return runOriginalQuery.call(connection, sql, params, _onCompleted);
+			var completeQuery = log.startQuery({ sql, parameters: params });
 
-			function _onCompleted(e, _result) {
+			client.d1
+				.prepare(sql)
+				.bind.apply(null, params)
+				.run()
+				.then(onInnerCompleted, onError);
+
+			function onInnerCompleted(response) {
+				var affectedRows = 0;
+
+				if (response) {
+					if (typeof response.changes === 'number') affectedRows = response.changes;
+					else if (typeof response.meta === 'object' && response.meta && typeof response.meta.changes === 'number') {
+						affectedRows = response.meta.changes;
+					} else if (typeof response.affectedRows === 'number') {
+						affectedRows = response.affectedRows;
+					}
+				}
+
+				completeQuery();
+				onCompleted(null, { rowsAffected: affectedRows });
+			}
+
+			function onError(e) {
 				completeQuery(e);
-				const result = {rowsAffected: _result?.affectedRows, ..._result};
-				onCompleted(e, result);
-
+				onCompleted(e, { rowsAffected: 0 });
 			}
 		}
-
 	}
 
-	wrapCommand_1$a = wrapCommand;
-	return wrapCommand_1$a;
+	wrapCommand_1$2 = wrapCommand;
+	return wrapCommand_1$2;
 }
 
-var encodeBoolean_1$5;
-var hasRequiredEncodeBoolean$5;
+var encodeBoolean_1$1;
+var hasRequiredEncodeBoolean$1;
 
-function requireEncodeBoolean$5 () {
-	if (hasRequiredEncodeBoolean$5) return encodeBoolean_1$5;
-	hasRequiredEncodeBoolean$5 = 1;
+function requireEncodeBoolean$1 () {
+	if (hasRequiredEncodeBoolean$1) return encodeBoolean_1$1;
+	hasRequiredEncodeBoolean$1 = 1;
 	function encodeBoolean(bool) {
 		if (bool)
 			return 1;
 		return 0;
 	}
 
-	encodeBoolean_1$5 = encodeBoolean;
-	return encodeBoolean_1$5;
+	encodeBoolean_1$1 = encodeBoolean;
+	return encodeBoolean_1$1;
+}
+
+var quote$1;
+var hasRequiredQuote$1;
+
+function requireQuote$1 () {
+	if (hasRequiredQuote$1) return quote$1;
+	hasRequiredQuote$1 = 1;
+	quote$1 = (name) => `"${name}"`;
+	return quote$1;
+}
+
+var formatBigintOut_1;
+var hasRequiredFormatBigintOut;
+
+function requireFormatBigintOut () {
+	if (hasRequiredFormatBigintOut) return formatBigintOut_1;
+	hasRequiredFormatBigintOut = 1;
+	const quote = requireQuote$1();
+
+	function formatBigintOut(column, alias) {
+		const quotedCol = quote(column._dbName);
+		if (alias)
+			return `CAST(${alias}.${quotedCol} AS TEXT)`;
+		else
+			return `CAST(${quotedCol} AS TEXT)`;
+	}
+
+	formatBigintOut_1 = formatBigintOut;
+	return formatBigintOut_1;
 }
 
 var format_1;
@@ -25573,85 +25594,68 @@ function requireFormat () {
 	return format_1;
 }
 
-var quote$5;
-var hasRequiredQuote$5;
+var deleteFromSql_1$1;
+var hasRequiredDeleteFromSql$1;
 
-function requireQuote$5 () {
-	if (hasRequiredQuote$5) return quote$5;
-	hasRequiredQuote$5 = 1;
-	quote$5 = (name) => `\`${name}\``;
-	return quote$5;
-}
-
-var deleteFromSql_1$5;
-var hasRequiredDeleteFromSql$5;
-
-function requireDeleteFromSql$5 () {
-	if (hasRequiredDeleteFromSql$5) return deleteFromSql_1$5;
-	hasRequiredDeleteFromSql$5 = 1;
-	const format = 'delete %s from %s as %s%s';
+function requireDeleteFromSql$1 () {
+	if (hasRequiredDeleteFromSql$1) return deleteFromSql_1$1;
+	hasRequiredDeleteFromSql$1 = 1;
+	const format = 'delete from %s where %s.rowId in (SELECT %s.rowId FROM %s %s%s)';
 	const formatString = requireFormat();
-	const quote = requireQuote$5();
+	const quote = requireQuote$1();
 
 	function deleteFromSql(table, alias, whereSql) {
 		const name = quote(table._dbName);
 		alias = quote(alias);
-		return formatString(format, alias, name, alias, whereSql);
+		return formatString(format, name, name, alias, name, alias, whereSql);
 	}
-	deleteFromSql_1$5 = deleteFromSql;
-	return deleteFromSql_1$5;
+	deleteFromSql_1$1 = deleteFromSql;
+	return deleteFromSql_1$1;
 }
 
-var selectForUpdateSql$4;
-var hasRequiredSelectForUpdateSql$5;
+var selectForUpdateSql$1;
+var hasRequiredSelectForUpdateSql$1;
 
-function requireSelectForUpdateSql$5 () {
-	if (hasRequiredSelectForUpdateSql$5) return selectForUpdateSql$4;
-	hasRequiredSelectForUpdateSql$5 = 1;
-	selectForUpdateSql$4 = function(_context, lock) {
-		if (typeof lock === 'string')
-			lock = { forUpdate: true };
-		let sql = '';
-		if (lock.forUpdate)
-			sql += ' FOR UPDATE';
-		if (lock.skipLocked)
-			sql += ' SKIP LOCKED';
-		return sql;
+function requireSelectForUpdateSql$1 () {
+	if (hasRequiredSelectForUpdateSql$1) return selectForUpdateSql$1;
+	hasRequiredSelectForUpdateSql$1 = 1;
+	selectForUpdateSql$1 = function(_context, lock) {
+		if (lock)
+			throw new Error('select for update is not supported by SQLite');
+		return '';
 	};
-	return selectForUpdateSql$4;
+	return selectForUpdateSql$1;
 }
 
-var lastInsertedSql_1$4;
-var hasRequiredLastInsertedSql$4;
+var lastInsertedSql_1$1;
+var hasRequiredLastInsertedSql$1;
 
-function requireLastInsertedSql$4 () {
-	if (hasRequiredLastInsertedSql$4) return lastInsertedSql_1$4;
-	hasRequiredLastInsertedSql$4 = 1;
-	const quote = requireQuote$5();
-
-	function lastInsertedSql(context,table, keyValues) {
+function requireLastInsertedSql$1 () {
+	if (hasRequiredLastInsertedSql$1) return lastInsertedSql_1$1;
+	hasRequiredLastInsertedSql$1 = 1;
+	function lastInsertedSql(context, table, keyValues) {
+		if (keyValues.some(value => value === undefined))
+			return ['rowid IN (select last_insert_rowid())'];
 		return keyValues.map((value,i) => {
 			let column = table._primaryColumns[i];
-			if (value === undefined && column.tsType === 'NumberColumn')
-				return `${quote(column._dbName)}=LAST_INSERT_ID()`;
-			else
-				return column.eq(context, value);
+			return column.eq(context, value);
 		});
+
 	}
 
-	lastInsertedSql_1$4 = lastInsertedSql;
-	return lastInsertedSql_1$4;
+	lastInsertedSql_1$1 = lastInsertedSql;
+	return lastInsertedSql_1$1;
 }
 
-var limitAndOffset_1$5;
-var hasRequiredLimitAndOffset$5;
+var limitAndOffset_1$1;
+var hasRequiredLimitAndOffset$1;
 
-function requireLimitAndOffset$5 () {
-	if (hasRequiredLimitAndOffset$5) return limitAndOffset_1$5;
-	hasRequiredLimitAndOffset$5 = 1;
+function requireLimitAndOffset$1 () {
+	if (hasRequiredLimitAndOffset$1) return limitAndOffset_1$1;
+	hasRequiredLimitAndOffset$1 = 1;
 	function limitAndOffset(span) {
 		if (span.offset)
-			return ` limit ${span.offset}${limit()}`;
+			return ` limit ${limit()} offset ${span.offset}`;
 		else if (span.limit || span.limit === 0)
 			return ` limit ${span.limit}`;
 		else
@@ -25659,62 +25663,46 @@ function requireLimitAndOffset$5 () {
 
 		function limit() {
 			if (span.limit || span.limit === 0)
-				return `, ${span.limit}`;
+				return span.limit;
 			else
-				return '';
+				return '-1';
 		}
 
 	}
 
-	limitAndOffset_1$5 = limitAndOffset;
-	return limitAndOffset_1$5;
+	limitAndOffset_1$1 = limitAndOffset;
+	return limitAndOffset_1$1;
 }
 
-var formatBigintOut_1$4;
-var hasRequiredFormatBigintOut$4;
+var insertSql_1$1;
+var hasRequiredInsertSql$1;
 
-function requireFormatBigintOut$4 () {
-	if (hasRequiredFormatBigintOut$4) return formatBigintOut_1$4;
-	hasRequiredFormatBigintOut$4 = 1;
-	const quote = requireQuote$5();
-
-	function formatBigintOut(column, alias) {
-		const quotedCol = quote(column._dbName);
-		if (alias)
-			return `CAST(${alias}.${quotedCol} AS CHAR)`;
-		else
-			return `CAST(${quotedCol} AS CHAR)`;
-	}
-
-	formatBigintOut_1$4 = formatBigintOut;
-	return formatBigintOut_1$4;
-}
-
-var insertSql_1$5;
-var hasRequiredInsertSql$5;
-
-function requireInsertSql$5 () {
-	if (hasRequiredInsertSql$5) return insertSql_1$5;
-	hasRequiredInsertSql$5 = 1;
-	const quote = requireQuote$5();
+function requireInsertSql$1 () {
+	if (hasRequiredInsertSql$1) return insertSql_1$1;
+	hasRequiredInsertSql$1 = 1;
+	const quote = requireQuote$1();
 
 	function insertSql(_context, table, row, options) {
 		let columnNames = [];
 		let conflictColumnUpdateSql = '';
 		let values = [];
+
 		let sql = 'INSERT INTO ' + quote(table._dbName) + ' ';
 		addDiscriminators();
 		addColumns();
+
 		if (columnNames.length === 0) {
-			sql += 'VALUES ()';
+			sql += 'DEFAULT VALUES';
 		} else {
-			sql = sql + '(' + columnNames.join(',') + ') ' + 'VALUES (' + values.join(',') + ')' + onDuplicateKeyUpdate();
+			sql = sql + '(' + columnNames.join(',') + ') ' + 'VALUES (' + values.join(',') + ')' + onConflict();
 		}
+
 		return sql;
 
-		function onDuplicateKeyUpdate() {
+		function onConflict() {
 			if (options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite') {
-				return ` ON DUPLICATE KEY UPDATE ${conflictColumnUpdateSql} `;
+				const primaryKeys = table._primaryColumns.map(x => quote(x._dbName)).join(',');
+				return ` ON CONFLICT(${primaryKeys}) ${conflictColumnUpdateSql}`;
 			} else {
 				return '';
 			}
@@ -25741,28 +25729,25 @@ function requireInsertSql$5 () {
 					addConflictUpdate(column);
 				}
 			}
-			if (conflictColumnUpdates.length === 0) {
-				const column = table._primaryColumns[0];
-				const columnName = quote(column._dbName);
-				conflictColumnUpdates.push(`${columnName}=VALUES(${columnName})`);
-			}
-			conflictColumnUpdateSql = conflictColumnUpdates.join(',');
+			if (conflictColumnUpdates.length === 0)
+				conflictColumnUpdateSql =  'DO NOTHING';
+			else
+				conflictColumnUpdateSql = 'DO UPDATE SET ' + conflictColumnUpdates.join(',');
 
 			function addConflictUpdate(column) {
 				let concurrency = options[column.alias]?.concurrency || options.concurrency;
+				const tableName = table._dbName;
 				const columnName = quote(column._dbName);
-				const tableName = quote(table._dbName);
 				if (concurrency === 'overwrite') {
-					conflictColumnUpdates.push(`${columnName}=VALUES(${columnName})`);
-				} else if (concurrency === 'optimistic') {
-					conflictColumnUpdates.push(`${columnName} = CASE WHEN ${tableName}.${columnName} <> VALUES(${columnName}) THEN CAST('12345678-1234-1234-1234-123456789012Conflict when updating ${columnName}12345678-1234-1234-1234-123456789012' AS SIGNED) ELSE ${tableName}.${columnName} END`);
-				}
+					conflictColumnUpdates.push(`${columnName}=excluded.${columnName}`);
+				} else if (concurrency === 'optimistic')
+					conflictColumnUpdates.push(`${columnName} = CASE WHEN ${tableName}.${columnName} <> excluded.${columnName} THEN '12345678-1234-1234-1234-123456789012Conflict when updating ${columnName}12345678-1234-1234-1234-123456789012' ELSE ${tableName}.${columnName} END`);
 			}
 		}
 	}
 
-	insertSql_1$5 = insertSql;
-	return insertSql_1$5;
+	insertSql_1$1 = insertSql;
+	return insertSql_1$1;
 }
 
 var newInsertCommand_1;
@@ -25839,7 +25824,7 @@ function requireGetSqlTemplate () {
 	if (hasRequiredGetSqlTemplate) return getSqlTemplate_1;
 	hasRequiredGetSqlTemplate = 1;
 	let getSessionContext = requireGetSessionContext();
-	let quote = requireQuote$6();
+	let quote = requireQuote$2();
 
 	function getSqlTemplate(context, _table, _row) {
 		let rdb = getSessionContext(context);
@@ -25908,12 +25893,12 @@ function requireGetSqlTemplate () {
 	return getSqlTemplate_1;
 }
 
-var newInsertCommandCore_1$1;
-var hasRequiredNewInsertCommandCore$1;
+var newInsertCommandCore_1;
+var hasRequiredNewInsertCommandCore;
 
-function requireNewInsertCommandCore$1 () {
-	if (hasRequiredNewInsertCommandCore$1) return newInsertCommandCore_1$1;
-	hasRequiredNewInsertCommandCore$1 = 1;
+function requireNewInsertCommandCore () {
+	if (hasRequiredNewInsertCommandCore) return newInsertCommandCore_1;
+	hasRequiredNewInsertCommandCore = 1;
 	const newParameterized = requireNewParameterized();
 	const getSqlTemplate = requireGetSqlTemplate();
 	const formatString = requireFormat();
@@ -25940,8 +25925,8 @@ function requireNewInsertCommandCore$1 () {
 		return newParameterized(sql, parameters);
 	}
 
-	newInsertCommandCore_1$1 = newInsertCommandCore;
-	return newInsertCommandCore_1$1;
+	newInsertCommandCore_1 = newInsertCommandCore;
+	return newInsertCommandCore_1;
 }
 
 var newGetLastInsertedCommandCore_1;
@@ -25953,7 +25938,7 @@ function requireNewGetLastInsertedCommandCore () {
 	const newParameterized = requireNewParameterized();
 	const getSessionContext = requireGetSessionContext();
 	const newDiscriminatorSql = requireNewDiscriminatorSql$1();
-	const quote = requireQuote$6();
+	const quote = requireQuote$2();
 
 	function newGetLastInsertedCommandCore(context, table, row) {
 		let parameters = [];
@@ -26065,14 +26050,14 @@ function requireNewGetLastInsertedCommand () {
 	return newGetLastInsertedCommand_1;
 }
 
-var insert$4;
-var hasRequiredInsert$5;
+var insert$1;
+var hasRequiredInsert$1;
 
-function requireInsert$5 () {
-	if (hasRequiredInsert$5) return insert$4;
-	hasRequiredInsert$5 = 1;
+function requireInsert$1 () {
+	if (hasRequiredInsert$1) return insert$1;
+	hasRequiredInsert$1 = 1;
 	let newInsertCommand = requireNewInsertCommand();
-	let newInsertCommandCore = requireNewInsertCommandCore$1();
+	let newInsertCommandCore = requireNewInsertCommandCore();
 	let newGetLastInsertedCommand = requireNewGetLastInsertedCommand();
 	let executeQueries = requireExecuteQueries();
 	let pushCommand = requirePushCommand();
@@ -26084,6 +26069,9 @@ function requireInsert$5 () {
 		insertCmd.disallowCompress = true;
 		pushCommand(context, insertCmd);
 
+		if (options && options.skipSelectAfterInsert)
+			return executeQueries(context, []).then(() => [toDbRow(table, row)]);
+
 		let selectCmd = newGetLastInsertedCommand(context, table, row, insertCmd);
 		commands.push(selectCmd);
 
@@ -26091,54 +26079,193 @@ function requireInsert$5 () {
 
 	}
 
-	insert$4 = insertDefault;
-	return insert$4;
+	function toDbRow(table, row) {
+		const dbRow = {};
+		const columns = table._columns || [];
+		for (let i = 0; i < columns.length; i++) {
+			const column = columns[i];
+			dbRow[column._dbName] = row[column.alias];
+		}
+		return dbRow;
+	}
+
+	insert$1 = insertDefault;
+	return insert$1;
 }
 
-var newTransaction$d;
-var hasRequiredNewTransaction$d;
+var batchInsert_1;
+var hasRequiredBatchInsert;
 
-function requireNewTransaction$d () {
-	if (hasRequiredNewTransaction$d) return newTransaction$d;
-	hasRequiredNewTransaction$d = 1;
-	const wrapQuery = requireWrapQuery$a();
-	const wrapCommand = requireWrapCommand$a();
-	const encodeBoolean = requireEncodeBoolean$5();
-	const deleteFromSql = requireDeleteFromSql$5();
-	const selectForUpdateSql = requireSelectForUpdateSql$5();
-	const lastInsertedSql = requireLastInsertedSql$4();
-	const limitAndOffset = requireLimitAndOffset$5();
-	const formatBigintOut = requireFormatBigintOut$4();
-	const insertSql = requireInsertSql$5();
-	const insert = requireInsert$5();
-	const quote = requireQuote$5();
+function requireBatchInsert () {
+	if (hasRequiredBatchInsert) return batchInsert_1;
+	hasRequiredBatchInsert = 1;
+	const executeCommand = requireExecuteCommand();
+	const newParameterized = requireNewParameterized();
+	const quote = requireQuote$1();
 
-	function newResolveTransaction(domain, pool, { readonly = false } = {}) {
+	async function batchInsert(context, table, rows, options = {}) {
+		const groups = groupRows(table, rows);
+		for (let i = 0; i < groups.length; i++) {
+			if (groups[i].columns.length === 0)
+				return false;
+		}
+		for (let i = 0; i < groups.length; i++) {
+			const group = groups[i];
+			await executeGroup(context, table, group, options);
+		}
+		return true;
+	}
+
+	async function executeGroup(context, table, group, options) {
+		const maxParameters = context.rdb.maxParameters || 999;
+		const columns = group.columns;
+		const chunks = chunkRows(context, group.rows, columns, maxParameters);
+
+		for (let i = 0; i < chunks.length; i++)
+			await executeCommand(context, buildCommand(context, table, columns, chunks[i], options));
+	}
+
+	function buildCommand(context, table, columns, rows, options) {
+		const parameters = [];
+		const columnNames = discriminatorColumnNames(table).concat(columns.map(column => quote(column._dbName)));
+		const valueRows = rows.map(row => {
+			const values = discriminatorValues(table).concat(columns.map(column => {
+				const encoded = column.encode(context, row[column.alias]);
+				parameters.push(...encoded.parameters);
+				return encoded.sql();
+			}));
+			return '(' + values.join(',') + ')';
+		});
+
+		const sql = 'INSERT INTO ' + quote(table._dbName) + ' (' + columnNames.join(',') + ') VALUES '
+			+ valueRows.join(',') + onConflict(table, columns, options);
+		return newParameterized(sql, parameters);
+	}
+
+	function groupRows(table, rows) {
+		const groups = [];
+		const groupsByKey = {};
+		for (let i = 0; i < rows.length; i++) {
+			const row = rows[i];
+			const columns = table._columns.filter(column => row['__' + column.alias] !== undefined);
+			const key = columns.map(column => column.alias).join('\0');
+			let group = groupsByKey[key];
+			if (!group) {
+				group = { columns, rows: [] };
+				groupsByKey[key] = group;
+				groups.push(group);
+			}
+			group.rows.push(row);
+		}
+		return groups;
+	}
+
+	function countParameterColumns(context, row, columns) {
+		let count = 0;
+		for (let i = 0; i < columns.length; i++) {
+			const encoded = columns[i].encode(context, row[columns[i].alias]);
+			count += encoded.parameters.length;
+		}
+		return count;
+	}
+
+	function chunkRows(context, rows, columns, maxParameters) {
+		const chunks = [];
+		let chunk = [];
+		let parameterCount = 0;
+		for (let i = 0; i < rows.length; i++) {
+			const row = rows[i];
+			const rowParameterCount = countParameterColumns(context, row, columns);
+			if (chunk.length > 0 && parameterCount + rowParameterCount > maxParameters) {
+				chunks.push(chunk);
+				chunk = [];
+				parameterCount = 0;
+			}
+			chunk.push(row);
+			parameterCount += rowParameterCount;
+		}
+		if (chunk.length > 0)
+			chunks.push(chunk);
+		return chunks;
+	}
+
+	function discriminatorColumnNames(table) {
+		return table._columnDiscriminators.map(discriminator => quote(discriminator.split('=')[0]));
+	}
+
+	function discriminatorValues(table) {
+		return table._columnDiscriminators.map(discriminator => discriminator.split('=')[1]);
+	}
+
+	function onConflict(table, columns, options) {
+		if (options.concurrency !== 'skipOnConflict' && options.concurrency !== 'overwrite')
+			return '';
+
+		const primaryKeys = table._primaryColumns.map(x => quote(x._dbName)).join(',');
+		const updates = [];
+		for (let i = 0; i < columns.length; i++) {
+			const column = columns[i];
+			const concurrency = options[column.alias]?.concurrency || options.concurrency;
+			const columnName = quote(column._dbName);
+			if (concurrency === 'overwrite')
+				updates.push(`${columnName}=excluded.${columnName}`);
+			else if (concurrency === 'optimistic')
+				updates.push(`${columnName} = CASE WHEN ${table._dbName}.${columnName} <> excluded.${columnName} THEN '12345678-1234-1234-1234-123456789012Conflict when updating ${columnName}12345678-1234-1234-1234-123456789012' ELSE ${table._dbName}.${columnName} END`);
+		}
+
+		if (updates.length === 0)
+			return ` ON CONFLICT(${primaryKeys}) DO NOTHING`;
+		return ` ON CONFLICT(${primaryKeys}) DO UPDATE SET ${updates.join(',')}`;
+	}
+
+	batchInsert_1 = batchInsert;
+	return batchInsert_1;
+}
+
+var newTransaction$3;
+var hasRequiredNewTransaction$3;
+
+function requireNewTransaction$3 () {
+	if (hasRequiredNewTransaction$3) return newTransaction$3;
+	hasRequiredNewTransaction$3 = 1;
+	const wrapQuery = requireWrapQuery$2();
+	const wrapCommand = requireWrapCommand$2();
+	const encodeBoolean = requireEncodeBoolean$1();
+	const formatBigintOut = requireFormatBigintOut();
+	const deleteFromSql = requireDeleteFromSql$1();
+	const selectForUpdateSql = requireSelectForUpdateSql$1();
+	const lastInsertedSql = requireLastInsertedSql$1();
+	const limitAndOffset = requireLimitAndOffset$1();
+	const insertSql = requireInsertSql$1();
+	const insert = requireInsert$1();
+	const batchInsert = requireBatchInsert();
+
+	function newResolveTransaction(domain, pool, { readonly = false } = {})  {
 		var rdb = {poolFactory: pool};
 		if (!pool.connect) {
 			pool = pool();
 			rdb.pool = pool;
 		}
-		rdb.engine = 'mysql';
+		rdb.engine = 'sqlite';
+		rdb.maxParameters = 100;
 		rdb.encodeBoolean = encodeBoolean;
 		rdb.decodeJSON = decodeJSON;
-		rdb.encodeDate = encodeDate;
-		rdb.encodeDateTz = encodeDateTz;
 		rdb.encodeJSON = JSON.stringify;
+		rdb.formatBigintOut = formatBigintOut;
 		rdb.deleteFromSql = deleteFromSql;
 		rdb.selectForUpdateSql = selectForUpdateSql;
-		rdb.lastInsertedIsSeparate = true;
 		rdb.lastInsertedSql = lastInsertedSql;
-		rdb.formatBigintOut = formatBigintOut;
 		rdb.insertSql = insertSql;
 		rdb.insert = insert;
+		rdb.batchInsert = batchInsert;
+		rdb.lastInsertedIsSeparate = true;
 		rdb.multipleStatements = false;
 		rdb.limitAndOffset = limitAndOffset;
 		rdb.accept = function(caller) {
-			caller.visitMySql();
+			caller.visitSqlite();
 		};
 		rdb.aggregateCount = 0;
-		rdb.quote = quote;
+		rdb.quote = (name) => `"${name}"`;
 		rdb.cache = {};
 		rdb.changes = [];
 
@@ -26207,27 +26334,8 @@ function requireNewTransaction$d () {
 		return JSON.parse(value);
 	}
 
-	function encodeDate(date) {
-		date = date.toISOString ? removeTimezone(date.toISOString()) : removeTimezone(date);
-		return date;
-	}
-
-	function removeTimezone(isoString) {
-		let dateTimePattern = /[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(.[0-9]{3})?/;
-		let match = isoString.match(dateTimePattern);
-		return match ? match[0] : isoString;
-	}
-
-	function encodeDateTz(date) {
-		if (date && date.toISOString)
-			return removeTimezone(date.toISOString());
-		if (typeof date === 'string' && /(Z|[+-][0-9]{2}:[0-9]{2})$/.test(date))
-			return removeTimezone(new Date(date).toISOString());
-		return date;
-	}
-
-	newTransaction$d = newResolveTransaction;
-	return newTransaction$d;
+	newTransaction$3 = newResolveTransaction;
+	return newTransaction$3;
 }
 
 var beginCommand;
@@ -26317,12 +26425,12 @@ function requirePromisify () {
 	return promisify_1;
 }
 
-var end$a;
-var hasRequiredEnd$a;
+var end$2;
+var hasRequiredEnd$2;
 
-function requireEnd$a () {
-	if (hasRequiredEnd$a) return end$a;
-	hasRequiredEnd$a = 1;
+function requireEnd$2 () {
+	if (hasRequiredEnd$2) return end$2;
+	hasRequiredEnd$2 = 1;
 	var pools = requirePools();
 
 	function endPool(genericPool, id, done) {
@@ -26335,8 +26443,8 @@ function requireEnd$a () {
 		}
 	}
 
-	end$a = endPool;
-	return end$a;
+	end$2 = endPool;
+	return end$2;
 }
 
 var poolDefaults;
@@ -26974,60 +27082,38 @@ function requireGenericPool () {
 	return genericPool;
 }
 
-var newGenericPool_1$7;
-var hasRequiredNewGenericPool$7;
+/* eslint-disable no-prototype-builtins */
 
-function requireNewGenericPool$7 () {
-	if (hasRequiredNewGenericPool$7) return newGenericPool_1$7;
-	hasRequiredNewGenericPool$7 = 1;
-	// @ts-nocheck
-	/* eslint-disable no-prototype-builtins */
+var newGenericPool_1;
+var hasRequiredNewGenericPool;
+
+function requireNewGenericPool () {
+	if (hasRequiredNewGenericPool) return newGenericPool_1;
+	hasRequiredNewGenericPool = 1;
 	var defaults = requirePoolDefaults();
 	var genericPool = requireGenericPool();
-	var mysql;
 
-	function newGenericPool(connectionString, poolOptions) {
-		if (typeof connectionString === 'string')
-			connectionString = connectionString + '?dateStrings=true&decimalNumbers=true';
-		else
-			connectionString.dateStrings = true;
+	function newGenericPool(d1Database, poolOptions) {
 		poolOptions = poolOptions || {};
+		// @ts-ignore
 		var pool = genericPool.Pool({
 			min: poolOptions.min || 0,
-			max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
+			max: 1,
 			idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
 			reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
-			log: poolOptions.log,
-			create: async function(cb) {
-				try {
-					if(!mysql) {
-						mysql = await import('mysql2');
-						mysql = mysql.default || mysql;
-					}
-				}
-				catch(err) {
-					return cb(err, null);
-				}
-				var innerPool = mysql.createPool(connectionString);
-				return cb(null, innerPool);
-				// innerPool.getConnection(onConnected);
+			log: poolOptions.log || defaults.poolLog,
+			create: function(cb) {
+				var client = {d1: d1Database, poolCount: 0};
 
-				// function onConnected(err, client) {
-				// 	console.dir('onConnected');
-				// 	if(err)
-				// 		return cb(err, null);
-				// 	client.poolCount = 0;
-				// 	return cb(null, client);
-				// }
+				return cb(null, client);
 			},
 
-			destroy: function(client) {
-				client.poolCount = undefined;
-				client.end();
+			destroy: function() {
 			}
 		});
 		//monkey-patch with connect method
 		pool.connect = function(cb) {
+
 			pool.acquire(function(err, client) {
 				if(err)  return cb(err, null, function() {/*NOOP*/});
 				client.poolCount++;
@@ -27043,27 +27129,27 @@ function requireNewGenericPool$7 () {
 		return pool;
 	}
 
-	newGenericPool_1$7 = newGenericPool;
-	return newGenericPool_1$7;
+	newGenericPool_1 = newGenericPool;
+	return newGenericPool_1;
 }
 
-var newPool_1$d;
-var hasRequiredNewPool$d;
+var newPool_1$3;
+var hasRequiredNewPool$3;
 
-function requireNewPool$d () {
-	if (hasRequiredNewPool$d) return newPool_1$d;
-	hasRequiredNewPool$d = 1;
+function requireNewPool$3 () {
+	if (hasRequiredNewPool$3) return newPool_1$3;
+	hasRequiredNewPool$3 = 1;
 	const promisify = requirePromisify();
 	const pools = requirePools();
-	const end = requireEnd$a();
-	const newGenericPool = requireNewGenericPool$7();
+	const end = requireEnd$2();
+	const newGenericPool = requireNewGenericPool();
 	const newId = requireNewId();
 
-	function newPool(connectionString, poolOptions) {
-		let pool = newGenericPool(connectionString, poolOptions);
-		let id = newId();
-		let boundEnd = end.bind(null, pool, id);
-		let c = {};
+	function newPool(d1Database, poolOptions) {
+		var pool = newGenericPool(d1Database, poolOptions);
+		var id = newId();
+		var boundEnd = end.bind(null, pool, id);
+		var c = {};
 
 		c.connect = pool.connect;
 		c.end = promisify(boundEnd);
@@ -27071,33 +27157,33 @@ function requireNewPool$d () {
 		return c;
 	}
 
-	newPool_1$d = newPool;
-	return newPool_1$d;
+	newPool_1$3 = newPool;
+	return newPool_1$3;
 }
 
-var newDatabase_1$d;
-var hasRequiredNewDatabase$d;
+var newDatabase_1$3;
+var hasRequiredNewDatabase$3;
 
-function requireNewDatabase$d () {
-	if (hasRequiredNewDatabase$d) return newDatabase_1$d;
-	hasRequiredNewDatabase$d = 1;
+function requireNewDatabase$3 () {
+	if (hasRequiredNewDatabase$3) return newDatabase_1$3;
+	hasRequiredNewDatabase$3 = 1;
 	let createDomain = requireCreateDomain();
-	let newTransaction = requireNewTransaction$d();
+	let newTransaction = requireNewTransaction$3();
 	let _begin = requireBegin();
 	let commit = requireCommit();
 	let rollback = requireRollback();
-	let newPool = requireNewPool$d();
+	let newPool = requireNewPool$3();
 	let express = requireHostExpress();
 	let hono = requireHostHono();
 	let hostLocal = requireHostLocal();
 	let doQuery = requireQuery();
 	let releaseDbClient = requireReleaseDbClient();
 
-	function newDatabase(connectionString, poolOptions) {
-		if (!connectionString)
-			throw new Error('Connection string cannot be empty');
+	function newDatabase(d1Database, poolOptions) {
+		if (!d1Database)
+			throw new Error('Missing d1Database');
 		poolOptions = poolOptions || { min: 1 };
-		var pool = newPool(connectionString, poolOptions);
+		var pool = newPool(d1Database, poolOptions);
 
 		let c = { poolFactory: pool, hostLocal, express, hono };
 
@@ -27119,13 +27205,13 @@ function requireNewDatabase$d () {
 					.then(begin)
 					.then(() => fn(domain))
 					.then((res) => result = res)
-					.then(() => commit(domain))
-					.then(null, (e) => rollback(domain, e));
+					.then(() => c.commit(domain))
+					.then(null, (e) =>  c.rollback(domain,e));
 				return result;
 			}
 
 			function begin() {
-				return _begin(domain, options);
+				return _begin(domain, { transactionLess: true });
 			}
 
 
@@ -27133,288 +27219,22 @@ function requireNewDatabase$d () {
 
 		c.createTransaction = function(options) {
 			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
+			let transaction = newTransaction(domain, pool, options);
 			let p = domain.run(() => new Promise(transaction).then(begin));
 
 			function run(fn) {
-				return p.then(() => fn(domain));
+				return p.then(domain.run.bind(domain, fn));
 			}
+
+			function begin() {
+				return _begin(domain, options);
+			}
+
 			run.rollback = rollback.bind(null, domain);
 			run.commit = commit.bind(null, domain);
+
 			return run;
 
-			function begin() {
-				return _begin(domain, options);
-			}
-		};
-
-
-		c.query = function(query) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
-			let p = domain.run(() => new Promise(transaction)
-				.then(() => doQuery(domain, query).then(onResult, onError)));
-			return p;
-
-			function onResult(result) {
-				releaseDbClient(domain);
-				return result;
-			}
-
-			function onError(e) {
-				releaseDbClient(domain);
-				throw e;
-			}
-		};
-
-
-		c.rollback = rollback;
-		c.commit = commit;
-
-		c.end = function() {
-			if (poolOptions)
-				return pool.end();
-			else
-				return Promise.resolve();
-		};
-
-		c.accept = function(caller) {
-			caller.visitMySql();
-		};
-
-		return c;
-	}
-
-	newDatabase_1$d = newDatabase;
-	return newDatabase_1$d;
-}
-
-var newTransaction$c;
-var hasRequiredNewTransaction$c;
-
-function requireNewTransaction$c () {
-	if (hasRequiredNewTransaction$c) return newTransaction$c;
-	hasRequiredNewTransaction$c = 1;
-	const wrapQuery = requireWrapQuery$a();
-	const wrapCommand = requireWrapCommand$a();
-	const encodeBoolean = requireEncodeBoolean$5();
-	const deleteFromSql = requireDeleteFromSql$5();
-	const selectForUpdateSql = requireSelectForUpdateSql$5();
-	const lastInsertedSql = requireLastInsertedSql$4();
-	const limitAndOffset = requireLimitAndOffset$5();
-	const formatBigintOut = requireFormatBigintOut$4();
-	const insertSql = requireInsertSql$5();
-	const insert = requireInsert$5();
-	const quote = requireQuote$5();
-
-	function newResolveTransaction(domain, pool, { readonly = false } = {}) {
-		var rdb = { poolFactory: pool };
-		if (!pool.connect) {
-			pool = pool();
-			rdb.pool = pool;
-		}
-		rdb.engine = 'mariadb';
-		rdb.encodeBoolean = encodeBoolean;
-		rdb.decodeJSON = decodeJSON;
-		rdb.encodeDate = encodeDate;
-		rdb.encodeDateTz = encodeDateTz;
-		rdb.encodeJSON = JSON.stringify;
-		rdb.deleteFromSql = deleteFromSql;
-		rdb.selectForUpdateSql = selectForUpdateSql;
-		rdb.lastInsertedIsSeparate = true;
-		rdb.lastInsertedSql = lastInsertedSql;
-		rdb.formatBigintOut = formatBigintOut;
-		rdb.insertSql = insertSql;
-		rdb.insert = insert;
-		rdb.multipleStatements = false;
-		rdb.limitAndOffset = limitAndOffset;
-		rdb.accept = function(caller) {
-			caller.visitMySql();
-		};
-		rdb.aggregateCount = 0;
-		rdb.quote = quote;
-		rdb.cache = {};
-		rdb.changes = [];
-
-		if (readonly) {
-			rdb.dbClient = {
-				executeQuery: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							wrapQuery(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				},
-				executeCommand: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							wrapCommand(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				}
-			};
-			domain.rdb = rdb;
-			return (onSuccess) => onSuccess();
-		}
-
-		return function(onSuccess, onError) {
-			pool.connect(onConnected);
-
-			function onConnected(err, client, done) {
-				try {
-					if (err) {
-						onError(err);
-						return;
-					}
-					client.executeQuery = wrapQuery(domain, client);
-					client.executeCommand = wrapCommand(domain, client);
-					rdb.dbClient = client;
-					rdb.dbClientDone = done;
-					domain.rdb = rdb;
-					onSuccess();
-				} catch (e) {
-					onError(e);
-				}
-			}
-		};
-	}
-
-	function decodeJSON(value) {
-		return JSON.parse(value);
-	}
-
-	function encodeDate(date) {
-		date = date.toISOString ? removeTimezone(date.toISOString()) : removeTimezone(date);
-		return date;
-	}
-
-	function removeTimezone(isoString) {
-		let dateTimePattern = /[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(.[0-9]{3})?/;
-		let match = isoString.match(dateTimePattern);
-		return match ? match[0] : isoString;
-	}
-
-	function encodeDateTz(date) {
-		if (date && date.toISOString)
-			return removeTimezone(date.toISOString());
-		if (typeof date === 'string' && /(Z|[+-][0-9]{2}:[0-9]{2})$/.test(date))
-			return removeTimezone(new Date(date).toISOString());
-		return date;
-	}
-
-	newTransaction$c = newResolveTransaction;
-	return newTransaction$c;
-}
-
-var newPool_1$c;
-var hasRequiredNewPool$c;
-
-function requireNewPool$c () {
-	if (hasRequiredNewPool$c) return newPool_1$c;
-	hasRequiredNewPool$c = 1;
-	const mySqlNewPool = requireNewPool$d();
-
-	function normalizeConnectionString(connectionString) {
-		if (typeof connectionString === 'string' && connectionString.indexOf('mariadb://') === 0)
-			return 'mysql://' + connectionString.slice('mariadb://'.length);
-		return connectionString;
-	}
-
-	function newPool(connectionString, poolOptions) {
-		return mySqlNewPool(normalizeConnectionString(connectionString), poolOptions);
-	}
-
-	newPool_1$c = newPool;
-	return newPool_1$c;
-}
-
-var newDatabase_1$c;
-var hasRequiredNewDatabase$c;
-
-function requireNewDatabase$c () {
-	if (hasRequiredNewDatabase$c) return newDatabase_1$c;
-	hasRequiredNewDatabase$c = 1;
-	let createDomain = requireCreateDomain();
-	let newTransaction = requireNewTransaction$c();
-	let _begin = requireBegin();
-	let commit = requireCommit();
-	let rollback = requireRollback();
-	let newPool = requireNewPool$c();
-	let express = requireHostExpress();
-	let hono = requireHostHono();
-	let hostLocal = requireHostLocal();
-	let doQuery = requireQuery();
-	let releaseDbClient = requireReleaseDbClient();
-
-	function newDatabase(connectionString, poolOptions) {
-		if (!connectionString)
-			throw new Error('Connection string cannot be empty');
-		poolOptions = poolOptions || { min: 1 };
-		var pool = newPool(connectionString, poolOptions);
-
-		let c = { poolFactory: pool, hostLocal, express, hono };
-
-		c.transaction = function(options, fn) {
-			if ((arguments.length === 1) && (typeof options === 'function')) {
-				fn = options;
-				options = undefined;
-			}
-			let domain = createDomain();
-
-			if (!fn)
-				throw new Error('transaction requires a function');
-			return domain.run(runInTransaction);
-
-			async function runInTransaction() {
-				let result;
-				let transaction = newTransaction(domain, pool, options);
-				await new Promise(transaction)
-					.then(begin)
-					.then(() => fn(domain))
-					.then((res) => result = res)
-					.then(() => commit(domain))
-					.then(null, (e) => rollback(domain, e));
-				return result;
-			}
-
-			function begin() {
-				return _begin(domain, options);
-			}
-		};
-
-		c.createTransaction = function(options) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
-			let p = domain.run(() => new Promise(transaction).then(begin));
-
-			function run(fn) {
-				return p.then(() => fn(domain));
-			}
-			run.rollback = rollback.bind(null, domain);
-			run.commit = commit.bind(null, domain);
-			return run;
-
-			function begin() {
-				return _begin(domain, options);
-			}
 		};
 
 		c.query = function(query) {
@@ -27446,22 +27266,22 @@ function requireNewDatabase$c () {
 		};
 
 		c.accept = function(caller) {
-			caller.visitMySql();
+			caller.visitSqlite();
 		};
 
 		return c;
 	}
 
-	newDatabase_1$c = newDatabase;
-	return newDatabase_1$c;
+	newDatabase_1$3 = newDatabase;
+	return newDatabase_1$3;
 }
 
-var replaceParamChar_1$1;
-var hasRequiredReplaceParamChar$1;
+var replaceParamChar_1;
+var hasRequiredReplaceParamChar;
 
-function requireReplaceParamChar$1 () {
-	if (hasRequiredReplaceParamChar$1) return replaceParamChar_1$1;
-	hasRequiredReplaceParamChar$1 = 1;
+function requireReplaceParamChar () {
+	if (hasRequiredReplaceParamChar) return replaceParamChar_1;
+	hasRequiredReplaceParamChar = 1;
 	function replaceParamChar(query, params) {
 		if (params.length === 0)
 			return query.sql();
@@ -27475,18 +27295,18 @@ function requireReplaceParamChar$1 () {
 		return sql;
 	}
 
-	replaceParamChar_1$1 = replaceParamChar;
-	return replaceParamChar_1$1;
+	replaceParamChar_1 = replaceParamChar;
+	return replaceParamChar_1;
 }
 
-var wrapQuery_1$9;
-var hasRequiredWrapQuery$9;
+var wrapQuery_1$1;
+var hasRequiredWrapQuery$1;
 
-function requireWrapQuery$9 () {
-	if (hasRequiredWrapQuery$9) return wrapQuery_1$9;
-	hasRequiredWrapQuery$9 = 1;
+function requireWrapQuery$1 () {
+	if (hasRequiredWrapQuery$1) return wrapQuery_1$1;
+	hasRequiredWrapQuery$1 = 1;
 	var log = requireLog();
-	var replaceParamChar = requireReplaceParamChar$1();
+	var replaceParamChar = requireReplaceParamChar();
 
 	function wrapQuery(_context, connection) {
 		var runOriginalQuery = connection.query;
@@ -27512,18 +27332,18 @@ function requireWrapQuery$9 () {
 
 	}
 
-	wrapQuery_1$9 = wrapQuery;
-	return wrapQuery_1$9;
+	wrapQuery_1$1 = wrapQuery;
+	return wrapQuery_1$1;
 }
 
-var wrapCommand_1$9;
-var hasRequiredWrapCommand$9;
+var wrapCommand_1$1;
+var hasRequiredWrapCommand$1;
 
-function requireWrapCommand$9 () {
-	if (hasRequiredWrapCommand$9) return wrapCommand_1$9;
-	hasRequiredWrapCommand$9 = 1;
+function requireWrapCommand$1 () {
+	if (hasRequiredWrapCommand$1) return wrapCommand_1$1;
+	hasRequiredWrapCommand$1 = 1;
 	var log = requireLog();
-	var replaceParamChar = requireReplaceParamChar$1();
+	var replaceParamChar = requireReplaceParamChar();
 
 	function wrapCommand(_context, connection) {
 		var runOriginalQuery = connection.query;
@@ -27552,8 +27372,8 @@ function requireWrapCommand$9 () {
 		}
 	}
 
-	wrapCommand_1$9 = wrapCommand;
-	return wrapCommand_1$9;
+	wrapCommand_1$1 = wrapCommand;
+	return wrapCommand_1$1;
 }
 
 var encodeDate_1;
@@ -27616,44 +27436,44 @@ function requireDecodeBinary () {
 	return decodeBinary_1;
 }
 
-var quote$4;
-var hasRequiredQuote$4;
+var quote;
+var hasRequiredQuote;
 
-function requireQuote$4 () {
-	if (hasRequiredQuote$4) return quote$4;
-	hasRequiredQuote$4 = 1;
-	quote$4 = (name) => `"${name}"`;
-	return quote$4;
+function requireQuote () {
+	if (hasRequiredQuote) return quote;
+	hasRequiredQuote = 1;
+	quote = (name) => `"${name}"`;
+	return quote;
 }
 
-var deleteFromSql_1$4;
-var hasRequiredDeleteFromSql$4;
+var deleteFromSql_1;
+var hasRequiredDeleteFromSql;
 
-function requireDeleteFromSql$4 () {
-	if (hasRequiredDeleteFromSql$4) return deleteFromSql_1$4;
-	hasRequiredDeleteFromSql$4 = 1;
+function requireDeleteFromSql () {
+	if (hasRequiredDeleteFromSql) return deleteFromSql_1;
+	hasRequiredDeleteFromSql = 1;
 	const format = 'delete from %s %s%s';
 	const formatString = requireFormat();
-	const quote = requireQuote$4();
+	const quote = requireQuote();
 
 	function deleteFromSql(table, alias, whereSql) {
 		const name = quote(table._dbName);
 		alias = quote(alias);
 		return formatString(format, name, alias, whereSql);
 	}
-	deleteFromSql_1$4 = deleteFromSql;
-	return deleteFromSql_1$4;
+	deleteFromSql_1 = deleteFromSql;
+	return deleteFromSql_1;
 }
 
-var selectForUpdateSql$3;
-var hasRequiredSelectForUpdateSql$4;
+var selectForUpdateSql;
+var hasRequiredSelectForUpdateSql;
 
-function requireSelectForUpdateSql$4 () {
-	if (hasRequiredSelectForUpdateSql$4) return selectForUpdateSql$3;
-	hasRequiredSelectForUpdateSql$4 = 1;
-	const quote = requireQuote$6();
+function requireSelectForUpdateSql () {
+	if (hasRequiredSelectForUpdateSql) return selectForUpdateSql;
+	hasRequiredSelectForUpdateSql = 1;
+	const quote = requireQuote$2();
 
-	selectForUpdateSql$3 = function(context, lock) {
+	selectForUpdateSql = function(context, lock) {
 		if (typeof lock === 'string')
 			lock = { aliases: [lock], forUpdate: true };
 		let sql = '';
@@ -27666,15 +27486,15 @@ function requireSelectForUpdateSql$4 () {
 			sql += ' SKIP LOCKED';
 		return sql;
 	};
-	return selectForUpdateSql$3;
+	return selectForUpdateSql;
 }
 
-var limitAndOffset_1$4;
-var hasRequiredLimitAndOffset$4;
+var limitAndOffset_1;
+var hasRequiredLimitAndOffset;
 
-function requireLimitAndOffset$4 () {
-	if (hasRequiredLimitAndOffset$4) return limitAndOffset_1$4;
-	hasRequiredLimitAndOffset$4 = 1;
+function requireLimitAndOffset () {
+	if (hasRequiredLimitAndOffset) return limitAndOffset_1;
+	hasRequiredLimitAndOffset = 1;
 	function limitAndOffset(span) {
 		if (span.offset)
 			return ` limit ${limit()} offset ${span.offset}`;
@@ -27692,16 +27512,16 @@ function requireLimitAndOffset$4 () {
 
 	}
 
-	limitAndOffset_1$4 = limitAndOffset;
-	return limitAndOffset_1$4;
+	limitAndOffset_1 = limitAndOffset;
+	return limitAndOffset_1;
 }
 
-var formatDateOut_1$2;
-var hasRequiredFormatDateOut$3;
+var formatDateOut_1;
+var hasRequiredFormatDateOut;
 
-function requireFormatDateOut$3 () {
-	if (hasRequiredFormatDateOut$3) return formatDateOut_1$2;
-	hasRequiredFormatDateOut$3 = 1;
+function requireFormatDateOut () {
+	if (hasRequiredFormatDateOut) return formatDateOut_1;
+	hasRequiredFormatDateOut = 1;
 	function formatDateOut(column, alias) {
 		if (alias)
 			return `${alias}."${(column._dbName)}"::text`;
@@ -27709,17 +27529,17 @@ function requireFormatDateOut$3 () {
 			return `"${(column._dbName)}"::text`;
 	}
 
-	formatDateOut_1$2 = formatDateOut;
-	return formatDateOut_1$2;
+	formatDateOut_1 = formatDateOut;
+	return formatDateOut_1;
 }
 
-var lastInsertedSql_1$3;
-var hasRequiredLastInsertedSql$3;
+var lastInsertedSql_1;
+var hasRequiredLastInsertedSql;
 
-function requireLastInsertedSql$3 () {
-	if (hasRequiredLastInsertedSql$3) return lastInsertedSql_1$3;
-	hasRequiredLastInsertedSql$3 = 1;
-	const quote = requireQuote$4();
+function requireLastInsertedSql () {
+	if (hasRequiredLastInsertedSql) return lastInsertedSql_1;
+	hasRequiredLastInsertedSql = 1;
+	const quote = requireQuote();
 
 	function lastInsertedSql(table) {
 		let separator = '';
@@ -27731,18 +27551,18 @@ function requireLastInsertedSql$3 () {
 		return result;
 	}
 
-	lastInsertedSql_1$3 = lastInsertedSql;
-	return lastInsertedSql_1$3;
+	lastInsertedSql_1 = lastInsertedSql;
+	return lastInsertedSql_1;
 }
 
-var insertSql_1$4;
-var hasRequiredInsertSql$4;
+var insertSql_1;
+var hasRequiredInsertSql;
 
-function requireInsertSql$4 () {
-	if (hasRequiredInsertSql$4) return insertSql_1$4;
-	hasRequiredInsertSql$4 = 1;
-	let lastInsertedSql = requireLastInsertedSql$3();
-	const quote = requireQuote$4();
+function requireInsertSql () {
+	if (hasRequiredInsertSql) return insertSql_1;
+	hasRequiredInsertSql = 1;
+	let lastInsertedSql = requireLastInsertedSql();
+	const quote = requireQuote();
 
 	function insertSql(_context, table, row, options) {
 		let columnNames = [];
@@ -27808,18 +27628,18 @@ function requireInsertSql$4 () {
 		}
 	}
 
-	insertSql_1$4 = insertSql;
-	return insertSql_1$4;
+	insertSql_1 = insertSql;
+	return insertSql_1;
 }
 
-var insert$3;
-var hasRequiredInsert$4;
+var insert;
+var hasRequiredInsert;
 
-function requireInsert$4 () {
-	if (hasRequiredInsert$4) return insert$3;
-	hasRequiredInsert$4 = 1;
+function requireInsert () {
+	if (hasRequiredInsert) return insert;
+	hasRequiredInsert = 1;
 	let newInsertCommand = requireNewInsertCommand();
-	let newInsertCommandCore = requireNewInsertCommandCore$1();
+	let newInsertCommandCore = requireNewInsertCommandCore();
 	let executeQueries = requireExecuteQueries();
 
 
@@ -27831,28 +27651,28 @@ function requireInsert$4 () {
 
 	}
 
-	insert$3 = insertDefault;
-	return insert$3;
+	insert = insertDefault;
+	return insert;
 }
 
-var newTransaction$b;
-var hasRequiredNewTransaction$b;
+var newTransaction$2;
+var hasRequiredNewTransaction$2;
 
-function requireNewTransaction$b () {
-	if (hasRequiredNewTransaction$b) return newTransaction$b;
-	hasRequiredNewTransaction$b = 1;
-	var wrapQuery = requireWrapQuery$9();
-	var wrapCommand = requireWrapCommand$9();
+function requireNewTransaction$2 () {
+	if (hasRequiredNewTransaction$2) return newTransaction$2;
+	hasRequiredNewTransaction$2 = 1;
+	var wrapQuery = requireWrapQuery$1();
+	var wrapCommand = requireWrapCommand$1();
 	var encodeDate = requireEncodeDate();
 	const encodeBinary = requireEncodeBinary();
 	const decodeBinary = requireDecodeBinary();
-	var deleteFromSql = requireDeleteFromSql$4();
-	var selectForUpdateSql = requireSelectForUpdateSql$4();
-	var limitAndOffset = requireLimitAndOffset$4();
-	var formatDateOut = requireFormatDateOut$3();
-	var insertSql = requireInsertSql$4();
-	var insert = requireInsert$4();
-	var quote = requireQuote$4();
+	var deleteFromSql = requireDeleteFromSql();
+	var selectForUpdateSql = requireSelectForUpdateSql();
+	var limitAndOffset = requireLimitAndOffset();
+	var formatDateOut = requireFormatDateOut();
+	var insertSql = requireInsertSql();
+	var insert = requireInsert();
+	var quote = requireQuote();
 
 	function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 		var rdb = { poolFactory: pool };
@@ -27940,16 +27760,16 @@ function requireNewTransaction$b () {
 		};
 	}
 
-	newTransaction$b = newResolveTransaction;
-	return newTransaction$b;
+	newTransaction$2 = newResolveTransaction;
+	return newTransaction$2;
 }
 
-var end$9;
-var hasRequiredEnd$9;
+var end$1;
+var hasRequiredEnd$1;
 
-function requireEnd$9 () {
-	if (hasRequiredEnd$9) return end$9;
-	hasRequiredEnd$9 = 1;
+function requireEnd$1 () {
+	if (hasRequiredEnd$1) return end$1;
+	hasRequiredEnd$1 = 1;
 	var pools = requirePools();
 
 	function endPool(pgPool, id, done) {
@@ -27963,18 +27783,18 @@ function requireEnd$9 () {
 		}
 	}
 
-	end$9 = endPool;
-	return end$9;
+	end$1 = endPool;
+	return end$1;
 }
 
 /* eslint-disable no-prototype-builtins */
 
-var newPgPool_1$2;
-var hasRequiredNewPgPool$2;
+var newPgPool_1$1;
+var hasRequiredNewPgPool$1;
 
-function requireNewPgPool$2 () {
-	if (hasRequiredNewPgPool$2) return newPgPool_1$2;
-	hasRequiredNewPgPool$2 = 1;
+function requireNewPgPool$1 () {
+	if (hasRequiredNewPgPool$1) return newPgPool_1$1;
+	hasRequiredNewPgPool$1 = 1;
 	// Simplified pool creator using URL API and handling search_path param
 
 	const log = requireLog();
@@ -28077,763 +27897,19 @@ function requireNewPgPool$2 () {
 	}
 
 
-	newPgPool_1$2 = newPgPool;
-	return newPgPool_1$2;
-}
-
-var newPool_1$b;
-var hasRequiredNewPool$b;
-
-function requireNewPool$b () {
-	if (hasRequiredNewPool$b) return newPool_1$b;
-	hasRequiredNewPool$b = 1;
-	const promisify = requirePromisify();
-	const pools = requirePools();
-	const end = requireEnd$9();
-	const newPgPool = requireNewPgPool$2();
-	const newId = requireNewId();
-
-	function newPool(connectionString, poolOptions) {
-		let pool = newPgPool(connectionString, poolOptions);
-		let id = newId();
-		let boundEnd = end.bind(null, pool, id);
-		let c = {};
-
-		c.connect = pool.connect;
-		c.end = promisify(boundEnd);
-		pools[id] = c;
-		return c;
-	}
-
-	newPool_1$b = newPool;
-	return newPool_1$b;
-}
-
-var newDatabase_1$b;
-var hasRequiredNewDatabase$b;
-
-function requireNewDatabase$b () {
-	if (hasRequiredNewDatabase$b) return newDatabase_1$b;
-	hasRequiredNewDatabase$b = 1;
-	let createDomain = requireCreateDomain();
-	let newTransaction = requireNewTransaction$b();
-	let _begin = requireBegin();
-	let commit = requireCommit();
-	let rollback = requireRollback();
-	let newPool = requireNewPool$b();
-	let lock = requireLock();
-	let executeSchema = requireSchema();
-	let express = requireHostExpress();
-	let hono = requireHostHono();
-	let hostLocal = requireHostLocal();
-	let doQuery = requireQuery();
-	let releaseDbClient = requireReleaseDbClient();
-
-	function newDatabase(connectionString, poolOptions) {
-		poolOptions = poolOptions || { min: 1 };
-		var pool = newPool(connectionString, poolOptions);
-
-		let c = { poolFactory: pool, hostLocal, express, hono };
-
-		c.transaction = function(options, fn) {
-			if ((arguments.length === 1) && (typeof options === 'function')) {
-				fn = options;
-				options = undefined;
-			}
-			let domain = createDomain();
-
-			if (!fn)
-				throw new Error('transaction requires a function');
-			return domain.run(runInTransaction);
-
-			async function runInTransaction() {
-				let result;
-				let transaction = newTransaction(domain, pool, options);
-				await new Promise(transaction)
-					.then(begin)
-					.then(negotiateSchema)
-					.then(() => fn(domain))
-					.then((res) => result = res)
-					.then(() => commit(domain))
-					.then(null, (e) => rollback(domain,e));
-				return result;
-			}
-
-			function begin() {
-				return _begin(domain, options);
-			}
-
-
-			function negotiateSchema(previous) {
-				let schema = options && options.schema;
-				if (!schema)
-					return previous;
-				return executeSchema(domain, schema);
-			}
-		};
-
-		c.createTransaction = function(options) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool, options);
-			let p = domain.run(() => new Promise(transaction)
-				.then(begin).then(negotiateSchema));
-
-			function run(fn) {
-				return p.then(domain.run.bind(domain, fn));
-			}
-
-			function begin() {
-				return _begin(domain, options);
-			}
-
-			function negotiateSchema(previous) {
-				let schema = options && options.schema;
-				if (!schema)
-					return previous;
-				return executeSchema(domain,schema);
-			}
-
-			run.rollback = rollback.bind(null, domain);
-			run.commit = commit.bind(null, domain);
-
-			return run;
-		};
-
-		c.query = function(query) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
-			let p = domain.run(() => new Promise(transaction)
-				.then(() => doQuery(domain, query).then(onResult, onError)));
-			return p;
-
-			function onResult(result) {
-				releaseDbClient(domain);
-				return result;
-			}
-
-			function onError(e) {
-				releaseDbClient(domain);
-				throw e;
-			}
-		};
-
-		c.rollback = rollback;
-		c.commit = commit;
-		c.lock = lock;
-		c.schema = executeSchema;
-
-		c.end = function() {
-			if (poolOptions)
-				return pool.end();
-			else
-				return Promise.resolve();
-		};
-
-		c.accept = function(caller) {
-			caller.visitPg();
-		};
-
-		return c;
-	}
-
-	newDatabase_1$b = newDatabase;
-	return newDatabase_1$b;
-}
-
-var wrapQuery_1$8;
-var hasRequiredWrapQuery$8;
-
-function requireWrapQuery$8 () {
-	if (hasRequiredWrapQuery$8) return wrapQuery_1$8;
-	hasRequiredWrapQuery$8 = 1;
-
-	const log = requireLog();
-	const replaceParamChar = requireReplaceParamChar$1();
-	const tryGetSessionContext = requireTryGetSessionContext();
-
-	function wrapQuery(context, connection) {
-		return runQuery;
-
-		async function runQuery(query, onCompleted) {
-			let completeQuery;
-			try {
-				completeQuery = log.startQuery({ sql: query.sql(), parameters: query.parameters });
-				const sql = replaceParamChar(query, query.parameters);
-				const params = Array.isArray(query.parameters) ? query.parameters : [];
-
-				const rdb = tryGetSessionContext(context);
-				let th = rdb.transactionHandler;
-
-				// --- tx control (short statements, no params) ---
-				if (sql.length < 18 && params.length === 0) {
-					const cmd = sql.trim().toUpperCase();
-
-					if (cmd === 'BEGIN' || cmd === 'BEGIN TRANSACTION') {
-						if (th && !th.closing) return complete(new Error('Already inside a transaction'), []);
-						beginTransaction(connection).then(
-							(_th) => {
-								rdb.transactionHandler = _th;
-								complete(null, []);
-							},
-							(err) => complete(err, [])
-						);
-						return;
-					}
-
-					if (cmd === 'COMMIT') {
-						if (!th) return complete(new Error('Cannot commit outside transaction'), []);
-						try {
-							th.closing = true;   // mark tx as closing; don’t reuse
-							th.resolve();        // resolve the *inner* control promise -> triggers commit
-							// IMPORTANT: wait for the *outer* promise (commit finished on the wire)
-							await th.settled;
-							th.closed = true;
-							rdb.transactionHandler = undefined;
-							complete(null, []);
-						} catch (e) {
-							th.closed = true;
-							rdb.transactionHandler = undefined;
-							complete(e, []);
-						}
-						return;
-					}
-
-					if (cmd === 'ROLLBACK') {
-						if (!th) return complete(new Error('Cannot rollback outside transaction'), []);
-						try {
-							th.closing = true;
-							th.reject(new Error('__rollback__')); // reject inner promise -> triggers rollback
-							// Wait for outer promise to settle (rollback finished)
-							try {
-								await th.settled;
-							} catch (e) {
-								// connection.begin() rejects on rollback; that’s expected
-								if (e?.message !== '__rollback__') throw e;
-							}
-							th.closed = true;
-							rdb.transactionHandler = undefined;
-							complete(null, []);
-						} catch (e) {
-							th.closed = true;
-							rdb.transactionHandler = undefined;
-							complete(e, []);
-						}
-						return;
-					}
-				}
-
-				// --- regular query ---
-				const conn = th && th.tx && !th.closing ? th.tx : connection;
-				const result = params.length === 0
-					? await conn.unsafe(sql)
-					: await conn.unsafe(sql, params);
-
-				complete(null, result);
-			} catch (e) {
-				complete(e);
-			}
-
-			function complete(e, result) {
-				if (completeQuery)
-					completeQuery(e);
-				onCompleted(e, result);
-			}
-		}
-	}
-
-	function beginTransaction(connection) {
-		let resolveCommit;
-		let rejectRollback;
-		let resolveBegin;
-		let rejectBegin;
-
-		// This promise is controlled by our code: resolve() -> COMMIT, reject() -> ROLLBACK
-		const controlPromise = new Promise((res, rej) => {
-			resolveCommit = res;
-			rejectRollback = rej;
-		});
-
-		// We resolve this when Bun gives us the tx object
-		const beginPromise = new Promise((res, rej) => {
-			resolveBegin = res;
-			rejectBegin = rej;
-		});
-
-		// Start the transaction
-		const settled = connection.begin(async (tx) => {
-			// hand back the handler
-			resolveBegin({
-				tx,
-				resolve: resolveCommit,     // call to request COMMIT
-				reject: rejectRollback,     // call to request ROLLBACK
-				promise: controlPromise,    // (inner) resolves/rejects when we signal commit/rollback
-				settled: null,              // will be set to the outer promise below
-				closing: false,
-				closed: false,
-			});
-			// keep tx open until caller resolves/rejects controlPromise
-			return controlPromise;
-		})
-			.then(
-				() => { /* commit finished */ },
-				(e) => {
-					// rollback or begin failure — propagate only non-sentinel errors
-					if (e?.message !== '__rollback__') throw e;
-				}
-			);
-
-		// Attach the outer promise to the handler once it exists
-		settled.then(null, () => {}); // keep microtasks rolling
-		beginPromise.then(
-			(handler) => { handler.settled = settled; },
-			() => {}
-		);
-
-		// Ensure beginPromise rejects if connection.begin() fails before callback runs
-		settled.catch((e) => {
-			// If callback never ran, resolveBegin is still undefined; reject beginPromise
-			if (!resolveBegin) rejectBegin?.(e);
-		});
-
-		return beginPromise;
-	}
-
-	wrapQuery_1$8 = wrapQuery;
-	return wrapQuery_1$8;
-}
-
-var wrapCommand_1$8;
-var hasRequiredWrapCommand$8;
-
-function requireWrapCommand$8 () {
-	if (hasRequiredWrapCommand$8) return wrapCommand_1$8;
-	hasRequiredWrapCommand$8 = 1;
-
-	const log = requireLog();
-	const replaceParamChar = requireReplaceParamChar$1();
-	const tryGetSessionContext = requireTryGetSessionContext();
-
-	function wrapCommand(context, connection) {
-		return runQuery;
-
-		async function runQuery(query, onCompleted) {
-			let completeQuery;
-			try {
-				completeQuery = log.startQuery({ sql: query.sql(), parameters: query.parameters });
-				const sql = replaceParamChar(query, query.parameters);
-				const params = Array.isArray(query.parameters) ? query.parameters : [];
-
-				const rdb = tryGetSessionContext(context);
-				let th = rdb.transactionHandler;
-
-				// --- tx control (short statements, no params) ---
-				if (sql.length < 18 && params.length === 0) {
-					const cmd = sql.trim().toUpperCase();
-
-					if (cmd === 'BEGIN' || cmd === 'BEGIN TRANSACTION') {
-						if (th && !th.closing) return complete(new Error('Already inside a transaction'), { rowsAffected: 0 });
-						beginTransaction(connection).then(
-							(_th) => {
-								rdb.transactionHandler = _th;
-								complete(null, { rowsAffected: 0 });
-							},
-							(err) => complete(err, { rowsAffected: 0 })
-						);
-						return;
-					}
-
-					if (cmd === 'COMMIT') {
-						if (!th) return complete(new Error('Cannot commit outside transaction'), { rowsAffected: 0 });
-						try {
-							th.closing = true;
-							th.resolve();
-							await th.settled;
-							th.closed = true;
-							rdb.transactionHandler = undefined;
-							complete(null, { rowsAffected: 0 });
-						} catch (e) {
-							th.closed = true;
-							rdb.transactionHandler = undefined;
-							complete(e, { rowsAffected: 0 });
-						}
-						return;
-					}
-
-					if (cmd === 'ROLLBACK') {
-						if (!th) return complete(new Error('Cannot rollback outside transaction'), { rowsAffected: 0 });
-						try {
-							th.closing = true;
-							th.reject(new Error('__rollback__'));
-							try {
-								await th.settled;
-							} catch (e) {
-								if (e?.message !== '__rollback__') throw e;
-							}
-							th.closed = true;
-							rdb.transactionHandler = undefined;
-							complete(null, { rowsAffected: 0 });
-						} catch (e) {
-							th.closed = true;
-							rdb.transactionHandler = undefined;
-							complete(e, { rowsAffected: 0 });
-						}
-						return;
-					}
-				}
-
-				// --- regular query ---
-				const conn = th && th.tx && !th.closing ? th.tx : connection;
-				const result = params.length === 0
-					? await conn.unsafe(sql)
-					: await conn.unsafe(sql, params);
-
-				let affectedRows = 0;
-
-				if (result != null) {
-					if (typeof result.rowCount === 'number') {
-						affectedRows = result.rowCount;
-					} else if (typeof result.count === 'number') {
-						affectedRows = result.count;
-					} else if (typeof result.changes === 'number') {
-						affectedRows = result.changes;
-					} else if (typeof result.affectedRows === 'number') {
-						affectedRows = result.affectedRows;
-					}
-				}
-
-				complete(null, { rowsAffected: affectedRows });
-			} catch (e) {
-				complete(e, { rowsAffected: 0 });
-			}
-
-			function complete(e, result) {
-				if (completeQuery)
-					completeQuery(e);
-				onCompleted(e, result);
-			}
-		}
-	}
-
-	function beginTransaction(connection) {
-		let resolveCommit;
-		let rejectRollback;
-		let resolveBegin;
-		let rejectBegin;
-
-		const controlPromise = new Promise((res, rej) => {
-			resolveCommit = res;
-			rejectRollback = rej;
-		});
-
-		const beginPromise = new Promise((res, rej) => {
-			resolveBegin = res;
-			rejectBegin = rej;
-		});
-
-		const settled = connection.begin(async (tx) => {
-			resolveBegin({
-				tx,
-				resolve: resolveCommit,
-				reject: rejectRollback,
-				promise: controlPromise,
-				settled: null,
-				closing: false,
-				closed: false,
-			});
-			return controlPromise;
-		}).then(
-			() => {},
-			(e) => {
-				if (e?.message !== '__rollback__') throw e;
-			}
-		);
-
-		settled.then(null, () => {});
-		beginPromise.then(
-			(handler) => { handler.settled = settled; },
-			() => {}
-		);
-
-		settled.catch((e) => {
-			if (!resolveBegin) rejectBegin?.(e);
-		});
-
-		return beginPromise;
-	}
-
-	wrapCommand_1$8 = wrapCommand;
-	return wrapCommand_1$8;
-}
-
-var formatJSONIn_1;
-var hasRequiredFormatJSONIn;
-
-function requireFormatJSONIn () {
-	if (hasRequiredFormatJSONIn) return formatJSONIn_1;
-	hasRequiredFormatJSONIn = 1;
-	function formatJSONIn(value) {
-		return `${value}::jsonb`;
-	}
-
-	formatJSONIn_1 = formatJSONIn;
-	return formatJSONIn_1;
-}
-
-var encodeJSON$1;
-var hasRequiredEncodeJSON$1;
-
-function requireEncodeJSON$1 () {
-	if (hasRequiredEncodeJSON$1) return encodeJSON$1;
-	hasRequiredEncodeJSON$1 = 1;
-	function encode(value) {
-		// Bun SQL rejects proxied objects as PG params; normalize to plain JSON value.
-		return JSON.parse(JSON.stringify(value));
-	}
-
-	encodeJSON$1 = encode;
-	return encodeJSON$1;
-}
-
-var newTransaction$a;
-var hasRequiredNewTransaction$a;
-
-function requireNewTransaction$a () {
-	if (hasRequiredNewTransaction$a) return newTransaction$a;
-	hasRequiredNewTransaction$a = 1;
-	var wrapQuery = requireWrapQuery$8();
-	var wrapCommand = requireWrapCommand$8();
-	var encodeDate = requireEncodeDate();
-	const encodeBinary = requireEncodeBinary();
-	const decodeBinary = requireDecodeBinary();
-	var deleteFromSql = requireDeleteFromSql$4();
-	var selectForUpdateSql = requireSelectForUpdateSql$4();
-	var limitAndOffset = requireLimitAndOffset$4();
-	var formatDateOut = requireFormatDateOut$3();
-	var formatJSONIn = requireFormatJSONIn();
-	var encodeJSON = requireEncodeJSON$1();
-	var insertSql = requireInsertSql$4();
-	var insert = requireInsert$4();
-	var quote = requireQuote$4();
-
-	function newResolveTransaction(domain, pool, { readonly = false } = {}) {
-		var rdb = { poolFactory: pool };
-		if (!pool.connect) {
-			pool = pool();
-			rdb.pool = pool;
-		}
-
-		rdb.engine = 'pg';
-		rdb.encodeDate = encodeDate;
-		rdb.encodeBinary = encodeBinary;
-		rdb.decodeBinary = decodeBinary;
-		rdb.formatJSONIn = formatJSONIn;
-		rdb.encodeJSON = encodeJSON;
-		rdb.formatDateOut = formatDateOut;
-		rdb.deleteFromSql = deleteFromSql;
-		rdb.selectForUpdateSql = selectForUpdateSql;
-		rdb.lastInsertedIsSeparate = false;
-		rdb.insertSql = insertSql;
-		rdb.insert = insert;
-		rdb.multipleStatements = true;
-		rdb.limitAndOffset = limitAndOffset;
-		rdb.accept = function(caller) {
-			caller.visitPg();
-		};
-		rdb.aggregateCount = 0;
-		rdb.quote = quote;
-		rdb.cache = {};
-		rdb.changes = [];
-
-		if (readonly) {
-			rdb.dbClient = {
-				executeQuery: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							wrapQuery(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				},
-				executeCommand: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							wrapCommand(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				}
-			};
-			domain.rdb = rdb;
-			return (onSuccess) => onSuccess();
-		}
-
-		return function(onSuccess, onError) {
-			pool.connect(onConnected);
-
-			function onConnected(err, client, done) {
-				try {
-					if (err) {
-						onError(err);
-						return;
-					}
-					client.executeQuery = wrapQuery(domain, client);
-					client.executeCommand = wrapCommand(domain, client);
-					rdb.dbClient = client;
-					rdb.dbClientDone = done;
-					domain.rdb = rdb;
-					onSuccess();
-				} catch (e) {
-					onError(e);
-				}
-			}
-		};
-	}
-
-	newTransaction$a = newResolveTransaction;
-	return newTransaction$a;
-}
-
-var end$8;
-var hasRequiredEnd$8;
-
-function requireEnd$8 () {
-	if (hasRequiredEnd$8) return end$8;
-	hasRequiredEnd$8 = 1;
-	var pools = requirePools();
-
-	function endPool(pgPool, id, done) {
-		pgPool.drain(onDrained);
-
-		function onDrained() {
-			pgPool.destroyAllNow();
-			delete pools[id];
-			done();
-		}
-	}
-
-	end$8 = endPool;
-	return end$8;
-}
-
-/* eslint-disable no-prototype-builtins */
-
-var newPgPool_1$1;
-var hasRequiredNewPgPool$1;
-
-function requireNewPgPool$1 () {
-	if (hasRequiredNewPgPool$1) return newPgPool_1$1;
-	hasRequiredNewPgPool$1 = 1;
-	// Simplified pool creator using URL API and handling search_path param
-
-	const log = requireLog();
-	const defaults = requirePoolDefaults();
-	const genericPool = requireGenericPool();
-	let SQL;
-
-	function newPgPool(connectionString, poolOptions = {}) {
-		let searchPath;
-		let connStr = connectionString;
-
-		try {
-			const url = new URL(connectionString);
-			const paramName = url.searchParams.has('search_path')
-				? 'search_path'
-				: url.searchParams.has('searchPath')
-					? 'searchPath'
-					: null;
-			if (paramName) {
-				searchPath = url.searchParams.get(paramName);
-				url.searchParams.delete(paramName);
-				connStr = url.toString();
-			}
-		} catch {
-			// Non-URL string; leave as-is
-		}
-
-		//@ts-ignore
-		const pool = genericPool.Pool({
-			min: poolOptions.min || 0,
-			max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
-			idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
-			reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
-			log: poolOptions.log,
-
-			create: async (cb) => {
-				try {
-					if (!SQL) ({ SQL } = await import('bun'));
-					const client = new SQL(connStr);
-					client.poolCount = 0;
-					await applySearchPath(client, searchPath);
-					cb(null, client);
-				} catch (err) {
-					cb(err, null);
-				}
-			},
-
-			destroy: (client) => {
-				client._destroying = true;
-				client.poolCount = undefined;
-				client.end();
-			},
-		});
-
-		pool.connect = (cb) => {
-			pool.acquire((err, client) => {
-				if (err) return cb(err, null, () => {});
-				client.poolCount++;
-				cb(null, client, (releaseErr) => {
-					releaseErr ? pool.destroy(client) : pool.release(client);
-				});
-			});
-		};
-
-		return pool;
-	}
-
-	async function applySearchPath(client, searchPath) {
-		if (searchPath) {
-			const sql = `SET search_path TO ${searchPath}`;
-			const completeQuery = log.startQuery({ sql, parameters: [] });
-			try {
-				await client.unsafe(sql);
-				completeQuery();
-			}
-			catch (e) {
-				completeQuery(e);
-				throw e;
-			}
-		}
-	}
-
 	newPgPool_1$1 = newPgPool;
 	return newPgPool_1$1;
 }
 
-var newPool_1$a;
-var hasRequiredNewPool$a;
+var newPool_1$2;
+var hasRequiredNewPool$2;
 
-function requireNewPool$a () {
-	if (hasRequiredNewPool$a) return newPool_1$a;
-	hasRequiredNewPool$a = 1;
+function requireNewPool$2 () {
+	if (hasRequiredNewPool$2) return newPool_1$2;
+	hasRequiredNewPool$2 = 1;
 	const promisify = requirePromisify();
 	const pools = requirePools();
-	const end = requireEnd$8();
+	const end = requireEnd$1();
 	const newPgPool = requireNewPgPool$1();
 	const newId = requireNewId();
 
@@ -28849,22 +27925,22 @@ function requireNewPool$a () {
 		return c;
 	}
 
-	newPool_1$a = newPool;
-	return newPool_1$a;
+	newPool_1$2 = newPool;
+	return newPool_1$2;
 }
 
-var newDatabase_1$a;
-var hasRequiredNewDatabase$a;
+var newDatabase_1$2;
+var hasRequiredNewDatabase$2;
 
-function requireNewDatabase$a () {
-	if (hasRequiredNewDatabase$a) return newDatabase_1$a;
-	hasRequiredNewDatabase$a = 1;
+function requireNewDatabase$2 () {
+	if (hasRequiredNewDatabase$2) return newDatabase_1$2;
+	hasRequiredNewDatabase$2 = 1;
 	let createDomain = requireCreateDomain();
-	let newTransaction = requireNewTransaction$a();
+	let newTransaction = requireNewTransaction$2();
 	let _begin = requireBegin();
 	let commit = requireCommit();
 	let rollback = requireRollback();
-	let newPool = requireNewPool$a();
+	let newPool = requireNewPool$2();
 	let lock = requireLock();
 	let executeSchema = requireSchema();
 	let express = requireHostExpress();
@@ -28874,8 +27950,6 @@ function requireNewDatabase$a () {
 	let releaseDbClient = requireReleaseDbClient();
 
 	function newDatabase(connectionString, poolOptions) {
-		if (!connectionString)
-			throw new Error('Connection string cannot be empty');
 		poolOptions = poolOptions || { min: 1 };
 		var pool = newPool(connectionString, poolOptions);
 
@@ -28982,2333 +28056,28 @@ function requireNewDatabase$a () {
 		return c;
 	}
 
-	newDatabase_1$a = newDatabase;
-	return newDatabase_1$a;
+	newDatabase_1$2 = newDatabase;
+	return newDatabase_1$2;
 }
 
-var wrapQuery_1$7;
-var hasRequiredWrapQuery$7;
-
-function requireWrapQuery$7 () {
-	if (hasRequiredWrapQuery$7) return wrapQuery_1$7;
-	hasRequiredWrapQuery$7 = 1;
-	var log = requireLog();
-	var replaceParamChar = requireReplaceParamChar$1();
-
-	function wrapQuery(_context, connection) {
-		var runOriginalQuery = connection.query;
-		return runQuery;
-
-		function runQuery(query, onCompleted) {
-			var params = query.parameters;
-			var originalSql = query.sql();
-			var completeQuery = log.startQuery({ sql: originalSql, parameters: params });
-			var sql = replaceParamChar(query, params);
-			query = {
-				text: sql,
-				values: params,
-				types: query.types
-			};
-
-			runOriginalQuery.call(connection, query, onInnerCompleted);
-
-			function onInnerCompleted(err, result) {
-				completeQuery(err);
-				if (err)
-					onCompleted(err);
-				else {
-					if (Array.isArray(result))
-						result = result[result.length-1];
-					onCompleted(null, result.rows);
-				}
-			}
-		}
-
-	}
-
-	wrapQuery_1$7 = wrapQuery;
-	return wrapQuery_1$7;
-}
-
-var wrapCommand_1$7;
-var hasRequiredWrapCommand$7;
-
-function requireWrapCommand$7 () {
-	if (hasRequiredWrapCommand$7) return wrapCommand_1$7;
-	hasRequiredWrapCommand$7 = 1;
-	var log = requireLog();
-	var replaceParamChar = requireReplaceParamChar$1();
-
-	function wrapCommand(_context, connection) {
-		var runOriginalQuery = connection.query;
-		return runCommand;
-
-		function runCommand(query, onCompleted) {
-			var params = query.parameters;
-			var completeQuery = log.startQuery({ sql: query.sql(), parameters: params });
-			var sql = replaceParamChar(query, params);
-			query = {
-				text: sql,
-				values: params,
-				types: query.types
-			};
-
-			runOriginalQuery.call(connection, query, onInnerCompleted);
-
-			function onInnerCompleted(err, result) {
-				completeQuery(err);
-				if (err)
-					onCompleted(err);
-				else
-					onCompleted(null, { rowsAffected: result.rowCount });
-
-			}
-		}
-
-	}
-
-	wrapCommand_1$7 = wrapCommand;
-	return wrapCommand_1$7;
-}
-
-var encodeBoolean_1$4;
-var hasRequiredEncodeBoolean$4;
-
-function requireEncodeBoolean$4 () {
-	if (hasRequiredEncodeBoolean$4) return encodeBoolean_1$4;
-	hasRequiredEncodeBoolean$4 = 1;
-	function encodeBoolean(bool) {
-		return bool.toString();
-	}
-
-	encodeBoolean_1$4 = encodeBoolean;
-	return encodeBoolean_1$4;
-}
-
-var encodeJSON;
-var hasRequiredEncodeJSON;
-
-function requireEncodeJSON () {
-	if (hasRequiredEncodeJSON) return encodeJSON;
-	hasRequiredEncodeJSON = 1;
-	function encode(arg) {
-		if (Array.isArray(arg))
-			return new JsonBArrayParam(arg);
-		else
-			return arg;
-	}
-
-	class JsonBArrayParam {
-		constructor(actualArray) { this.actualArray = actualArray; }
-		toPostgres() {
-			return JSON.stringify(this.actualArray);
-		}
-	}
-
-	encodeJSON = encode;
-	return encodeJSON;
-}
-
-var newTransaction$9;
-var hasRequiredNewTransaction$9;
-
-function requireNewTransaction$9 () {
-	if (hasRequiredNewTransaction$9) return newTransaction$9;
-	hasRequiredNewTransaction$9 = 1;
-	var wrapQuery = requireWrapQuery$7();
-	var wrapCommand = requireWrapCommand$7();
-	var encodeDate = requireEncodeDate();
-	var encodeBoolean = requireEncodeBoolean$4();
-	var deleteFromSql = requireDeleteFromSql$4();
-	var selectForUpdateSql = requireSelectForUpdateSql$4();
-	var limitAndOffset = requireLimitAndOffset$4();
-	var formatDateOut = requireFormatDateOut$3();
-	var encodeJSON = requireEncodeJSON();
-	var insertSql = requireInsertSql$4();
-	var insert = requireInsert$4();
-	var quote = requireQuote$4();
-
-	function newResolveTransaction(domain, pool, { readonly = false } = {}) {
-		var rdb = { poolFactory: pool };
-		if (!pool.connect) {
-			pool = pool();
-			rdb.pool = pool;
-		}
-
-		rdb.engine = 'pg';
-		rdb.encodeBoolean = encodeBoolean;
-		rdb.encodeDate = encodeDate;
-		rdb.encodeJSON = encodeJSON;
-		rdb.formatDateOut = formatDateOut;
-		rdb.deleteFromSql = deleteFromSql;
-		rdb.selectForUpdateSql = selectForUpdateSql;
-		rdb.lastInsertedIsSeparate = false;
-		rdb.insertSql = insertSql;
-		rdb.insert = insert;
-		rdb.multipleStatements = true;
-		rdb.limitAndOffset = limitAndOffset;
-		rdb.accept = function(caller) {
-			caller.visitPg();
-		};
-		rdb.aggregateCount = 0;
-		rdb.quote = quote;
-		rdb.cache = {};
-		rdb.changes = [];
-
-		if (readonly) {
-			rdb.dbClient = {
-				executeQuery: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							wrapQuery(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				},
-				executeCommand: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							wrapCommand(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				}
-			};
-			domain.rdb = rdb;
-			return (onSuccess) => onSuccess();
-		}
-
-		return function(onSuccess, onError) {
-			pool.connect(onConnected);
-
-			function onConnected(err, client, done) {
-				try {
-					if (err) {
-						onError(err);
-						return;
-					}
-					client.executeQuery = wrapQuery(domain, client);
-					client.executeCommand = wrapCommand(domain, client);
-					rdb.dbClient = client;
-					rdb.dbClientDone = done;
-					domain.rdb = rdb;
-					onSuccess();
-				} catch (e) {
-					onError(e);
-				}
-			}
-		};
-	}
-
-	newTransaction$9 = newResolveTransaction;
-	return newTransaction$9;
-}
-
-var end$7;
-var hasRequiredEnd$7;
-
-function requireEnd$7 () {
-	if (hasRequiredEnd$7) return end$7;
-	hasRequiredEnd$7 = 1;
-	var pools = requirePools();
-
-	function endPool(pgPool, id, done) {
-		pgPool.drain(onDrained);
-
-		function onDrained() {
-			pgPool.destroyAllNow();
-			delete pools[id];
-			done();
-		}
-	}
-
-	end$7 = endPool;
-	return end$7;
-}
-
-var parseSearchPathParam_1;
-var hasRequiredParseSearchPathParam;
-
-function requireParseSearchPathParam () {
-	if (hasRequiredParseSearchPathParam) return parseSearchPathParam_1;
-	hasRequiredParseSearchPathParam = 1;
-	function parseSearchPathParam(connectionString = '') {
-		const [, queryString] = connectionString.split('?');
-		if (!queryString)
-			return;
-		const params = new URLSearchParams(queryString);
-		const searchPath = params.get('search_path');
-		return searchPath;
-	}
-
-	parseSearchPathParam_1 = parseSearchPathParam;
-	return parseSearchPathParam_1;
-}
-
-/* eslint-disable no-prototype-builtins */
-
-var newPgPool_1;
-var hasRequiredNewPgPool;
-
-function requireNewPgPool () {
-	if (hasRequiredNewPgPool) return newPgPool_1;
-	hasRequiredNewPgPool = 1;
-	//slightly modified code from github.com/brianc/node-postgres
-	var log = requireLog();
-
-	var defaults = requirePoolDefaults();
-	var genericPool = requireGenericPool();
-	var pg;
-	var parseSearchPathParam = requireParseSearchPathParam();
-
-	function newPgPool(connectionString, poolOptions) {
-		poolOptions = poolOptions || {};
-
-		// @ts-ignore
-		var pool = genericPool.Pool({
-			min: poolOptions.min || 0,
-			max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
-			idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
-			reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
-			log: poolOptions.log,
-			create: async function(cb) {
-				try {
-					if (!pg) {
-						pg = await import('pg');
-						pg  = pg.default || pg;
-						let types = pg.types;
-						types.setTypeParser(1700, function(val) {
-							return parseFloat(val);
-						});
-					}
-				}
-				catch(e) {
-					return cb(e, null);
-				}
-				var client = new pg.Client(connectionString);
-				client.connect(function(err) {
-					if (err) return cb(err, null);
-
-					//handle connected client background errors by emitting event
-					//via the pg object and then removing errored client from the pool
-					client.on('error', function(e) {
-						pool.emit('error', e, client);
-
-						// If the client is already being destroyed, the error
-						// occurred during stream ending. Do not attempt to destroy
-						// the client again.
-						if (!client._destroying) {
-							pool.destroy(client);
-						}
-					});
-
-					// Remove connection from pool on disconnect
-					client.on('end', function(_e) {
-						// Do not enter infinite loop between pool.destroy
-						// and client 'end' event...
-						if (!client._destroying) {
-							pool.destroy(client);
-						}
-					});
-					client.poolCount = 0;
-					negotiateSearchPath(client, connectionString, (err) => cb(err, client));
-
-				});
-			},
-			destroy: function(client) {
-				client._destroying = true;
-				client.poolCount = undefined;
-				client.end();
-			}
-		});
-		//monkey-patch with connect method
-		pool.connect = function(cb) {
-			pool.acquire(function(err, client) {
-				if (err) return cb(err, null, function() {
-					/*NOOP*/
-				});
-				client.poolCount++;
-				cb(null, client, function(err) {
-					if (err) {
-						pool.destroy(client);
-					} else {
-						pool.release(client);
-					}
-				});
-			});
-		};
-		return pool;
-	}
-
-	function negotiateSearchPath(client, connectionString, cb) {
-		const searchPath = parseSearchPathParam(connectionString);
-		if (searchPath) {
-			const sql = `set search_path to ${searchPath}`;
-			const completeQuery = log.startQuery({sql, parameters: []});
-			return client.query(sql, (err, result) => {
-				completeQuery(err);
-				cb(err, result);
-			});
-		}
-		else
-			cb();
-
-
-	}
-
-	newPgPool_1 = newPgPool;
-	return newPgPool_1;
-}
-
-var newPool_1$9;
-var hasRequiredNewPool$9;
-
-function requireNewPool$9 () {
-	if (hasRequiredNewPool$9) return newPool_1$9;
-	hasRequiredNewPool$9 = 1;
-	const promisify = requirePromisify();
-	const pools = requirePools();
-	const end = requireEnd$7();
-	const newPgPool = requireNewPgPool();
-	const newId = requireNewId();
-
-	function newPool(connectionString, poolOptions) {
-		let pool = newPgPool(connectionString, poolOptions);
-		let id = newId();
-		let boundEnd = end.bind(null, pool, id);
-		let c = {};
-
-		c.connect = pool.connect;
-		c.end = promisify(boundEnd);
-		pools[id] = c;
-		return c;
-	}
-
-	newPool_1$9 = newPool;
-	return newPool_1$9;
-}
-
-var newDatabase_1$9;
-var hasRequiredNewDatabase$9;
-
-function requireNewDatabase$9 () {
-	if (hasRequiredNewDatabase$9) return newDatabase_1$9;
-	hasRequiredNewDatabase$9 = 1;
-	let createDomain = requireCreateDomain();
-	let newTransaction = requireNewTransaction$9();
-	let _begin = requireBegin();
-	let commit = requireCommit();
-	let rollback = requireRollback();
-	let newPool = requireNewPool$9();
-	let lock = requireLock();
-	let executeSchema = requireSchema();
-	let express = requireHostExpress();
-	let hono = requireHostHono();
-	let hostLocal = requireHostLocal();
-	let doQuery = requireQuery();
-	let releaseDbClient = requireReleaseDbClient();
-
-	function newDatabase(connectionString, poolOptions) {
-		if (!connectionString)
-			throw new Error('Connection string cannot be empty');
-		poolOptions = poolOptions || { min: 1 };
-		var pool = newPool(connectionString, poolOptions);
-
-		let c = { poolFactory: pool, hostLocal, express, hono };
-
-		c.transaction = function(options, fn) {
-			if ((arguments.length === 1) && (typeof options === 'function')) {
-				fn = options;
-				options = undefined;
-			}
-			let domain = createDomain();
-
-			if (!fn)
-				throw new Error('transaction requires a function');
-			return domain.run(runInTransaction);
-
-			async function runInTransaction() {
-				let result;
-				let transaction = newTransaction(domain, pool, options);
-				await new Promise(transaction)
-					.then(begin)
-					.then(negotiateSchema)
-					.then(() => fn(domain))
-					.then((res) => result = res)
-					.then(() => commit(domain))
-					.then(null, (e) => rollback(domain,e));
-				return result;
-			}
-
-			function begin() {
-				return _begin(domain, options);
-			}
-
-			function negotiateSchema(previous) {
-				let schema = options && options.schema;
-				if (!schema)
-					return previous;
-				return executeSchema(domain, schema);
-			}
-		};
-
-		c.createTransaction = function(options) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool, options);
-			let p = domain.run(() => new Promise(transaction)
-				.then(begin).then(negotiateSchema));
-
-			function run(fn) {
-				return p.then(domain.run.bind(domain, fn));
-			}
-
-			function begin() {
-				return _begin(domain, options);
-			}
-
-			function negotiateSchema(previous) {
-				let schema = options && options.schema;
-				if (!schema)
-					return previous;
-				return executeSchema(domain,schema);
-			}
-
-			run.rollback = rollback.bind(null, domain);
-			run.commit = commit.bind(null, domain);
-
-			return run;
-		};
-
-		c.query = function(query) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
-			let p = domain.run(() => new Promise(transaction)
-				.then(() => doQuery(domain, query).then(onResult, onError)));
-			return p;
-
-			function onResult(result) {
-				releaseDbClient(domain);
-				return result;
-			}
-
-			function onError(e) {
-				releaseDbClient(domain);
-				throw e;
-			}
-		};
-
-		c.rollback = rollback;
-		c.commit = commit;
-		c.lock = lock;
-		c.schema = executeSchema;
-
-		c.end = function() {
-			if (poolOptions)
-				return pool.end();
-			else
-				return Promise.resolve();
-		};
-
-		c.accept = function(caller) {
-			caller.visitPg();
-		};
-
-		return c;
-	}
-
-	newDatabase_1$9 = newDatabase;
-	return newDatabase_1$9;
-}
-
-var wrapQuery_1$6;
-var hasRequiredWrapQuery$6;
-
-function requireWrapQuery$6 () {
-	if (hasRequiredWrapQuery$6) return wrapQuery_1$6;
-	hasRequiredWrapQuery$6 = 1;
-	const log = requireLog();
-	const connectionCache  = new WeakMap();
-
-	function wrapQuery(_context, connection) {
-		let statementCache = connectionCache.get(connection);
-		if (!statementCache) {
-			statementCache = new Map();
-			connectionCache.set(connection, statementCache);
-		}
-
-		return runQuery;
-
-		function runQuery(query, onCompleted) {
-			try {
-				var params = query.parameters;
-				var sql = query.sql();
-				var completeQuery = log.startQuery({ sql, parameters: params });
-
-				let statement = statementCache.get(sql);
-				if (!statement) {
-					statement = connection.prepare(sql);
-					statementCache.set(sql, statement);
-				}
-				const rows = statement.all.apply(statement, params);
-				completeQuery();
-				onCompleted(null, rows);
-			}
-			catch (e) {
-				if (completeQuery)
-					completeQuery(e);
-				onCompleted(e);
-			}
-		}
-
-	}
-
-	wrapQuery_1$6 = wrapQuery;
-	return wrapQuery_1$6;
-}
-
-var wrapCommand_1$6;
-var hasRequiredWrapCommand$6;
-
-function requireWrapCommand$6 () {
-	if (hasRequiredWrapCommand$6) return wrapCommand_1$6;
-	hasRequiredWrapCommand$6 = 1;
-	const log = requireLog();
-	const connectionCache  = new WeakMap();
-
-	function wrapCommand(_context, connection) {
-		let statementCache = connectionCache.get(connection);
-		if (!statementCache) {
-			statementCache = new Map();
-			connectionCache.set(connection, statementCache);
-		}
-
-		return runCommand;
-
-		function runCommand(query, onCompleted) {
-			try {
-				var params = query.parameters;
-				var sql = query.sql();
-				var completeQuery = log.startQuery({ sql, parameters: params });
-
-				let statement = statementCache.get(sql);
-				if (!statement) {
-					statement = connection.prepare(sql);
-					statementCache.set(sql, statement);
-				}
-				const info = statement.run.apply(statement, params);
-				completeQuery();
-				onCompleted(null, { rowsAffected: info.changes, lastInsertRowid: info.lastInsertRowid });
-			}
-			catch (e) {
-				if (completeQuery)
-					completeQuery(e);
-				onCompleted(e);
-			}
-		}
-
-	}
-
-	wrapCommand_1$6 = wrapCommand;
-	return wrapCommand_1$6;
-}
-
-var encodeBoolean_1$3;
-var hasRequiredEncodeBoolean$3;
-
-function requireEncodeBoolean$3 () {
-	if (hasRequiredEncodeBoolean$3) return encodeBoolean_1$3;
-	hasRequiredEncodeBoolean$3 = 1;
-	function encodeBoolean(bool) {
-		if (bool)
-			return 1;
-		return 0;
-	}
-
-	encodeBoolean_1$3 = encodeBoolean;
-	return encodeBoolean_1$3;
-}
-
-var quote$3;
-var hasRequiredQuote$3;
-
-function requireQuote$3 () {
-	if (hasRequiredQuote$3) return quote$3;
-	hasRequiredQuote$3 = 1;
-	quote$3 = (name) => `"${name}"`;
-	return quote$3;
-}
-
-var deleteFromSql_1$3;
-var hasRequiredDeleteFromSql$3;
-
-function requireDeleteFromSql$3 () {
-	if (hasRequiredDeleteFromSql$3) return deleteFromSql_1$3;
-	hasRequiredDeleteFromSql$3 = 1;
-	const format = 'delete from %s where %s.rowId in (SELECT %s.rowId FROM %s %s%s)';
-	const formatString = requireFormat();
-	const quote = requireQuote$3();
-
-	function deleteFromSql(table, alias, whereSql) {
-		const name = quote(table._dbName);
-		alias = quote(alias);
-		return formatString(format, name, name, alias, name, alias, whereSql);
-	}
-	deleteFromSql_1$3 = deleteFromSql;
-	return deleteFromSql_1$3;
-}
-
-var selectForUpdateSql$2;
-var hasRequiredSelectForUpdateSql$3;
-
-function requireSelectForUpdateSql$3 () {
-	if (hasRequiredSelectForUpdateSql$3) return selectForUpdateSql$2;
-	hasRequiredSelectForUpdateSql$3 = 1;
-	selectForUpdateSql$2 = function(_context, lock) {
-		if (lock)
-			throw new Error('select for update is not supported by SQLite');
-		return '';
-	};
-	return selectForUpdateSql$2;
-}
-
-var lastInsertedSql_1$2;
-var hasRequiredLastInsertedSql$2;
-
-function requireLastInsertedSql$2 () {
-	if (hasRequiredLastInsertedSql$2) return lastInsertedSql_1$2;
-	hasRequiredLastInsertedSql$2 = 1;
-	function lastInsertedSql(context, table, keyValues) {
-		if (keyValues.some(value => value === undefined))
-			return ['rowid IN (select last_insert_rowid())'];
-		return keyValues.map((value,i) => {
-			let column = table._primaryColumns[i];
-			return column.eq(context, value);
-		});
-
-	}
-
-	lastInsertedSql_1$2 = lastInsertedSql;
-	return lastInsertedSql_1$2;
-}
-
-var limitAndOffset_1$3;
-var hasRequiredLimitAndOffset$3;
-
-function requireLimitAndOffset$3 () {
-	if (hasRequiredLimitAndOffset$3) return limitAndOffset_1$3;
-	hasRequiredLimitAndOffset$3 = 1;
-	function limitAndOffset(span) {
-		if (span.offset)
-			return ` limit ${limit()} offset ${span.offset}`;
-		else if (span.limit || span.limit === 0)
-			return ` limit ${span.limit}`;
-		else
-			return '';
-
-		function limit() {
-			if (span.limit || span.limit === 0)
-				return span.limit;
-			else
-				return '-1';
-		}
-
-	}
-
-	limitAndOffset_1$3 = limitAndOffset;
-	return limitAndOffset_1$3;
-}
-
-var formatBigintOut_1$3;
-var hasRequiredFormatBigintOut$3;
-
-function requireFormatBigintOut$3 () {
-	if (hasRequiredFormatBigintOut$3) return formatBigintOut_1$3;
-	hasRequiredFormatBigintOut$3 = 1;
-	const quote = requireQuote$3();
-
-	function formatBigintOut(column, alias) {
-		const quotedCol = quote(column._dbName);
-		if (alias)
-			return `CAST(${alias}.${quotedCol} AS TEXT)`;
-		else
-			return `CAST(${quotedCol} AS TEXT)`;
-	}
-
-	formatBigintOut_1$3 = formatBigintOut;
-	return formatBigintOut_1$3;
-}
-
-var insertSql_1$3;
-var hasRequiredInsertSql$3;
-
-function requireInsertSql$3 () {
-	if (hasRequiredInsertSql$3) return insertSql_1$3;
-	hasRequiredInsertSql$3 = 1;
-	const quote = requireQuote$3();
-
-	function insertSql(_context, table, row, options) {
-		let columnNames = [];
-		let conflictColumnUpdateSql = '';
-		let values = [];
-
-		let sql = 'INSERT INTO ' + quote(table._dbName) + ' ';
-		addDiscriminators();
-		addColumns();
-
-		if (columnNames.length === 0) {
-			sql += 'DEFAULT VALUES';
-		} else {
-			sql = sql + '(' + columnNames.join(',') + ') ' + 'VALUES (' + values.join(',') + ')' + onConflict();
-		}
-
-		return sql;
-
-		function onConflict() {
-			if (options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite') {
-				const primaryKeys = table._primaryColumns.map(x => quote(x._dbName)).join(',');
-				return ` ON CONFLICT(${primaryKeys}) ${conflictColumnUpdateSql}`;
-			} else {
-				return '';
-			}
-		}
-
-		function addDiscriminators() {
-			let discriminators = table._columnDiscriminators;
-			for (let i = 0; i < discriminators.length; i++) {
-				let parts = discriminators[i].split('=');
-				columnNames.push(quote(parts[0]));
-				values.push(parts[1]);
-			}
-		}
-
-		function addColumns() {
-			let conflictColumnUpdates = [];
-			let columns = table._columns;
-			for (let i = 0; i < columns.length; i++) {
-				let column = columns[i];
-				const columnName = quote(column._dbName);
-				if (row['__' + column.alias] !== undefined) {
-					columnNames.push(columnName);
-					values.push('%s');
-					addConflictUpdate(column);
-				}
-			}
-			if (conflictColumnUpdates.length === 0)
-				conflictColumnUpdateSql =  'DO NOTHING';
-			else
-				conflictColumnUpdateSql = 'DO UPDATE SET ' + conflictColumnUpdates.join(',');
-
-			function addConflictUpdate(column) {
-				let concurrency = options[column.alias]?.concurrency || options.concurrency;
-				const tableName = table._dbName;
-				const columnName = quote(column._dbName);
-				if (concurrency === 'overwrite') {
-					conflictColumnUpdates.push(`${columnName}=excluded.${columnName}`);
-				} else if (concurrency === 'optimistic')
-					conflictColumnUpdates.push(`${columnName} = CASE WHEN ${tableName}.${columnName} <> excluded.${columnName} THEN '12345678-1234-1234-1234-123456789012Conflict when updating ${columnName}12345678-1234-1234-1234-123456789012' ELSE ${tableName}.${columnName} END`);
-			}
-		}
-	}
-
-	insertSql_1$3 = insertSql;
-	return insertSql_1$3;
-}
-
-var insert$2;
-var hasRequiredInsert$3;
-
-function requireInsert$3 () {
-	if (hasRequiredInsert$3) return insert$2;
-	hasRequiredInsert$3 = 1;
-	let newInsertCommand = requireNewInsertCommand();
-	let newInsertCommandCore = requireNewInsertCommandCore$1();
-	let newGetLastInsertedCommand = requireNewGetLastInsertedCommand();
-	let executeQueries = requireExecuteQueries();
-	let pushCommand = requirePushCommand();
-
-
-	function insertDefault(context, table, row, options) {
-		let commands = [];
-		let insertCmd = newInsertCommand(newInsertCommandCore.bind(null, context), table, row, options);
-		insertCmd.disallowCompress = true;
-		pushCommand(context, insertCmd);
-
-		if (options && options.skipSelectAfterInsert)
-			return executeQueries(context, []).then(() => [toDbRow(table, row)]);
-
-		let selectCmd = newGetLastInsertedCommand(context, table, row, insertCmd);
-		commands.push(selectCmd);
-
-		return executeQueries(context, commands).then((result) => result[result.length - 1]);
-
-	}
-
-	function toDbRow(table, row) {
-		const dbRow = {};
-		const columns = table._columns || [];
-		for (let i = 0; i < columns.length; i++) {
-			const column = columns[i];
-			dbRow[column._dbName] = row[column.alias];
-		}
-		return dbRow;
-	}
-
-	insert$2 = insertDefault;
-	return insert$2;
-}
-
-var batchInsert_1;
-var hasRequiredBatchInsert;
-
-function requireBatchInsert () {
-	if (hasRequiredBatchInsert) return batchInsert_1;
-	hasRequiredBatchInsert = 1;
-	const executeCommand = requireExecuteCommand();
-	const newParameterized = requireNewParameterized();
-	const quote = requireQuote$3();
-
-	async function batchInsert(context, table, rows, options = {}) {
-		const groups = groupRows(table, rows);
-		for (let i = 0; i < groups.length; i++) {
-			if (groups[i].columns.length === 0)
-				return false;
-		}
-		for (let i = 0; i < groups.length; i++) {
-			const group = groups[i];
-			await executeGroup(context, table, group, options);
-		}
-		return true;
-	}
-
-	async function executeGroup(context, table, group, options) {
-		const maxParameters = context.rdb.maxParameters || 999;
-		const columns = group.columns;
-		const chunks = chunkRows(context, group.rows, columns, maxParameters);
-
-		for (let i = 0; i < chunks.length; i++)
-			await executeCommand(context, buildCommand(context, table, columns, chunks[i], options));
-	}
-
-	function buildCommand(context, table, columns, rows, options) {
-		const parameters = [];
-		const columnNames = discriminatorColumnNames(table).concat(columns.map(column => quote(column._dbName)));
-		const valueRows = rows.map(row => {
-			const values = discriminatorValues(table).concat(columns.map(column => {
-				const encoded = column.encode(context, row[column.alias]);
-				parameters.push(...encoded.parameters);
-				return encoded.sql();
-			}));
-			return '(' + values.join(',') + ')';
-		});
-
-		const sql = 'INSERT INTO ' + quote(table._dbName) + ' (' + columnNames.join(',') + ') VALUES '
-			+ valueRows.join(',') + onConflict(table, columns, options);
-		return newParameterized(sql, parameters);
-	}
-
-	function groupRows(table, rows) {
-		const groups = [];
-		const groupsByKey = {};
-		for (let i = 0; i < rows.length; i++) {
-			const row = rows[i];
-			const columns = table._columns.filter(column => row['__' + column.alias] !== undefined);
-			const key = columns.map(column => column.alias).join('\0');
-			let group = groupsByKey[key];
-			if (!group) {
-				group = { columns, rows: [] };
-				groupsByKey[key] = group;
-				groups.push(group);
-			}
-			group.rows.push(row);
-		}
-		return groups;
-	}
-
-	function countParameterColumns(context, row, columns) {
-		let count = 0;
-		for (let i = 0; i < columns.length; i++) {
-			const encoded = columns[i].encode(context, row[columns[i].alias]);
-			count += encoded.parameters.length;
-		}
-		return count;
-	}
-
-	function chunkRows(context, rows, columns, maxParameters) {
-		const chunks = [];
-		let chunk = [];
-		let parameterCount = 0;
-		for (let i = 0; i < rows.length; i++) {
-			const row = rows[i];
-			const rowParameterCount = countParameterColumns(context, row, columns);
-			if (chunk.length > 0 && parameterCount + rowParameterCount > maxParameters) {
-				chunks.push(chunk);
-				chunk = [];
-				parameterCount = 0;
-			}
-			chunk.push(row);
-			parameterCount += rowParameterCount;
-		}
-		if (chunk.length > 0)
-			chunks.push(chunk);
-		return chunks;
-	}
-
-	function discriminatorColumnNames(table) {
-		return table._columnDiscriminators.map(discriminator => quote(discriminator.split('=')[0]));
-	}
-
-	function discriminatorValues(table) {
-		return table._columnDiscriminators.map(discriminator => discriminator.split('=')[1]);
-	}
-
-	function onConflict(table, columns, options) {
-		if (options.concurrency !== 'skipOnConflict' && options.concurrency !== 'overwrite')
-			return '';
-
-		const primaryKeys = table._primaryColumns.map(x => quote(x._dbName)).join(',');
-		const updates = [];
-		for (let i = 0; i < columns.length; i++) {
-			const column = columns[i];
-			const concurrency = options[column.alias]?.concurrency || options.concurrency;
-			const columnName = quote(column._dbName);
-			if (concurrency === 'overwrite')
-				updates.push(`${columnName}=excluded.${columnName}`);
-			else if (concurrency === 'optimistic')
-				updates.push(`${columnName} = CASE WHEN ${table._dbName}.${columnName} <> excluded.${columnName} THEN '12345678-1234-1234-1234-123456789012Conflict when updating ${columnName}12345678-1234-1234-1234-123456789012' ELSE ${table._dbName}.${columnName} END`);
-		}
-
-		if (updates.length === 0)
-			return ` ON CONFLICT(${primaryKeys}) DO NOTHING`;
-		return ` ON CONFLICT(${primaryKeys}) DO UPDATE SET ${updates.join(',')}`;
-	}
-
-	batchInsert_1 = batchInsert;
-	return batchInsert_1;
-}
-
-var newTransaction$8;
-var hasRequiredNewTransaction$8;
-
-function requireNewTransaction$8 () {
-	if (hasRequiredNewTransaction$8) return newTransaction$8;
-	hasRequiredNewTransaction$8 = 1;
-	const wrapQuery = requireWrapQuery$6();
-	const wrapCommand = requireWrapCommand$6();
-	const encodeBoolean = requireEncodeBoolean$3();
+var newTransaction$1;
+var hasRequiredNewTransaction$1;
+
+function requireNewTransaction$1 () {
+	if (hasRequiredNewTransaction$1) return newTransaction$1;
+	hasRequiredNewTransaction$1 = 1;
+	const encodeBoolean = requireEncodeBoolean$1();
 	const encodeBinary = requireEncodeBinary();
 	const decodeBinary = requireDecodeBinary();
-	const deleteFromSql = requireDeleteFromSql$3();
-	const selectForUpdateSql = requireSelectForUpdateSql$3();
-	const lastInsertedSql = requireLastInsertedSql$2();
-	const limitAndOffset = requireLimitAndOffset$3();
-	const formatBigintOut = requireFormatBigintOut$3();
-	const insertSql = requireInsertSql$3();
-	const insert = requireInsert$3();
+	const deleteFromSql = requireDeleteFromSql$1();
+	const selectForUpdateSql = requireSelectForUpdateSql$1();
+	const lastInsertedSql = requireLastInsertedSql$1();
+	const limitAndOffset = requireLimitAndOffset$1();
+	const formatBigintOut = requireFormatBigintOut();
+	const insertSql = requireInsertSql$1();
+	const insert = requireInsert$1();
 	const batchInsert = requireBatchInsert();
-	const quote = requireQuote$3();
-
-	function newResolveTransaction(domain, pool, { readonly = false } = {})  {
-		var rdb = {poolFactory: pool};
-		if (!pool.connect) {
-			pool = pool();
-			rdb.pool = pool;
-		}
-		rdb.engine = 'sqlite';
-		rdb.maxParameters = 32766;
-		rdb.encodeBoolean = encodeBoolean;
-		rdb.encodeBinary = encodeBinary;
-		rdb.decodeBinary = decodeBinary;
-		rdb.decodeJSON = decodeJSON;
-		rdb.encodeJSON = JSON.stringify;
-		rdb.formatBigintOut = formatBigintOut;
-		rdb.deleteFromSql = deleteFromSql;
-		rdb.selectForUpdateSql = selectForUpdateSql;
-		rdb.lastInsertedSql = lastInsertedSql;
-		rdb.insertSql = insertSql;
-		rdb.insert = insert;
-		rdb.batchInsert = batchInsert;
-		rdb.lastInsertedIsSeparate = true;
-		rdb.multipleStatements = false;
-		rdb.limitAndOffset = limitAndOffset;
-		rdb.accept = function(caller) {
-			caller.visitSqlite();
-		};
-		rdb.aggregateCount = 0;
-		rdb.quote = quote;
-		rdb.cache = {};
-		rdb.changes = [];
-
-		if (readonly) {
-			rdb.dbClient = {
-				executeQuery: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							wrapQuery(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				},
-				executeCommand: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							wrapCommand(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				}
-			};
-			domain.rdb = rdb;
-			return (onSuccess) => onSuccess();
-		}
-
-		return function(onSuccess, onError) {
-			pool.connect(onConnected);
-
-			function onConnected(err, client, done) {
-				try {
-					if (err) {
-						onError(err);
-						return;
-					}
-					client.executeQuery = wrapQuery(domain, client);
-					client.executeCommand = wrapCommand(domain, client);
-					rdb.dbClient = client;
-					rdb.dbClientDone = done;
-					domain.rdb = rdb;
-					onSuccess();
-				} catch (e) {
-					onError(e);
-				}
-			}
-		};
-	}
-
-	function decodeJSON(value) {
-		return JSON.parse(value);
-	}
-
-	newTransaction$8 = newResolveTransaction;
-	return newTransaction$8;
-}
-
-var end$6;
-var hasRequiredEnd$6;
-
-function requireEnd$6 () {
-	if (hasRequiredEnd$6) return end$6;
-	hasRequiredEnd$6 = 1;
-	var pools = requirePools();
-
-	function endPool(genericPool, id, done) {
-		genericPool.drain(onDrained);
-
-		function onDrained() {
-			genericPool.destroyAllNow();
-			delete pools[id];
-			done();
-		}
-	}
-
-	end$6 = endPool;
-	return end$6;
-}
-
-/* eslint-disable no-prototype-builtins */
-
-var newGenericPool_1$6;
-var hasRequiredNewGenericPool$6;
-
-function requireNewGenericPool$6 () {
-	if (hasRequiredNewGenericPool$6) return newGenericPool_1$6;
-	hasRequiredNewGenericPool$6 = 1;
-	var defaults = requirePoolDefaults();
-
-	var genericPool = requireGenericPool();
-	var sqlite;
-
-	function newGenericPool(connectionString, poolOptions) {
-
-		poolOptions = poolOptions || {};
-		var pool = genericPool.Pool({
-			min: poolOptions.min || 0,
-			max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
-			idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
-			reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
-			log: poolOptions.log || defaults.poolLog,
-			create: async function(cb) {
-				try {
-					if (!sqlite)
-						sqlite = await import('node:sqlite');
-					var client = new sqlite.DatabaseSync(connectionString);
-					client.poolCount = 0;
-					cb(null, client);
-				}
-				catch(err) {
-					return cb(err, null);
-				}
-			},
-
-			destroy: function(client) {
-				client.poolCount = undefined;
-				client.close();
-			}
-		});
-		//monkey-patch with connect method
-		pool.connect = function(cb) {
-			pool.acquire(function(err, client) {
-				if(err)  return cb(err, null, function() {/*NOOP*/});
-				client.poolCount++;
-				cb(null, client, function(err) {
-					if(err) {
-						pool.destroy(client);
-					} else {
-						pool.release(client);
-					}
-				});
-			});
-		};
-		return pool;
-	}
-
-	newGenericPool_1$6 = newGenericPool;
-	return newGenericPool_1$6;
-}
-
-var newPool_1$8;
-var hasRequiredNewPool$8;
-
-function requireNewPool$8 () {
-	if (hasRequiredNewPool$8) return newPool_1$8;
-	hasRequiredNewPool$8 = 1;
-	const promisify = requirePromisify();
-	const pools = requirePools();
-	const end = requireEnd$6();
-	const newGenericPool = requireNewGenericPool$6();
-	const newId = requireNewId();
-
-	function newPool(connectionString, poolOptions) {
-		let pool = newGenericPool(connectionString, poolOptions);
-		let id = newId();
-		let boundEnd = end.bind(null, pool, id);
-		let c = {};
-
-		c.connect = pool.connect;
-		c.end = promisify(boundEnd);
-		pools[id] = c;
-		return c;
-	}
-
-	newPool_1$8 = newPool;
-	return newPool_1$8;
-}
-
-var newDatabase_1$8;
-var hasRequiredNewDatabase$8;
-
-function requireNewDatabase$8 () {
-	if (hasRequiredNewDatabase$8) return newDatabase_1$8;
-	hasRequiredNewDatabase$8 = 1;
-	let createDomain = requireCreateDomain();
-	let newTransaction = requireNewTransaction$8();
-	let _begin = requireBegin();
-	let commit = requireCommit();
-	let rollback = requireRollback();
-	let newPool = requireNewPool$8();
-	let express = requireHostExpress();
-	let hono = requireHostHono();
-	let hostLocal = requireHostLocal();
-	let doQuery = requireQuery();
-	let doSqliteFunction = requireSqliteFunction();
-	let releaseDbClient = requireReleaseDbClient();
-
-	function newDatabase(connectionString, poolOptions) {
-		if (!connectionString)
-			throw new Error('Connection string cannot be empty');
-		poolOptions = poolOptions || { min: 1 };
-		var pool = newPool(connectionString, poolOptions);
-		pool.__sqliteSync = poolOptions && poolOptions.sync;
-		pool.__orangeSyncIdentity = `sqlite:${connectionString}`;
-
-		let c = { poolFactory: pool, hostLocal, express, hono };
-		c.__orangeSyncIdentity = pool.__orangeSyncIdentity;
-
-		c.transaction = function(options, fn) {
-			if ((arguments.length === 1) && (typeof options === 'function')) {
-				fn = options;
-				options = undefined;
-			}
-			let domain = createDomain();
-			if (!fn)
-				throw new Error('transaction requires a function');
-			return domain.run(runInTransaction);
-
-			function begin() {
-				return _begin(domain, options);
-			}
-
-			async function runInTransaction() {
-				let result;
-				let transaction = newTransaction(domain, pool, options);
-				await new Promise(transaction)
-					.then(begin)
-					.then(() => fn(domain))
-					.then((res) => result = res)
-					.then(() => commit(domain))
-					.then(null, (e) => Promise.resolve(rollback(domain, e)));
-				return result;
-			}
-
-
-		};
-
-		c.createTransaction = function(options) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
-			let p = domain.run(() => new Promise(transaction).then(begin));
-			function run(fn) {
-				return p.then(() => fn(domain));
-			}
-			run.rollback = function(error) {
-				return Promise.resolve(rollback(domain, error));
-			};
-			run.commit = function() {
-				return Promise.resolve(commit(domain));
-			};
-			return run;
-
-			function begin() {
-				return _begin(domain, options);
-			}
-		};
-
-		c.query = function(query) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
-			let p = domain.run(() => new Promise(transaction)
-				.then(() => doQuery(domain, query).then(onResult, onError)));
-			return p;
-
-			function onResult(result) {
-				releaseDbClient(domain);
-				return result;
-			}
-
-			function onError(e) {
-				releaseDbClient(domain);
-				throw e;
-			}
-		};
-
-		c.sqliteFunction = function(...args) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
-			let p = domain.run(() => new Promise(transaction)
-				.then(() => doSqliteFunction(domain, ...args).then(onResult, onError)));
-			return p;
-
-			function onResult(result) {
-				releaseDbClient(domain);
-				return result;
-			}
-
-			function onError(e) {
-				releaseDbClient(domain);
-				throw e;
-			}
-		};
-
-		c.rollback = rollback;
-		c.commit = commit;
-		c.__sqliteSync = poolOptions && poolOptions.sync;
-
-		c.end = function() {
-			if (poolOptions)
-				return pool.end();
-			else
-				return Promise.resolve();
-		};
-
-		c.accept = function(caller) {
-			caller.visitSqlite();
-		};
-
-		return c;
-	}
-
-	newDatabase_1$8 = newDatabase;
-	return newDatabase_1$8;
-}
-
-var wrapQuery_1$5;
-var hasRequiredWrapQuery$5;
-
-function requireWrapQuery$5 () {
-	if (hasRequiredWrapQuery$5) return wrapQuery_1$5;
-	hasRequiredWrapQuery$5 = 1;
-	var log = requireLog();
-
-	function wrapQuery(_context, connection) {
-		return runQuery;
-
-		function runQuery(query, onCompleted) {
-			try {
-				var params = query.parameters;
-				var sql = query.sql();
-				var completeQuery = log.startQuery({ sql, parameters: params });
-
-				var statement = connection.query(sql);
-				const rows = statement.all.apply(statement, params);
-				completeQuery();
-				onCompleted(null, rows);
-			}
-			catch (e) {
-				if (completeQuery)
-					completeQuery(e);
-				onCompleted(e);
-			}
-		}
-
-	}
-
-	wrapQuery_1$5 = wrapQuery;
-	return wrapQuery_1$5;
-}
-
-var wrapCommand_1$5;
-var hasRequiredWrapCommand$5;
-
-function requireWrapCommand$5 () {
-	if (hasRequiredWrapCommand$5) return wrapCommand_1$5;
-	hasRequiredWrapCommand$5 = 1;
-	var log = requireLog();
-
-	function wrapCommand(_context, connection) {
-		return runQuery;
-
-		function runQuery(query, onCompleted) {
-			try {
-				var params = Array.isArray(query.parameters) ? query.parameters : [];
-				var sql = query.sql();
-				var completeQuery = log.startQuery({ sql, parameters: params });
-
-				var statement = connection.query(sql);
-
-				var info;
-				if (params.length === 0) info = statement.run();
-				else info = statement.run.apply(statement, params);
-
-				var affectedRows = 0;
-				if (info && typeof info.changes === 'number') affectedRows = info.changes;
-				else if (info && typeof info.affectedRows === 'number') affectedRows = info.affectedRows;
-
-				completeQuery();
-				onCompleted(null, { rowsAffected: affectedRows });
-			}
-			catch (e) {
-				if (completeQuery)
-					completeQuery(e);
-				onCompleted(e, { rowsAffected: 0 });
-			}
-		}
-	}
-
-	wrapCommand_1$5 = wrapCommand;
-	return wrapCommand_1$5;
-}
-
-var newTransaction$7;
-var hasRequiredNewTransaction$7;
-
-function requireNewTransaction$7 () {
-	if (hasRequiredNewTransaction$7) return newTransaction$7;
-	hasRequiredNewTransaction$7 = 1;
-	const wrapQuery = requireWrapQuery$5();
-	const wrapCommand = requireWrapCommand$5();
-	const encodeBoolean = requireEncodeBoolean$3();
-	const encodeBinary = requireEncodeBinary();
-	const decodeBinary = requireDecodeBinary();
-	const formatBigintOut = requireFormatBigintOut$3();
-	const deleteFromSql = requireDeleteFromSql$3();
-	const selectForUpdateSql = requireSelectForUpdateSql$3();
-	const lastInsertedSql = requireLastInsertedSql$2();
-	const limitAndOffset = requireLimitAndOffset$3();
-	const insertSql = requireInsertSql$3();
-	const insert = requireInsert$3();
-	const batchInsert = requireBatchInsert();
-	const quote = requireQuote$3();
-
-	function newResolveTransaction(domain, pool, { readonly = false } = {})  {
-		var rdb = {poolFactory: pool};
-		if (!pool.connect) {
-			pool = pool();
-			rdb.pool = pool;
-		}
-		rdb.engine = 'sqlite';
-		rdb.maxParameters = 32766;
-		rdb.encodeBoolean = encodeBoolean;
-		rdb.encodeBinary = encodeBinary;
-		rdb.decodeBinary = decodeBinary;
-		rdb.formatBigintOut = formatBigintOut;
-		rdb.decodeJSON = decodeJSON;
-		rdb.encodeJSON = JSON.stringify;
-		rdb.deleteFromSql = deleteFromSql;
-		rdb.selectForUpdateSql = selectForUpdateSql;
-		rdb.lastInsertedSql = lastInsertedSql;
-		rdb.insertSql = insertSql;
-		rdb.insert = insert;
-		rdb.batchInsert = batchInsert;
-		rdb.lastInsertedIsSeparate = true;
-		rdb.multipleStatements = false;
-		rdb.limitAndOffset = limitAndOffset;
-		rdb.accept = function(caller) {
-			caller.visitSqlite();
-		};
-		rdb.aggregateCount = 0;
-		rdb.quote = quote;
-		rdb.cache = {};
-		rdb.changes = [];
-
-		if (readonly) {
-			rdb.dbClient = {
-				executeQuery: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							wrapQuery(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				},
-				executeCommand: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							wrapCommand(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				}
-			};
-			domain.rdb = rdb;
-			return (onSuccess) => onSuccess();
-		}
-
-		return function(onSuccess, onError) {
-			pool.connect(onConnected);
-
-			function onConnected(err, client, done) {
-				try {
-					if (err) {
-						onError(err);
-						return;
-					}
-					client.executeQuery = wrapQuery(domain, client);
-					client.executeCommand = wrapCommand(domain, client);
-					rdb.dbClient = client;
-					rdb.dbClientDone = done;
-					domain.rdb = rdb;
-					onSuccess();
-				} catch (e) {
-					onError(e);
-				}
-			}
-		};
-	}
-
-	function decodeJSON(value) {
-		return JSON.parse(value);
-	}
-
-	newTransaction$7 = newResolveTransaction;
-	return newTransaction$7;
-}
-
-/* eslint-disable no-prototype-builtins */
-
-var newGenericPool_1$5;
-var hasRequiredNewGenericPool$5;
-
-function requireNewGenericPool$5 () {
-	if (hasRequiredNewGenericPool$5) return newGenericPool_1$5;
-	hasRequiredNewGenericPool$5 = 1;
-	var defaults = requirePoolDefaults();
-
-	var genericPool = requireGenericPool();
-	var Database;
-	function newGenericPool(connectionString, poolOptions) {
-		poolOptions = poolOptions || {};
-		var pool = genericPool.Pool({
-			min: poolOptions.min || 0,
-			max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
-			idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
-			reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
-			log: poolOptions.log || defaults.poolLog,
-			create: async function(cb) {
-				try {
-					try {
-						if (!Database)
-							({ Database } = await import('bun:sqlite'));
-
-					}
-					catch (err) {
-						return cb(err, null);
-					}
-
-					var client = new Database(connectionString);
-					client.poolCount = 0;
-					cb(null, client);
-				}
-				catch(err) {
-					return cb(err, null);
-				}
-			},
-
-			destroy: function(client) {
-				client.poolCount = undefined;
-				client.close();
-			}
-		});
-		//monkey-patch with connect method
-		pool.connect = function(cb) {
-			pool.acquire(function(err, client) {
-				if(err)  return cb(err, null, function() {/*NOOP*/});
-				client.poolCount++;
-				cb(null, client, function(err) {
-					if(err) {
-						pool.destroy(client);
-					} else {
-						pool.release(client);
-					}
-				});
-			});
-		};
-		return pool;
-	}
-
-	newGenericPool_1$5 = newGenericPool;
-	return newGenericPool_1$5;
-}
-
-var newPool_1$7;
-var hasRequiredNewPool$7;
-
-function requireNewPool$7 () {
-	if (hasRequiredNewPool$7) return newPool_1$7;
-	hasRequiredNewPool$7 = 1;
-	const promisify = requirePromisify();
-	const pools = requirePools();
-	const end = requireEnd$6();
-	const newGenericPool = requireNewGenericPool$5();
-	const newId = requireNewId();
-
-	function newPool(connectionString, poolOptions) {
-		let pool = newGenericPool(connectionString, poolOptions);
-		let id = newId();
-		let boundEnd = end.bind(null, pool, id);
-		let c = {};
-
-		c.connect = pool.connect;
-		c.end = promisify(boundEnd);
-		pools[id] = c;
-		return c;
-	}
-
-	newPool_1$7 = newPool;
-	return newPool_1$7;
-}
-
-var newDatabase_1$7;
-var hasRequiredNewDatabase$7;
-
-function requireNewDatabase$7 () {
-	if (hasRequiredNewDatabase$7) return newDatabase_1$7;
-	hasRequiredNewDatabase$7 = 1;
-	let createDomain = requireCreateDomain();
-	let newTransaction = requireNewTransaction$7();
-	let _begin = requireBegin();
-	let commit = requireCommit();
-	let rollback = requireRollback();
-	let newPool = requireNewPool$7();
-	let express = requireHostExpress();
-	let hono = requireHostHono();
-	let hostLocal = requireHostLocal();
-	let doQuery = requireQuery();
-	let doSqliteFunction = requireSqliteFunction();
-	let releaseDbClient = requireReleaseDbClient();
-
-	function newDatabase(connectionString, poolOptions) {
-		if (!connectionString)
-			throw new Error('Connection string cannot be empty');
-		poolOptions = poolOptions || { min: 1 };
-		var pool = newPool(connectionString, poolOptions);
-		pool.__sqliteSync = poolOptions && poolOptions.sync;
-		pool.__orangeSyncIdentity = `sqlite:${connectionString}`;
-
-		let c = { poolFactory: pool, hostLocal, express, hono };
-		c.__orangeSyncIdentity = pool.__orangeSyncIdentity;
-
-		c.transaction = function(options, fn) {
-			if ((arguments.length === 1) && (typeof options === 'function')) {
-				fn = options;
-				options = undefined;
-			}
-			let domain = createDomain();
-
-			if (!fn)
-				throw new Error('transaction requires a function');
-			return domain.run(runInTransaction);
-
-			function begin() {
-				return _begin(domain, options);
-			}
-
-			async function runInTransaction() {
-				let result;
-				let transaction = newTransaction(domain, pool, options);
-				await new Promise(transaction)
-					.then(begin)
-					.then(() => fn(domain))
-					.then((res) => result = res)
-					.then(() => commit(domain))
-					.then(null, (e) => rollback(domain, e));
-				return result;
-			}
-
-
-		};
-
-		c.createTransaction = function(options) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
-			let p = domain.run(() => new Promise(transaction).then(begin));
-
-			function run(fn) {
-				return p.then(() => fn(domain));
-			}
-			run.rollback = rollback.bind(null, domain);
-			run.commit = commit.bind(null, domain);
-			return run;
-
-			function begin() {
-				return _begin(domain, options);
-			}
-		};
-
-		c.query = function(query) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
-			let p = domain.run(() => new Promise(transaction)
-				.then(() => doQuery(domain, query).then(onResult, onError)));
-			return p;
-
-			function onResult(result) {
-				releaseDbClient(domain);
-				return result;
-			}
-
-			function onError(e) {
-				releaseDbClient(domain);
-				throw e;
-			}
-		};
-
-		c.sqliteFunction = function(...args) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
-			let p = domain.run(() => new Promise(transaction)
-				.then(() => doSqliteFunction(domain, ...args).then(onResult, onError)));
-			return p;
-
-			function onResult(result) {
-				releaseDbClient(domain);
-				return result;
-			}
-
-			function onError(e) {
-				releaseDbClient(domain);
-				throw e;
-			}
-		};
-
-
-		c.rollback = rollback;
-		c.commit = commit;
-		c.__sqliteSync = poolOptions && poolOptions.sync;
-
-		c.end = function() {
-			if (poolOptions)
-				return pool.end();
-			else
-				return Promise.resolve();
-		};
-
-		c.accept = function(caller) {
-			caller.visitSqlite();
-		};
-
-		return c;
-	}
-
-	newDatabase_1$7 = newDatabase;
-	return newDatabase_1$7;
-}
-
-var wrapQuery_1$4;
-var hasRequiredWrapQuery$4;
-
-function requireWrapQuery$4 () {
-	if (hasRequiredWrapQuery$4) return wrapQuery_1$4;
-	hasRequiredWrapQuery$4 = 1;
-	const log = requireLog();
-	const connectionCache  = new WeakMap();
-
-	function wrapQuery(_context, connection) {
-		let statementCache = connectionCache.get(connection);
-		if (!statementCache) {
-			statementCache = new Map();
-			connectionCache.set(connection, statementCache);
-		}
-
-		return runQuery;
-
-		function runQuery(query, onCompleted) {
-			try {
-				var params = query.parameters;
-				var sql = query.sql();
-				var completeQuery = log.startQuery({ sql, parameters: params });
-
-				let statement = statementCache.get(sql);
-				if (!statement) {
-					statement = connection.prepare(sql);
-					statementCache.set(sql, statement);
-				}
-
-				if (statement.reader) {
-					const rows = statement.all.apply(statement, params);
-					completeQuery();
-					onCompleted(null, rows);
-				} else {
-					statement.run.apply(statement, params);
-					completeQuery();
-					onCompleted(null, []);
-				}
-			}
-			catch (e) {
-				if (completeQuery)
-					completeQuery(e);
-				onCompleted(e);
-			}
-		}
-	}
-
-	wrapQuery_1$4 = wrapQuery;
-	return wrapQuery_1$4;
-}
-
-var wrapCommand_1$4;
-var hasRequiredWrapCommand$4;
-
-function requireWrapCommand$4 () {
-	if (hasRequiredWrapCommand$4) return wrapCommand_1$4;
-	hasRequiredWrapCommand$4 = 1;
-	var log = requireLog();
-	var connectionCache = new WeakMap();
-
-	function wrapCommand(_context, connection) {
-		var statementCache = connectionCache.get(connection);
-		if (!statementCache) {
-			statementCache = new Map();
-			connectionCache.set(connection, statementCache);
-		}
-		return runQuery;
-
-		function runQuery(query, onCompleted) {
-			var params = query.parameters;
-			var sql = query.sql();
-			var completeQuery = log.startQuery({ sql, parameters: params });
-
-			try {
-				var statement = statementCache.get(sql);
-				if (!statement) {
-					statement = connection.prepare(sql);
-					statementCache.set(sql, statement);
-				}
-				var info = statement.run.apply(statement, params);
-				var affected = info && typeof info.changes === 'number' ? info.changes : 0;
-				var insertId = info && typeof info.lastInsertRowid !== 'undefined' ? info.lastInsertRowid : undefined;
-				if (typeof insertId !== 'undefined')
-					complete(null, { rowsAffected: affected, lastInsertRowid: insertId });
-				else
-					complete(null, { rowsAffected: affected });
-			}
-			catch (e) {
-				complete(e);
-			}
-
-			function complete(e, result) {
-				completeQuery(e);
-				onCompleted(e, result);
-			}
-		}
-	}
-
-	wrapCommand_1$4 = wrapCommand;
-	return wrapCommand_1$4;
-}
-
-var newTransaction$6;
-var hasRequiredNewTransaction$6;
-
-function requireNewTransaction$6 () {
-	if (hasRequiredNewTransaction$6) return newTransaction$6;
-	hasRequiredNewTransaction$6 = 1;
-	const wrapQuery = requireWrapQuery$4();
-	const wrapCommand = requireWrapCommand$4();
-	const encodeBoolean = requireEncodeBoolean$3();
-	const deleteFromSql = requireDeleteFromSql$3();
-	const selectForUpdateSql = requireSelectForUpdateSql$3();
-	const lastInsertedSql = requireLastInsertedSql$2();
-	const limitAndOffset = requireLimitAndOffset$3();
-	const formatBigintOut = requireFormatBigintOut$3();
-	const insertSql = requireInsertSql$3();
-	const insert = requireInsert$3();
-	const batchInsert = requireBatchInsert();
-	const quote = requireQuote$3();
-
-	function newResolveTransaction(domain, pool, { readonly = false } = {})  {
-		var rdb = {poolFactory: pool};
-		if (!pool.connect) {
-			pool = pool();
-			rdb.pool = pool;
-		}
-		rdb.engine = 'sqlite';
-		rdb.maxParameters = 32766;
-		rdb.encodeBoolean = encodeBoolean;
-		rdb.decodeJSON = decodeJSON;
-		rdb.encodeJSON = JSON.stringify;
-		rdb.deleteFromSql = deleteFromSql;
-		rdb.selectForUpdateSql = selectForUpdateSql;
-		rdb.lastInsertedSql = lastInsertedSql;
-		rdb.formatBigintOut = formatBigintOut;
-		rdb.insertSql = insertSql;
-		rdb.insert = insert;
-		rdb.batchInsert = batchInsert;
-		rdb.lastInsertedIsSeparate = true;
-		rdb.multipleStatements = false;
-		rdb.limitAndOffset = limitAndOffset;
-		rdb.accept = function(caller) {
-			caller.visitSqlite();
-		};
-		rdb.aggregateCount = 0;
-		rdb.quote = quote;
-		rdb.cache = {};
-		rdb.changes = [];
-
-		if (readonly) {
-			rdb.dbClient = {
-				executeQuery: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							wrapQuery(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				},
-				executeCommand: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							wrapCommand(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				}
-			};
-			domain.rdb = rdb;
-			return (onSuccess) => onSuccess();
-		}
-
-		return function(onSuccess, onError) {
-			pool.connect(onConnected);
-
-			function onConnected(err, client, done) {
-				try {
-					if (err) {
-						onError(err);
-						return;
-					}
-					client.executeQuery = wrapQuery(domain, client);
-					client.executeCommand = wrapCommand(domain, client);
-					rdb.dbClient = client;
-					rdb.dbClientDone = done;
-					domain.rdb = rdb;
-					onSuccess();
-				} catch (e) {
-					onError(e);
-				}
-			}
-		};
-	}
-
-	function decodeJSON(value) {
-		return JSON.parse(value);
-	}
-
-	newTransaction$6 = newResolveTransaction;
-	return newTransaction$6;
-}
-
-var end$5;
-var hasRequiredEnd$5;
-
-function requireEnd$5 () {
-	if (hasRequiredEnd$5) return end$5;
-	hasRequiredEnd$5 = 1;
-	var pools = requirePools();
-
-	function endPool(genericPool, id, done) {
-		genericPool.drain(onDrained);
-
-		function onDrained() {
-			genericPool.destroyAllNow();
-			delete pools[id];
-			done();
-		}
-	}
-
-	end$5 = endPool;
-	return end$5;
-}
-
-/* eslint-disable no-prototype-builtins */
-
-var newGenericPool_1$4;
-var hasRequiredNewGenericPool$4;
-
-function requireNewGenericPool$4 () {
-	if (hasRequiredNewGenericPool$4) return newGenericPool_1$4;
-	hasRequiredNewGenericPool$4 = 1;
-	var defaults = requirePoolDefaults();
-
-	var genericPool = requireGenericPool();
-	var sqlite;
-
-	function newGenericPool(connectionString, poolOptions) {
-		poolOptions = poolOptions || {};
-		var pool = genericPool.Pool({
-			min: poolOptions.min || 0,
-			max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
-			idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
-			reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
-			log: poolOptions.log || defaults.poolLog,
-			create: async function(cb) {
-				try {
-					if (!sqlite)
-						sqlite = await import('better-sqlite3');
-					sqlite = sqlite.default || sqlite;
-				}
-				catch (err) {
-					return cb(err, null);
-				}
-				try {
-					var client = new sqlite(connectionString);
-					client.poolCount = 0;
-					return cb(null, client);
-				}
-				catch (err) {
-					return cb(err, null);
-				}
-			},
-
-			destroy: function(client) {
-				client.poolCount = undefined;
-				client.close();
-			}
-		});
-		//monkey-patch with connect method
-		pool.connect = function(cb) {
-			pool.acquire(function(err, client) {
-				if(err)  return cb(err, null, function() {/*NOOP*/});
-				client.poolCount++;
-				cb(null, client, function(err) {
-					if(err) {
-						pool.destroy(client);
-					} else {
-						pool.release(client);
-					}
-				});
-			});
-		};
-		return pool;
-	}
-
-	newGenericPool_1$4 = newGenericPool;
-	return newGenericPool_1$4;
-}
-
-var newPool_1$6;
-var hasRequiredNewPool$6;
-
-function requireNewPool$6 () {
-	if (hasRequiredNewPool$6) return newPool_1$6;
-	hasRequiredNewPool$6 = 1;
-	const promisify = requirePromisify();
-	const pools = requirePools();
-	const end = requireEnd$5();
-	const newGenericPool = requireNewGenericPool$4();
-	const newId = requireNewId();
-
-	function newPool(connectionString, poolOptions) {
-		let pool = newGenericPool(connectionString, poolOptions);
-		let id = newId();
-		let boundEnd = end.bind(null, pool, id);
-		let c = {};
-
-		c.connect = pool.connect;
-		c.end = promisify(boundEnd);
-		c.__orangeCloneDatabaseTo = function(targetConnectionString) {
-			return new Promise((resolve, reject) => {
-				pool.connect((error, client, release) => {
-					if (error)
-						return reject(error);
-					if (!client || typeof client.backup !== 'function') {
-						release();
-						return reject(new Error('SQLite client cannot clone a database.'));
-					}
-					Promise.resolve(client.backup(targetConnectionString))
-						.then((result) => {
-							release();
-							resolve(result);
-						}, (backupError) => {
-							release(backupError);
-							reject(backupError);
-						});
-				});
-			});
-		};
-		pools[id] = c;
-		return c;
-	}
-
-	newPool_1$6 = newPool;
-	return newPool_1$6;
-}
-
-var newDatabase_1$6;
-var hasRequiredNewDatabase$6;
-
-function requireNewDatabase$6 () {
-	if (hasRequiredNewDatabase$6) return newDatabase_1$6;
-	hasRequiredNewDatabase$6 = 1;
-	let createDomain = requireCreateDomain();
-	let newTransaction = requireNewTransaction$6();
-	let _begin = requireBegin();
-	let commit = requireCommit();
-	let rollback = requireRollback();
-	let newPool = requireNewPool$6();
-	let express = requireHostExpress();
-	let hono = requireHostHono();
-	let hostLocal = requireHostLocal();
-	let doQuery = requireQuery();
-	let doSqliteFunction = requireSqliteFunction();
-	let releaseDbClient = requireReleaseDbClient();
-
-	function newDatabase(connectionString, poolOptions) {
-		if (!connectionString)
-			throw new Error('Connection string cannot be empty');
-		poolOptions = poolOptions || { min: 1 };
-		var pool = newPool(connectionString, poolOptions);
-		pool.__sqliteSync = poolOptions && poolOptions.sync;
-		pool.__orangeSyncIdentity = `sqlite:${connectionString}`;
-
-		let c = { poolFactory: pool, hostLocal, express, hono };
-		c.__orangeSyncIdentity = pool.__orangeSyncIdentity;
-
-		c.transaction = function(options, fn) {
-			if ((arguments.length === 1) && (typeof options === 'function')) {
-				fn = options;
-				options = undefined;
-			}
-			let domain = createDomain();
-
-			if (!fn)
-				throw new Error('transaction requires a function');
-			return domain.run(runInTransaction);
-
-			function begin() {
-				return _begin(domain, options);
-			}
-
-			async function runInTransaction() {
-				let result;
-				let transaction = newTransaction(domain, pool, options);
-				await new Promise(transaction)
-					.then(begin)
-					.then(() => fn(domain))
-					.then((res) => result = res)
-					.then(() => commit(domain))
-					.then(null, (e) => rollback(domain, e));
-				return result;
-			}
-
-
-		};
-
-		c.createTransaction = function(options) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
-			let p = domain.run(() => new Promise(transaction).then(begin));
-
-			function run(fn) {
-				return p.then(() => fn(domain));
-			}
-			run.rollback = rollback.bind(null, domain);
-			run.commit = commit.bind(null, domain);
-			return run;
-
-			function begin() {
-				return _begin(domain, options);
-			}
-		};
-
-		c.query = function(query) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
-			let p = domain.run(() => new Promise(transaction)
-				.then(() => doQuery(domain, query).then(onResult, onError)));
-			return p;
-
-			function onResult(result) {
-				releaseDbClient(domain);
-				return result;
-			}
-
-			function onError(e) {
-				releaseDbClient(domain);
-				throw e;
-			}
-		};
-
-		c.sqliteFunction = function(...args) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
-			let p = domain.run(() => new Promise(transaction)
-				.then(() => doSqliteFunction(domain, ...args).then(onResult, onError)));
-			return p;
-
-			function onResult(result) {
-				releaseDbClient(domain);
-				return result;
-			}
-
-			function onError(e) {
-				releaseDbClient(domain);
-				throw e;
-			}
-		};
-
-
-		c.rollback = rollback;
-		c.commit = commit;
-		c.__sqliteSync = poolOptions && poolOptions.sync;
-
-		c.end = function() {
-			if (poolOptions)
-				return pool.end();
-			else
-				return Promise.resolve();
-		};
-
-		c.accept = function(caller) {
-			caller.visitSqlite();
-		};
-
-		return c;
-	}
-
-	newDatabase_1$6 = newDatabase;
-	return newDatabase_1$6;
-}
-
-var newTransaction$5;
-var hasRequiredNewTransaction$5;
-
-function requireNewTransaction$5 () {
-	if (hasRequiredNewTransaction$5) return newTransaction$5;
-	hasRequiredNewTransaction$5 = 1;
-	const encodeBoolean = requireEncodeBoolean$3();
-	const encodeBinary = requireEncodeBinary();
-	const decodeBinary = requireDecodeBinary();
-	const deleteFromSql = requireDeleteFromSql$3();
-	const selectForUpdateSql = requireSelectForUpdateSql$3();
-	const lastInsertedSql = requireLastInsertedSql$2();
-	const limitAndOffset = requireLimitAndOffset$3();
-	const formatBigintOut = requireFormatBigintOut$3();
-	const insertSql = requireInsertSql$3();
-	const insert = requireInsert$3();
-	const batchInsert = requireBatchInsert();
-	const quote = requireQuote$3();
+	const quote = requireQuote$1();
 
 	function newResolveTransaction(domain, pool, { readonly = false, priority } = {})  {
 		var rdb = { poolFactory: pool };
@@ -31400,16 +28169,16 @@ function requireNewTransaction$5 () {
 		return JSON.parse(value);
 	}
 
-	newTransaction$5 = newResolveTransaction;
-	return newTransaction$5;
+	newTransaction$1 = newResolveTransaction;
+	return newTransaction$1;
 }
 
-var newPool_1$5;
-var hasRequiredNewPool$5;
+var newPool_1$1;
+var hasRequiredNewPool$1;
 
-function requireNewPool$5 () {
-	if (hasRequiredNewPool$5) return newPool_1$5;
-	hasRequiredNewPool$5 = 1;
+function requireNewPool$1 () {
+	if (hasRequiredNewPool$1) return newPool_1$1;
+	hasRequiredNewPool$1 = 1;
 	const pools = requirePools();
 	const newId = requireNewId();
 	const createSqliteOPFSWorkerClient = requireWorkerClient();
@@ -31786,8 +28555,8 @@ function requireNewPool$5 () {
 		};
 	}
 
-	newPool_1$5 = newPool;
-	return newPool_1$5;
+	newPool_1$1 = newPool;
+	return newPool_1$1;
 }
 
 var dualSyncDatabase = {exports: {}};
@@ -34752,18 +31521,18 @@ function requireDualSyncDatabase () {
 	return dualSyncDatabase.exports;
 }
 
-var newDatabase_1$5;
-var hasRequiredNewDatabase$5;
+var newDatabase_1$1;
+var hasRequiredNewDatabase$1;
 
-function requireNewDatabase$5 () {
-	if (hasRequiredNewDatabase$5) return newDatabase_1$5;
-	hasRequiredNewDatabase$5 = 1;
+function requireNewDatabase$1 () {
+	if (hasRequiredNewDatabase$1) return newDatabase_1$1;
+	hasRequiredNewDatabase$1 = 1;
 	let createDomain = requireCreateDomain();
-	let newTransaction = requireNewTransaction$5();
+	let newTransaction = requireNewTransaction$1();
 	let _begin = requireBegin();
 	let commit = requireCommit();
 	let rollback = requireRollback();
-	let newPool = requireNewPool$5();
+	let newPool = requireNewPool$1();
 	let express = requireHostExpress();
 	let hono = requireHostHono();
 	let hostLocal = requireHostLocal();
@@ -34892,2969 +31661,8 @@ function requireNewDatabase$5 () {
 		return !!sync;
 	}
 
-	newDatabase_1$5 = newDatabase;
-	return newDatabase_1$5;
-}
-
-var wrapQuery_1$3;
-var hasRequiredWrapQuery$3;
-
-function requireWrapQuery$3 () {
-	if (hasRequiredWrapQuery$3) return wrapQuery_1$3;
-	hasRequiredWrapQuery$3 = 1;
-	var log = requireLog();
-
-	function wrapQuery(_context, client) {
-
-		return runQuery;
-
-		function runQuery(query, onCompleted) {
-
-			var params = query.parameters;
-			var sql = query.sql();
-			var completeQuery = log.startQuery({sql, parameters: params});
-			client.d1.prepare(sql, params).bind(...params).all().then(onInnerCompleted, onError);
-
-			function onInnerCompleted(response) {
-				completeQuery();
-				onCompleted(null, response.results);
-			}
-
-			function onError(e) {
-				completeQuery(e);
-				onCompleted(e);
-			}
-
-		}
-
-	}
-
-	wrapQuery_1$3 = wrapQuery;
-	return wrapQuery_1$3;
-}
-
-var wrapCommand_1$3;
-var hasRequiredWrapCommand$3;
-
-function requireWrapCommand$3 () {
-	if (hasRequiredWrapCommand$3) return wrapCommand_1$3;
-	hasRequiredWrapCommand$3 = 1;
-	var log = requireLog();
-
-	function wrapCommand(_context, client) {
-		return runQuery;
-
-		function runQuery(query, onCompleted) {
-			var params = Array.isArray(query.parameters) ? query.parameters : [];
-			var sql = query.sql();
-			var completeQuery = log.startQuery({ sql, parameters: params });
-
-			client.d1
-				.prepare(sql)
-				.bind.apply(null, params)
-				.run()
-				.then(onInnerCompleted, onError);
-
-			function onInnerCompleted(response) {
-				var affectedRows = 0;
-
-				if (response) {
-					if (typeof response.changes === 'number') affectedRows = response.changes;
-					else if (typeof response.meta === 'object' && response.meta && typeof response.meta.changes === 'number') {
-						affectedRows = response.meta.changes;
-					} else if (typeof response.affectedRows === 'number') {
-						affectedRows = response.affectedRows;
-					}
-				}
-
-				completeQuery();
-				onCompleted(null, { rowsAffected: affectedRows });
-			}
-
-			function onError(e) {
-				completeQuery(e);
-				onCompleted(e, { rowsAffected: 0 });
-			}
-		}
-	}
-
-	wrapCommand_1$3 = wrapCommand;
-	return wrapCommand_1$3;
-}
-
-var newTransaction$4;
-var hasRequiredNewTransaction$4;
-
-function requireNewTransaction$4 () {
-	if (hasRequiredNewTransaction$4) return newTransaction$4;
-	hasRequiredNewTransaction$4 = 1;
-	const wrapQuery = requireWrapQuery$3();
-	const wrapCommand = requireWrapCommand$3();
-	const encodeBoolean = requireEncodeBoolean$3();
-	const formatBigintOut = requireFormatBigintOut$3();
-	const deleteFromSql = requireDeleteFromSql$3();
-	const selectForUpdateSql = requireSelectForUpdateSql$3();
-	const lastInsertedSql = requireLastInsertedSql$2();
-	const limitAndOffset = requireLimitAndOffset$3();
-	const insertSql = requireInsertSql$3();
-	const insert = requireInsert$3();
-	const batchInsert = requireBatchInsert();
-
-	function newResolveTransaction(domain, pool, { readonly = false } = {})  {
-		var rdb = {poolFactory: pool};
-		if (!pool.connect) {
-			pool = pool();
-			rdb.pool = pool;
-		}
-		rdb.engine = 'sqlite';
-		rdb.maxParameters = 100;
-		rdb.encodeBoolean = encodeBoolean;
-		rdb.decodeJSON = decodeJSON;
-		rdb.encodeJSON = JSON.stringify;
-		rdb.formatBigintOut = formatBigintOut;
-		rdb.deleteFromSql = deleteFromSql;
-		rdb.selectForUpdateSql = selectForUpdateSql;
-		rdb.lastInsertedSql = lastInsertedSql;
-		rdb.insertSql = insertSql;
-		rdb.insert = insert;
-		rdb.batchInsert = batchInsert;
-		rdb.lastInsertedIsSeparate = true;
-		rdb.multipleStatements = false;
-		rdb.limitAndOffset = limitAndOffset;
-		rdb.accept = function(caller) {
-			caller.visitSqlite();
-		};
-		rdb.aggregateCount = 0;
-		rdb.quote = (name) => `"${name}"`;
-		rdb.cache = {};
-		rdb.changes = [];
-
-		if (readonly) {
-			rdb.dbClient = {
-				executeQuery: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							wrapQuery(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				},
-				executeCommand: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							wrapCommand(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				}
-			};
-			domain.rdb = rdb;
-			return (onSuccess) => onSuccess();
-		}
-
-		return function(onSuccess, onError) {
-			pool.connect(onConnected);
-
-			function onConnected(err, client, done) {
-				try {
-					if (err) {
-						onError(err);
-						return;
-					}
-					client.executeQuery = wrapQuery(domain, client);
-					client.executeCommand = wrapCommand(domain, client);
-					rdb.dbClient = client;
-					rdb.dbClientDone = done;
-					domain.rdb = rdb;
-					onSuccess();
-				} catch (e) {
-					onError(e);
-				}
-			}
-		};
-	}
-
-	function decodeJSON(value) {
-		return JSON.parse(value);
-	}
-
-	newTransaction$4 = newResolveTransaction;
-	return newTransaction$4;
-}
-
-var end$4;
-var hasRequiredEnd$4;
-
-function requireEnd$4 () {
-	if (hasRequiredEnd$4) return end$4;
-	hasRequiredEnd$4 = 1;
-	var pools = requirePools();
-
-	function endPool(genericPool, id, done) {
-		genericPool.drain(onDrained);
-
-		function onDrained() {
-			genericPool.destroyAllNow();
-			delete pools[id];
-			done();
-		}
-	}
-
-	end$4 = endPool;
-	return end$4;
-}
-
-/* eslint-disable no-prototype-builtins */
-
-var newGenericPool_1$3;
-var hasRequiredNewGenericPool$3;
-
-function requireNewGenericPool$3 () {
-	if (hasRequiredNewGenericPool$3) return newGenericPool_1$3;
-	hasRequiredNewGenericPool$3 = 1;
-	var defaults = requirePoolDefaults();
-	var genericPool = requireGenericPool();
-
-	function newGenericPool(d1Database, poolOptions) {
-		poolOptions = poolOptions || {};
-		// @ts-ignore
-		var pool = genericPool.Pool({
-			min: poolOptions.min || 0,
-			max: 1,
-			idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
-			reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
-			log: poolOptions.log || defaults.poolLog,
-			create: function(cb) {
-				var client = {d1: d1Database, poolCount: 0};
-
-				return cb(null, client);
-			},
-
-			destroy: function() {
-			}
-		});
-		//monkey-patch with connect method
-		pool.connect = function(cb) {
-
-			pool.acquire(function(err, client) {
-				if(err)  return cb(err, null, function() {/*NOOP*/});
-				client.poolCount++;
-				cb(null, client, function(err) {
-					if(err) {
-						pool.destroy(client);
-					} else {
-						pool.release(client);
-					}
-				});
-			});
-		};
-		return pool;
-	}
-
-	newGenericPool_1$3 = newGenericPool;
-	return newGenericPool_1$3;
-}
-
-var newPool_1$4;
-var hasRequiredNewPool$4;
-
-function requireNewPool$4 () {
-	if (hasRequiredNewPool$4) return newPool_1$4;
-	hasRequiredNewPool$4 = 1;
-	const promisify = requirePromisify();
-	const pools = requirePools();
-	const end = requireEnd$4();
-	const newGenericPool = requireNewGenericPool$3();
-	const newId = requireNewId();
-
-	function newPool(d1Database, poolOptions) {
-		var pool = newGenericPool(d1Database, poolOptions);
-		var id = newId();
-		var boundEnd = end.bind(null, pool, id);
-		var c = {};
-
-		c.connect = pool.connect;
-		c.end = promisify(boundEnd);
-		pools[id] = c;
-		return c;
-	}
-
-	newPool_1$4 = newPool;
-	return newPool_1$4;
-}
-
-var newDatabase_1$4;
-var hasRequiredNewDatabase$4;
-
-function requireNewDatabase$4 () {
-	if (hasRequiredNewDatabase$4) return newDatabase_1$4;
-	hasRequiredNewDatabase$4 = 1;
-	let createDomain = requireCreateDomain();
-	let newTransaction = requireNewTransaction$4();
-	let _begin = requireBegin();
-	let commit = requireCommit();
-	let rollback = requireRollback();
-	let newPool = requireNewPool$4();
-	let express = requireHostExpress();
-	let hono = requireHostHono();
-	let hostLocal = requireHostLocal();
-	let doQuery = requireQuery();
-	let releaseDbClient = requireReleaseDbClient();
-
-	function newDatabase(d1Database, poolOptions) {
-		if (!d1Database)
-			throw new Error('Missing d1Database');
-		poolOptions = poolOptions || { min: 1 };
-		var pool = newPool(d1Database, poolOptions);
-
-		let c = { poolFactory: pool, hostLocal, express, hono };
-
-		c.transaction = function(options, fn) {
-			if ((arguments.length === 1) && (typeof options === 'function')) {
-				fn = options;
-				options = undefined;
-			}
-			let domain = createDomain();
-
-			if (!fn)
-				throw new Error('transaction requires a function');
-			return domain.run(runInTransaction);
-
-			async function runInTransaction() {
-				let result;
-				let transaction = newTransaction(domain, pool, options);
-				await new Promise(transaction)
-					.then(begin)
-					.then(() => fn(domain))
-					.then((res) => result = res)
-					.then(() => c.commit(domain))
-					.then(null, (e) =>  c.rollback(domain,e));
-				return result;
-			}
-
-			function begin() {
-				return _begin(domain, { transactionLess: true });
-			}
-
-
-		};
-
-		c.createTransaction = function(options) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool, options);
-			let p = domain.run(() => new Promise(transaction).then(begin));
-
-			function run(fn) {
-				return p.then(domain.run.bind(domain, fn));
-			}
-
-			function begin() {
-				return _begin(domain, options);
-			}
-
-			run.rollback = rollback.bind(null, domain);
-			run.commit = commit.bind(null, domain);
-
-			return run;
-
-		};
-
-		c.query = function(query) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
-			let p = domain.run(() => new Promise(transaction)
-				.then(() => doQuery(domain, query).then(onResult, onError)));
-			return p;
-
-			function onResult(result) {
-				releaseDbClient(domain);
-				return result;
-			}
-
-			function onError(e) {
-				releaseDbClient(domain);
-				throw e;
-			}
-		};
-
-		c.rollback = rollback;
-		c.commit = commit;
-
-		c.end = function() {
-			if (poolOptions)
-				return pool.end();
-			else
-				return Promise.resolve();
-		};
-
-		c.accept = function(caller) {
-			caller.visitSqlite();
-		};
-
-		return c;
-	}
-
-	newDatabase_1$4 = newDatabase;
-	return newDatabase_1$4;
-}
-
-var wrapQuery_1$2;
-var hasRequiredWrapQuery$2;
-
-function requireWrapQuery$2 () {
-	if (hasRequiredWrapQuery$2) return wrapQuery_1$2;
-	hasRequiredWrapQuery$2 = 1;
-	var log = requireLog();
-	var getSessionSingleton = requireGetSessionSingleton();
-
-	function wrapQuery(_context, connection) {
-		var runOriginalQuery = connection.query;
-		return runQuery;
-
-		function runQuery(query, onCompleted) {
-			var params = query.parameters;
-			var sql = query.sql();
-			var completeQuery = log.startQuery({ sql, parameters: params });
-
-			const replacements = [];
-			const parametersToRemove = [];
-			const engine = getSessionSingleton(_context, 'engine');
-
-			if (engine === 'sap') {
-				const sap = connection.msnodesqlv8;
-
-				// Check if this is a stored procedure call
-				const isStoredProcCall = /EXECUTE\s+/i.test(sql) || /EXEC\s+/i.test(sql);
-				let hexVariables = [];
-
-				// Non-ASCII UTF-8 characters workaround
-				for (let i = 0; i < params.length; i++) {
-					const parameter = params[i];
-
-					if (typeof parameter === 'string') {
-						const byteLength = Buffer.from(parameter, 'utf8').length;
-
-						if (hasNonAsciiCharacters(parameter)) {
-							const hexValue = stringToHex(parameter);
-
-							if (isStoredProcCall) {
-								// For stored procedures, create a variable with exact lengths
-								const varName = `@hex_param_${i}`;
-								const convertClause = `CONVERT(VARCHAR(${byteLength}), CONVERT(VARBINARY(${byteLength}), 0x${hexValue}))`;
-
-								hexVariables.push({
-									declaration: `DECLARE ${varName} VARCHAR(${byteLength})`,
-									assignment: `SET ${varName} = ${convertClause}`
-								});
-
-								replacements.push({
-									index: i,
-									replacement: varName
-								});
-							} else {
-								// For regular queries, use inline conversion with exact lengths
-								const convertClause = `CONVERT(VARCHAR(${byteLength}), CONVERT(VARBINARY(${byteLength}), 0x${hexValue}))`;
-								replacements.push({
-									index: i,
-									replacement: convertClause
-								});
-							}
-							parametersToRemove.push(i);
-						} else {
-							// For ASCII strings, use VarChar with exact byte length
-							params[i] = sap.VarChar(parameter, byteLength);
-						}
-					}
-				}
-
-				// Apply replacements
-				if (replacements.length > 0) {
-					let questionMarkIndex = 0;
-					sql = sql.replace(/\?/g, (match) => {
-						const replacement = replacements.find(r => r.index === questionMarkIndex);
-						questionMarkIndex++;
-
-						if (replacement) {
-							return replacement.replacement;
-						}
-						return match;
-					});
-
-					// For stored procedures, inject hex variable declarations
-					if (isStoredProcCall && hexVariables.length > 0) {
-						const lines = sql.split('\n');
-						let insertIndex = 0;
-
-						// Find the last DECLARE statement
-						for (let i = 0; i < lines.length; i++) {
-							if (/^\s*DECLARE\s+/i.test(lines[i])) {
-								insertIndex = i + 1;
-							}
-						}
-
-						// Insert hex variable declarations and assignments
-						const hexDeclarations = hexVariables.map(v => v.declaration);
-						const hexAssignments = hexVariables.map(v => v.assignment);
-
-						lines.splice(insertIndex, 0, ...hexDeclarations, ...hexAssignments);
-						sql = lines.join('\n');
-					}
-				}
-
-				// Remove parameters in reverse order to maintain correct indices
-				parametersToRemove.reverse().forEach(index => {
-					params.splice(index, 1);
-				});
-			}
-
-			runOriginalQuery.call(connection, sql, params, onInnerCompleted);
-			let result = [];
-
-			function onInnerCompleted(err, rows, hasMore) {
-				if (err) {
-					if (err.code && err.code !== 3604) {
-						completeQuery(err);
-						onCompleted(err);
-					}
-					if (rows)
-						result.push(rows);
-					return;
-				}
-
-				result.push(rows);
-				if (!hasMore) {
-					completeQuery();
-					if (result.length === 1)
-						onCompleted(null, result[0]);
-					else
-						onCompleted(null, result);
-				}
-			}
-		}
-	}
-
-	function hasNonAsciiCharacters(str) {
-		// Check if string contains any character with code point > 127 (non-ASCII)
-		return /[\u0080-\uFFFF]/.test(str);
-	}
-
-	function stringToHex(str) {
-		return Buffer.from(str, 'utf8').toString('hex');
-	}
-
-	wrapQuery_1$2 = wrapQuery;
-	return wrapQuery_1$2;
-}
-
-var wrapCommand_1$2;
-var hasRequiredWrapCommand$2;
-
-function requireWrapCommand$2 () {
-	if (hasRequiredWrapCommand$2) return wrapCommand_1$2;
-	hasRequiredWrapCommand$2 = 1;
-	var log = requireLog();
-	var getSessionSingleton = requireGetSessionSingleton();
-
-	function wrapCommand(_context, connection) {
-		var runOriginalQuery = connection.query;
-		return runQuery;
-
-		function runQuery(query, onCompleted) {
-			var params = query.parameters;
-			var sql = query.sql();
-			var completeQuery = log.startQuery({ sql, parameters: params });
-
-			const replacements = [];
-			const parametersToRemove = [];
-			const engine = getSessionSingleton(_context, 'engine');
-
-			if (engine === 'sap') {
-				const sap = connection.msnodesqlv8;
-
-				const isStoredProcCall = /EXECUTE\s+/i.test(sql) || /EXEC\s+/i.test(sql);
-				let hexVariables = [];
-
-				for (let i = 0; i < params.length; i++) {
-					const parameter = params[i];
-
-					if (typeof parameter === 'string') {
-						const byteLength = Buffer.from(parameter, 'utf8').length;
-
-						if (hasNonAsciiCharacters(parameter)) {
-							const hexValue = stringToHex(parameter);
-
-							if (isStoredProcCall) {
-								const varName = `@hex_param_${i}`;
-								const convertClause = `CONVERT(VARCHAR(${byteLength}), CONVERT(VARBINARY(${byteLength}), 0x${hexValue}))`;
-
-								hexVariables.push({
-									declaration: `DECLARE ${varName} VARCHAR(${byteLength})`,
-									assignment: `SET ${varName} = ${convertClause}`
-								});
-
-								replacements.push({
-									index: i,
-									replacement: varName
-								});
-							} else {
-								const convertClause = `CONVERT(VARCHAR(${byteLength}), CONVERT(VARBINARY(${byteLength}), 0x${hexValue}))`;
-								replacements.push({
-									index: i,
-									replacement: convertClause
-								});
-							}
-							parametersToRemove.push(i);
-						} else {
-							params[i] = sap.VarChar(parameter, byteLength);
-						}
-					}
-				}
-
-				if (replacements.length > 0) {
-					let questionMarkIndex = 0;
-					sql = sql.replace(/\?/g, (match) => {
-						const replacement = replacements.find(r => r.index === questionMarkIndex);
-						questionMarkIndex++;
-
-						if (replacement) {
-							return replacement.replacement;
-						}
-						return match;
-					});
-
-					if (isStoredProcCall && hexVariables.length > 0) {
-						const lines = sql.split('\n');
-						let insertIndex = 0;
-
-						for (let i = 0; i < lines.length; i++) {
-							if (/^\s*DECLARE\s+/i.test(lines[i])) {
-								insertIndex = i + 1;
-							}
-						}
-
-						const hexDeclarations = hexVariables.map(v => v.declaration);
-						const hexAssignments = hexVariables.map(v => v.assignment);
-
-						lines.splice(insertIndex, 0, ...hexDeclarations, ...hexAssignments);
-						sql = lines.join('\n');
-					}
-				}
-
-				parametersToRemove.reverse().forEach(index => {
-					params.splice(index, 1);
-				});
-			}
-
-			let affectedRows = 0;
-
-			const q = runOriginalQuery.call(connection, sql, params, onInnerCompleted);
-
-			if (q && typeof q.on === 'function') {
-				q.on('rowcount', (count) => {
-					if (typeof count === 'number') {
-						affectedRows += count;
-					}
-				});
-			}
-
-			function onInnerCompleted(err, _rows, hasMore) {
-				if (err) {
-					if (err.code && err.code !== 3604) {
-						completeQuery(err);
-						onCompleted(err, { rowsAffected: 0 });
-						return;
-					}
-				}
-
-				if (!hasMore) {
-					completeQuery();
-					onCompleted(null, { rowsAffected: affectedRows });
-				}
-			}
-		}
-	}
-
-	function hasNonAsciiCharacters(str) {
-		return /[\u0080-\uFFFF]/.test(str);
-	}
-
-	function stringToHex(str) {
-		return Buffer.from(str, 'utf8').toString('hex');
-	}
-
-	wrapCommand_1$2 = wrapCommand;
-	return wrapCommand_1$2;
-}
-
-var encodeBoolean_1$2;
-var hasRequiredEncodeBoolean$2;
-
-function requireEncodeBoolean$2 () {
-	if (hasRequiredEncodeBoolean$2) return encodeBoolean_1$2;
-	hasRequiredEncodeBoolean$2 = 1;
-	function encodeBoolean(bool) {
-		if (bool)
-			return 1;
-		return 0;
-	}
-
-	encodeBoolean_1$2 = encodeBoolean;
-	return encodeBoolean_1$2;
-}
-
-var quote$2;
-var hasRequiredQuote$2;
-
-function requireQuote$2 () {
-	if (hasRequiredQuote$2) return quote$2;
-	hasRequiredQuote$2 = 1;
-	quote$2 = (name) => `[${name}]`;
-	return quote$2;
-}
-
-var deleteFromSql_1$2;
-var hasRequiredDeleteFromSql$2;
-
-function requireDeleteFromSql$2 () {
-	if (hasRequiredDeleteFromSql$2) return deleteFromSql_1$2;
-	hasRequiredDeleteFromSql$2 = 1;
-	const format = 'delete %s from %s as %s%s';
-	const formatString = requireFormat();
-	const quote = requireQuote$2();
-
-	function deleteFromSql(table, alias, whereSql) {
-		const name = quote(table._dbName);
-		alias = quote(alias);
-		return formatString(format, alias, name, alias, whereSql);
-	}
-	deleteFromSql_1$2 = deleteFromSql;
-	return deleteFromSql_1$2;
-}
-
-var selectForUpdateSql_1;
-var hasRequiredSelectForUpdateSql$2;
-
-function requireSelectForUpdateSql$2 () {
-	if (hasRequiredSelectForUpdateSql$2) return selectForUpdateSql_1;
-	hasRequiredSelectForUpdateSql$2 = 1;
-	function selectForUpdateSql() {
-		return '';
-	}
-
-	selectForUpdateSql.tableHint = function(_context, lock) {
-		const hints = [];
-		if (lock.forUpdate)
-			hints.push('UPDLOCK');
-		if (lock.skipLocked) {
-			hints.push('READPAST');
-			hints.push('ROWLOCK');
-		}
-		if (hints.length === 0)
-			return '';
-		return ' WITH (' + hints.join(', ') + ')';
-	};
-
-	selectForUpdateSql_1 = selectForUpdateSql;
-	return selectForUpdateSql_1;
-}
-
-var limitAndOffset_1$2;
-var hasRequiredLimitAndOffset$2;
-
-function requireLimitAndOffset$2 () {
-	if (hasRequiredLimitAndOffset$2) return limitAndOffset_1$2;
-	hasRequiredLimitAndOffset$2 = 1;
-	function limitAndOffset(span) {
-		if (span.offset)
-			return ` OFFSET ${span.offset} ROWS${limit()}`;
-		else
-			return '';
-
-		function limit() {
-			if (span.limit || span.limit === 0)
-				return ` FETCH NEXT ${span.limit} ROW ONLY`;
-			else
-				return '';
-		}
-
-	}
-
-	limitAndOffset_1$2 = limitAndOffset;
-	return limitAndOffset_1$2;
-}
-
-var formatDateOut_1$1;
-var hasRequiredFormatDateOut$2;
-
-function requireFormatDateOut$2 () {
-	if (hasRequiredFormatDateOut$2) return formatDateOut_1$1;
-	hasRequiredFormatDateOut$2 = 1;
-	const quote = requireQuote$2();
-
-	function formatDateOut(column, alias) {
-		if (alias)
-			return `CONVERT(VARCHAR, ${alias}.${quote(column._dbName)}, 126)`;
-		else
-			return `CONVERT(VARCHAR, ${quote(column._dbName)}, 126)`;
-	}
-
-	formatDateOut_1$1 = formatDateOut;
-	return formatDateOut_1$1;
-}
-
-var formatBigintOut_1$2;
-var hasRequiredFormatBigintOut$2;
-
-function requireFormatBigintOut$2 () {
-	if (hasRequiredFormatBigintOut$2) return formatBigintOut_1$2;
-	hasRequiredFormatBigintOut$2 = 1;
-	const quote = requireQuote$2();
-
-	function formatBigintOut(column, alias) {
-		const quotedCol = quote(column._dbName);
-		if (alias)
-			return `CAST(${alias}.${quotedCol} AS NVARCHAR(20))`;
-		else
-			return `CAST(${quotedCol} AS NVARCHAR(20))`;
-	}
-
-	formatBigintOut_1$2 = formatBigintOut;
-	return formatBigintOut_1$2;
-}
-
-var formatBigintIn_1$1;
-var hasRequiredFormatBigintIn$1;
-
-function requireFormatBigintIn$1 () {
-	if (hasRequiredFormatBigintIn$1) return formatBigintIn_1$1;
-	hasRequiredFormatBigintIn$1 = 1;
-	function formatBigintIn(value) {
-		return `CONVERT(BIGINT, ${value})`;
-	}
-
-	formatBigintIn_1$1 = formatBigintIn;
-	return formatBigintIn_1$1;
-}
-
-var formatJSONOut_1;
-var hasRequiredFormatJSONOut;
-
-function requireFormatJSONOut () {
-	if (hasRequiredFormatJSONOut) return formatJSONOut_1;
-	hasRequiredFormatJSONOut = 1;
-	function formatJSONOut(column, alias) {
-		if (alias)
-			return `JSON_QUERY(${alias}.[${column._dbName}])`;
-		else
-			return `JSON_QUERY([${column._dbName}])`;
-	}
-
-	formatJSONOut_1 = formatJSONOut;
-	return formatJSONOut_1;
-}
-
-var outputInsertedSql_1;
-var hasRequiredOutputInsertedSql;
-
-function requireOutputInsertedSql () {
-	if (hasRequiredOutputInsertedSql) return outputInsertedSql_1;
-	hasRequiredOutputInsertedSql = 1;
-	function outputInsertedSql(context, table) {
-		let separator = '';
-		let result = 'OUTPUT ';
-		for (let i = 0; i < table._columns.length; i++) {
-			result += separator + formatColumn(table._columns[i]);
-			separator = ',';
-		}
-		return result;
-
-		function formatColumn(column) {
-			if (column.formatOut)
-				return `${column.formatOut(context, 'INSERTED')} AS [${column._dbName}]`;
-			else
-				return `INSERTED.[${column._dbName}]`;
-		}
-	}
-
-
-
-	outputInsertedSql_1 = outputInsertedSql;
-	return outputInsertedSql_1;
-}
-
-var mergeSql$2;
-var hasRequiredMergeSql$2;
-
-function requireMergeSql$2 () {
-	if (hasRequiredMergeSql$2) return mergeSql$2;
-	hasRequiredMergeSql$2 = 1;
-	const outputInsertedSql = requireOutputInsertedSql();
-
-	function insertSql(context, table, row, options) {
-
-		let columnNames = [];
-		let conflictColumnUpdateSql = '';
-		let values = [];
-		addDiscriminators();
-		addColumns();
-
-		const matched = whenMatched();
-		let sql;
-		if (matched)
-			sql = `MERGE INTO [${table._dbName}] AS target USING (SELECT ${values.join(',')}) AS source ON ${join()} WHEN MATCHED THEN ${matched} WHEN NOT MATCHED THEN ${whenNotMatched()} ${outputInsertedSql(context, table)};`;
-		else
-			sql = `MERGE INTO [${table._dbName}] AS target USING (SELECT ${values.join(',')}) AS source ON ${join()} WHEN NOT MATCHED THEN ${whenNotMatched()} ${outputInsertedSql(context, table)};`;
-		return sql;
-
-		function join() {
-			const discriminators = table._columnDiscriminators.map(x => {
-				const name = `[${x.split('=')[0]}]`;
-
-				return `target.${name}=source.${name}`;
-			});
-			const primaries = table._primaryColumns.map(x => `target.[${x._dbName}]=source.[${x._dbName}]`);
-			return [...discriminators, ...primaries].join(' AND ');
-		}
-
-		function whenMatched() {
-			if (options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite') {
-				return conflictColumnUpdateSql;
-			}
-			else return '';
-		}
-
-		function whenNotMatched() {
-			return `INSERT (${columnNames.join(',')}) VALUES (${columnNames.map(name => 'source.' + name)})`;
-		}
-
-		function addDiscriminators() {
-			let discriminators = table._columnDiscriminators;
-			for (let i = 0; i < discriminators.length; i++) {
-				let parts = discriminators[i].split('=');
-				columnNames.push(`[${parts[0]}]`);
-				values.push(`${parts[1]} AS ${[parts[0]]}`);
-			}
-		}
-
-		function addColumns() {
-			let conflictColumnUpdates = [];
-			let columns = table._columns;
-			for (let i = 0; i < columns.length; i++) {
-				let column = columns[i];
-				if (row['__' + column.alias] !== undefined) {
-					columnNames.push(`[${column._dbName}]`);
-					values.push(`%s AS [${column.alias}]`);
-					addConflictUpdate(column);
-				}
-			}
-
-			if (conflictColumnUpdates.length > 0)
-				conflictColumnUpdateSql = 'UPDATE SET ' + conflictColumnUpdates.join(',');
-
-
-			function addConflictUpdate(column) {
-				let concurrency = options[column.alias]?.concurrency || options.concurrency;
-				if (concurrency === 'overwrite')
-					conflictColumnUpdates.push(`target.[${column._dbName}]=source.[${column._dbName}]`);
-				else if (concurrency === 'optimistic')
-					conflictColumnUpdates.push(`target.[${column._dbName}] = CASE WHEN target.[${column._dbName}] <> source.[${column._dbName}] THEN CAST('12345678-1234-1234-1234-123456789012Conflict when updating [${column._dbName}]12345678-1234-1234-1234-123456789012' AS INTEGER) ELSE target.[${column._dbName}] END`);
-			}
-		}
-	}
-
-	mergeSql$2 = insertSql;
-	return mergeSql$2;
-}
-
-var insertSql_1$2;
-var hasRequiredInsertSql$2;
-
-function requireInsertSql$2 () {
-	if (hasRequiredInsertSql$2) return insertSql_1$2;
-	hasRequiredInsertSql$2 = 1;
-	let outputInsertedSql = requireOutputInsertedSql();
-	let mergeSql = requireMergeSql$2();
-
-	function getSqlTemplate(context, _table, _row, options) {
-		if (hasConcurrency(_table, options) && hasColumns())
-			return mergeSql.apply(null, [...arguments]);
-		else
-			return insertSql.apply(null, [...arguments]);
-
-		function hasColumns() {
-			for(let p in _row) {
-				let alias = _table[p]?.alias;
-				if (alias &&  _row['__' + alias] !== undefined && _table[p]?.equal)
-					return true;
-			}
-		}
-	}
-
-	function hasConcurrency(table,options) {
-		for (let i = 0; i < table._primaryColumns.length; i++) {
-			const concurrency = options[table._primaryColumns[i]]?.concurrency;
-			if ( concurrency === 'skipOnConflict' || concurrency === 'overwrite' )
-				return true;
-		}
-		return options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite';
-	}
-
-	function insertSql(context, table, row) {
-		let columnNames = [];
-		let values = [];
-		let sql = `INSERT INTO [${table._dbName}] `;
-		addDiscriminators();
-		addColumns();
-		if (columnNames.length === 0)
-			sql += `${outputInserted()}DEFAULT VALUES`;
-		else
-			sql = sql + '('+ columnNames.join(',') + ')' + outputInserted() +  'VALUES (' + values.join(',') + ')';
-		return sql;
-
-		function addDiscriminators() {
-			let discriminators = table._columnDiscriminators;
-			for (let i = 0; i < discriminators.length; i++) {
-				let parts = discriminators[i].split('=');
-				columnNames.push(`[${parts[0]}]`);
-				values.push(parts[1]);
-			}
-		}
-
-		function addColumns() {
-			let columns = table._columns;
-			for (let i = 0; i < columns.length; i++) {
-				let column = columns[i];
-				if (row['__' + column.alias] !== undefined) {
-					columnNames.push(`[${column._dbName}]`);
-					values.push('%s');
-				}
-			}
-		}
-
-
-		function outputInserted() {
-
-			return ' ' + outputInsertedSql(context, table) + ' ';
-		}
-
-	}
-
-	insertSql_1$2 = getSqlTemplate;
-	return insertSql_1$2;
-}
-
-var insert$1;
-var hasRequiredInsert$2;
-
-function requireInsert$2 () {
-	if (hasRequiredInsert$2) return insert$1;
-	hasRequiredInsert$2 = 1;
-	let newInsertCommand = requireNewInsertCommand();
-	let newInsertCommandCore = requireNewInsertCommandCore$1();
-	let executeQueries = requireExecuteQueries();
-
-	async function insertDefault(context, table, row, options) {
-		let insertCmd = newInsertCommand(newInsertCommandCore.bind(null, context), table, row, options);
-		insertCmd.disallowCompress = true;
-
-		return executeQueries(context, [insertCmd]).then((result) => result[result.length - 1]);
-
-	}
-
-	insert$1 = insertDefault;
-	return insert$1;
-}
-
-var newTransaction$3;
-var hasRequiredNewTransaction$3;
-
-function requireNewTransaction$3 () {
-	if (hasRequiredNewTransaction$3) return newTransaction$3;
-	hasRequiredNewTransaction$3 = 1;
-	var wrapQuery = requireWrapQuery$2();
-	var wrapCommand = requireWrapCommand$2();
-	var encodeBoolean = requireEncodeBoolean$2();
-	var deleteFromSql = requireDeleteFromSql$2();
-	var selectForUpdateSql = requireSelectForUpdateSql$2();
-	const limitAndOffset = requireLimitAndOffset$2();
-	const formatDateOut = requireFormatDateOut$2();
-	const formatBigintOut = requireFormatBigintOut$2();
-	const formatBigintIn = requireFormatBigintIn$1();
-	const formatJSONOut = requireFormatJSONOut();
-	const insertSql = requireInsertSql$2();
-	const insert = requireInsert$2();
-	const quote = requireQuote$2();
-
-	function newResolveTransaction(domain, pool, { readonly = false } = {}) {
-		var rdb = {poolFactory: pool};
-		if (!pool.connect) {
-			pool = pool();
-			rdb.pool = pool;
-		}
-		rdb.engine = 'mssqlNative';
-		rdb.maxParameters = 2098;
-		rdb.encodeBoolean = encodeBoolean;
-		rdb.decodeJSON = decodeJSON;
-		rdb.encodeJSON = JSON.stringify;
-		rdb.formatDateOut = formatDateOut;
-		rdb.formatBigintOut = formatBigintOut;
-		rdb.formatBigintIn = formatBigintIn;
-		rdb.formatJSONOut = formatJSONOut;
-		rdb.deleteFromSql = deleteFromSql;
-		rdb.selectForUpdateSql = selectForUpdateSql;
-		rdb.insertSql = insertSql;
-		rdb.insert = insert;
-		rdb.lastInsertedIsSeparate = false;
-		rdb.multipleStatements = true;
-		rdb.begin = 'BEGIN TRANSACTION';
-		rdb.limit = (span) => {
-			if (span.offset)
-				return '';
-			else if (span.limit || span.limit === 0)
-				return 'TOP ' + span.limit;
-			else
-				return '';
-		};
-		rdb.limitAndOffset = limitAndOffset;
-		rdb.accept = function(caller) {
-			caller.visitSqlite();
-		};
-		rdb.aggregateCount = 0;
-		rdb.quote = quote;
-		rdb.cache = {};
-		rdb.changes = [];
-
-		if (readonly) {
-			rdb.dbClient = {
-				executeQuery: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							client.setUseUTC(false);
-							wrapQuery(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				},
-				executeCommand: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							client.setUseUTC(false);
-							wrapCommand(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				}
-			};
-			domain.rdb = rdb;
-			return (onSuccess) => onSuccess();
-		}
-
-		return function(onSuccess, onError) {
-			pool.connect(onConnected);
-
-			function onConnected(err, client, done) {
-				try {
-					if (err) {
-						onError(err);
-						return;
-					}
-					client.setUseUTC(false);
-					client.executeQuery = wrapQuery(domain, client);
-					client.executeCommand = wrapCommand(domain, client);
-					rdb.dbClient = client;
-					rdb.dbClientDone = done;
-					domain.rdb = rdb;
-					onSuccess();
-				} catch (e) {
-					onError(e);
-				}
-			}
-		};
-	}
-	function decodeJSON(value){
-		return JSON.parse(value);
-	}
-
-	newTransaction$3 = newResolveTransaction;
-	return newTransaction$3;
-}
-
-var end$3;
-var hasRequiredEnd$3;
-
-function requireEnd$3 () {
-	if (hasRequiredEnd$3) return end$3;
-	hasRequiredEnd$3 = 1;
-	var pools = requirePools();
-
-	function endPool(genericPool, id, done) {
-		genericPool.drain(onDrained);
-
-		function onDrained() {
-			genericPool.destroyAllNow();
-			delete pools[id];
-			done();
-		}
-	}
-
-	end$3 = endPool;
-	return end$3;
-}
-
-var newGenericPool_1$2;
-var hasRequiredNewGenericPool$2;
-
-function requireNewGenericPool$2 () {
-	if (hasRequiredNewGenericPool$2) return newGenericPool_1$2;
-	hasRequiredNewGenericPool$2 = 1;
-	// @ts-nocheck
-	/* eslint-disable no-prototype-builtins */
-
-	var defaults = requirePoolDefaults();
-	var genericPool = requireGenericPool();
-	var mssql;
-
-	function newGenericPool(connectionString, poolOptions) {
-		poolOptions = poolOptions || {};
-		var pool = genericPool.Pool({
-			min: poolOptions.min || 0,
-			max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
-			idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
-			reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
-			log: poolOptions.log || defaults.poolLog,
-			create: async function(cb) {
-				try {
-					if (!mssql)
-						mssql = await import('msnodesqlv8');
-				}
-				catch (err) {
-					return cb(err, null);
-				}
-				var client;
-				// const config = {
-				// 	connectionString: connectionString,
-				// 	options: {
-				// 		useNumericString: true
-				// 	}
-				// };
-				mssql.open(connectionString, onConnected);
-
-				function onConnected(err, _client) {
-					if(err)
-						return cb(err, null);
-					client = _client;
-					// client.setUseNumericString(true);
-					client.poolCount = 0;
-					client.msnodesqlv8 = mssql;
-					return cb(null, client);
-				}
-			},
-
-			destroy: function(client) {
-				client.poolCount = undefined;
-				client.close();
-			}
-		});
-		//monkey-patch with connect method
-		pool.connect = function(cb) {
-			pool.acquire(function(err, client) {
-				if(err)  return cb(err, null, function() {/*NOOP*/});
-				client.poolCount++;
-				cb(null, client, function(err) {
-					if(err) {
-						pool.destroy(client);
-					} else {
-						pool.release(client);
-					}
-				});
-			});
-		};
-		return pool;
-	}
-
-	newGenericPool_1$2 = newGenericPool;
-	return newGenericPool_1$2;
-}
-
-var newPool_1$3;
-var hasRequiredNewPool$3;
-
-function requireNewPool$3 () {
-	if (hasRequiredNewPool$3) return newPool_1$3;
-	hasRequiredNewPool$3 = 1;
-	const promisify = requirePromisify();
-	var pools = requirePools();
-	var end = requireEnd$3();
-	var newGenericPool = requireNewGenericPool$2();
-	var newId = requireNewId();
-
-	function newPool(connectionString, poolOptions) {
-		var pool = newGenericPool(connectionString, poolOptions);
-		var id = newId();
-		var boundEnd = end.bind(null, pool, id);
-		var c = {};
-
-		c.connect = pool.connect;
-		c.end = promisify(boundEnd);
-		pools[id] = c;
-		return c;
-	}
-
-	newPool_1$3 = newPool;
-	return newPool_1$3;
-}
-
-var newDatabase_1$3;
-var hasRequiredNewDatabase$3;
-
-function requireNewDatabase$3 () {
-	if (hasRequiredNewDatabase$3) return newDatabase_1$3;
-	hasRequiredNewDatabase$3 = 1;
-	let createDomain = requireCreateDomain();
-	let newTransaction = requireNewTransaction$3();
-	let _begin = requireBegin();
-	let commit = requireCommit();
-	let rollback = requireRollback();
-	let newPool = requireNewPool$3();
-	let express = requireHostExpress();
-	let hono = requireHostHono();
-	let hostLocal = requireHostLocal();
-	let doQuery = requireQuery();
-	let releaseDbClient = requireReleaseDbClient();
-
-	function newDatabase(connectionString, poolOptions) {
-		if (!connectionString)
-			throw new Error('Connection string cannot be empty');
-		poolOptions = poolOptions || { min: 1 };
-		var pool = newPool(connectionString, poolOptions);
-
-		let c = { poolFactory: pool, hostLocal, express, hono };
-
-		c.transaction = function(options, fn) {
-			if ((arguments.length === 1) && (typeof options === 'function')) {
-				fn = options;
-				options = undefined;
-			}
-			let domain = createDomain();
-
-			if (!fn)
-				throw new Error('transaction requires a function');
-			return domain.run(runInTransaction);
-
-			async function runInTransaction() {
-				let result;
-				let transaction = newTransaction(domain, pool, options);
-				await new Promise(transaction)
-					.then(begin)
-					.then(() => fn(domain))
-					.then((res) => result = res)
-					.then(() => c.commit(domain))
-					.then(null, (e) => c.rollback(domain, e));
-				return result;
-			}
-
-			function begin() {
-				return _begin(domain, options);
-			}
-
-
-		};
-
-		c.createTransaction = function(options) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
-			let p = domain.run(() => new Promise(transaction).then(begin));
-
-			function run(fn) {
-				return p.then(domain.run.bind(domain, fn));
-			}
-
-			function begin() {
-				return _begin(domain, options);
-			}
-
-			run.rollback = rollback.bind(null, domain);
-			run.commit = commit.bind(null, domain);
-
-			return run;
-
-
-		};
-
-		c.query = function(query) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
-			let p = domain.run(() => new Promise(transaction)
-				.then(() => doQuery(domain, query).then(onResult, onError)));
-			return p;
-
-			function onResult(result) {
-				releaseDbClient(domain);
-				return result;
-			}
-
-			function onError(e) {
-				releaseDbClient(domain);
-				throw e;
-			}
-		};
-
-
-		c.rollback = rollback;
-		c.commit = commit;
-
-		c.end = function() {
-			if (poolOptions)
-				return pool.end();
-			else
-				return Promise.resolve();
-		};
-
-		c.accept = function(caller) {
-			caller.visitSqlite();
-		};
-
-
-		return c;
-	}
-
-	newDatabase_1$3 = newDatabase;
-	return newDatabase_1$3;
-}
-
-var wrapQuery_1$1;
-var hasRequiredWrapQuery$1;
-
-function requireWrapQuery$1 () {
-	if (hasRequiredWrapQuery$1) return wrapQuery_1$1;
-	hasRequiredWrapQuery$1 = 1;
-	var log = requireLog();
-
-	function wrapQuery(_context, connection) {
-		let CachedRequest = null;
-		let CachedTypes = null;
-
-		return runQuery;
-
-		function runQuery(query, onCompleted) {
-			enqueue(function(done) {
-				function safeCompleted(err, rows) {
-					try {
-						onCompleted(err, rows);
-					} finally {
-						done();
-					}
-				}
-
-				if (!CachedRequest || !CachedTypes) {
-					import('tedious')
-						.then(({ Request, TYPES }) => {
-							CachedRequest = Request;
-							CachedTypes = TYPES;
-							doQuery(query, safeCompleted);
-						})
-						.catch(err => safeCompleted(extractError(err), []));
-				}
-				else {
-					doQuery(query, safeCompleted);
-				}
-			});
-		}
-
-		function doQuery(query, onCompleted) {
-			const results = []; // Array to hold multiple result sets
-			let currentResult = []; // Current result set being built
-			let hasResultSet = false; // Track if we're in an actual result set
-
-			const completeQuery = log.startQuery({ sql: query.sql(), parameters: query.parameters });
-			const sql = replaceParamChar(query.sql(), query.parameters);
-
-			// Transaction statements
-			if (sql.length < 18 && query.parameters.length === 0) {
-				if (sql === 'BEGIN TRANSACTION') {
-					connection.beginTransaction((err) => {
-						completeQuery(extractError(err));
-						onCompleted(extractError(err), []);
-					});
-					return;
-				}
-				else if (sql === 'COMMIT') {
-					connection.commitTransaction((err) => {
-						completeQuery(extractError(err));
-						onCompleted(extractError(err), []);
-					});
-					return;
-				}
-				else if (sql === 'ROLLBACK') {
-					connection.rollbackTransaction((err) => {
-						completeQuery(extractError(err));
-						onCompleted(extractError(err), []);
-					});
-					return;
-				}
-			}
-
-			let keys;
-			var request = new CachedRequest(sql, onInnerCompleted);
-			addParameters(request, query.parameters, CachedTypes);
-
-			request.on('row', rows => {
-				const tmp = {};
-				if (!keys) {
-					keys = Object.keys(rows);
-				}
-				keys.forEach(cols => {
-					tmp[cols] = rows[cols].value;
-				});
-				currentResult.push(tmp);
-				hasResultSet = true; // We're definitely in a result set
-			});
-
-			// Handle column metadata - indicates a result set is starting
-			request.on('columnMetadata', (_columns) => {
-				hasResultSet = true; // A result set is starting (even if it ends up empty)
-			});
-
-			// Handle end of each result set
-			request.on('doneInProc', (_rowCount, _more) => {
-				// End of a result set within a stored procedure
-				// Add to results if we had a result set (even if empty)
-				if (hasResultSet) {
-					results.push(currentResult);
-					currentResult = [];
-					keys = null; // Reset keys for next result set
-					hasResultSet = false; // Reset for next potential result set
-				}
-			});
-
-			request.on('doneProc', (_rowCount, _more) => {
-				// End of stored procedure execution
-				// Add to results if we had a result set (even if empty)
-				if (hasResultSet) {
-					results.push(currentResult);
-					currentResult = [];
-					hasResultSet = false; // Reset for next potential result set
-				}
-			});
-
-			connection.execSql(request);
-
-			function onInnerCompleted(err) {
-				if (err) {
-					const error = extractError(err);
-					completeQuery(error);
-					onCompleted(error);
-				} else {
-					// If we have any remaining result set, add it
-					if (hasResultSet) {
-						results.push(currentResult);
-					}
-
-					// Return based on number of actual result sets
-					if (results.length === 0) {
-						// No result sets - return empty array
-						completeQuery();
-						onCompleted(null, []);
-					} else if (results.length === 1) {
-						// Single result set - return as single-depth array (even if empty)
-						completeQuery();
-						onCompleted(null, results[0]);
-					} else {
-						// Multiple result sets - return as array of arrays
-						completeQuery();
-						onCompleted(null, results);
-					}
-				}
-			}
-		}
-
-		function enqueue(task) {
-			if (!connection.__orangeOrmQueue)
-				connection.__orangeOrmQueue = Promise.resolve();
-			connection.__orangeOrmQueue = connection.__orangeOrmQueue.then(() => new Promise((resolve) => {
-				try {
-					task(resolve);
-				}
-				catch (_e) {
-					resolve();
-				}
-			})).catch(() => {});
-		}
-	}
-
-	// Helper functions remain the same
-	function extractError(e) {
-		if (e && e.errors) {
-			return e.errors[0];
-		}
-		else {
-			return e;
-		}
-	}
-
-	function replaceParamChar(sql, params) {
-		if (params.length === 0)
-			return sql;
-		var splitted = sql.split('?');
-		sql = '';
-		var lastIndex = splitted.length - 1;
-		for (var i = 0; i < lastIndex; i++) {
-			sql += splitted[i] + '@' + i;
-		}
-		sql += splitted[lastIndex];
-		return sql;
-	}
-
-	function addParameters(request, params, TYPES) {
-		const res = [];
-		for (let i = 0; i < params.length; i++) {
-			const p = [`${i}`, toType(params[i]), params[i]];
-			request.addParameter.apply(request, p);
-			res.push(p);
-		}
-		return res;
-
-		function toType(p) {
-			if (typeof p === 'string')
-				return TYPES.VarChar;
-			else if (Number.isInteger(p)) {
-				// Check if the integer is within the 32-bit signed integer range
-				if (p >= -2147483648 && p <= 2147483647) {
-					return TYPES.Int;
-				} else {
-					return TYPES.BigInt;
-				}
-			}
-			else if (typeof p === 'number')
-				return TYPES.Money;
-			else if (p instanceof Date && !isNaN(p))
-				return TYPES.Date;
-			else if (Array.isArray(p))
-				return TYPES.NVarChar;
-			else if (Buffer.isBuffer(p))
-				return TYPES.VarBinary;
-			else if (typeof p === 'object' && p instanceof Object)
-				return TYPES.NVarChar;
-			else
-				throw new Error('Unknown data type');
-		}
-	}
-
-	wrapQuery_1$1 = wrapQuery;
-	return wrapQuery_1$1;
-}
-
-var wrapCommand_1$1;
-var hasRequiredWrapCommand$1;
-
-function requireWrapCommand$1 () {
-	if (hasRequiredWrapCommand$1) return wrapCommand_1$1;
-	hasRequiredWrapCommand$1 = 1;
-	var log = requireLog();
-
-	function wrapCommand(_context, connection) {
-		let CachedRequest = null;
-		let CachedTypes = null;
-
-		return runQuery;
-
-		function runQuery(query, onCompleted) {
-			enqueue(function(done) {
-				function safeCompleted(err, result) {
-					try {
-						onCompleted(err, result);
-					} finally {
-						done();
-					}
-				}
-
-				if (!CachedRequest || !CachedTypes) {
-					import('tedious')
-						.then(({ Request, TYPES }) => {
-							CachedRequest = Request;
-							CachedTypes = TYPES;
-							doQuery(query, safeCompleted);
-						})
-						.catch((err) => safeCompleted(extractError(err), { rowsAffected: 0 }));
-				} else {
-					doQuery(query, safeCompleted);
-				}
-			});
-		}
-
-		function doQuery(query, onCompleted) {
-			const completeQuery = log.startQuery({ sql: query.sql(), parameters: query.parameters });
-			const sql = replaceParamChar(query.sql(), query.parameters);
-
-			if (sql.length < 18 && query.parameters.length === 0) {
-				if (sql === 'BEGIN TRANSACTION') {
-					connection.beginTransaction((err) => {
-						if (err) {
-							const error = extractError(err);
-							completeQuery(error);
-							return onCompleted(error, { rowsAffected: 0 });
-						}
-						completeQuery();
-						return onCompleted(null, { rowsAffected: 0 });
-					});
-					return;
-				} else if (sql === 'COMMIT') {
-					connection.commitTransaction((err) => {
-						if (err) {
-							const error = extractError(err);
-							completeQuery(error);
-							return onCompleted(error, { rowsAffected: 0 });
-						}
-						completeQuery();
-						return onCompleted(null, { rowsAffected: 0 });
-					});
-					return;
-				} else if (sql === 'ROLLBACK') {
-					connection.rollbackTransaction((err) => {
-						if (err) {
-							const error = extractError(err);
-							completeQuery(error);
-							return onCompleted(error, { rowsAffected: 0 });
-						}
-						completeQuery();
-						return onCompleted(null, { rowsAffected: 0 });
-					});
-					return;
-				}
-			}
-
-			let affectedRows = 0;
-
-			var request = new CachedRequest(sql, onInnerCompleted);
-			addParameters(request, query.parameters, CachedTypes);
-
-			request.on('doneInProc', (rowCount) => {
-				if (typeof rowCount === 'number') affectedRows += rowCount;
-			});
-
-			request.on('doneProc', (rowCount) => {
-				if (typeof rowCount === 'number') affectedRows += rowCount;
-			});
-
-			request.on('done', (rowCount) => {
-				if (typeof rowCount === 'number') affectedRows += rowCount;
-			});
-
-			connection.execSql(request);
-
-			function onInnerCompleted(err) {
-				if (err) {
-					const error = extractError(err);
-					completeQuery(error);
-					return onCompleted(error, { rowsAffected: 0 });
-				}
-				completeQuery();
-				return onCompleted(null, { rowsAffected: affectedRows });
-			}
-		}
-
-		function enqueue(task) {
-			if (!connection.__orangeOrmQueue)
-				connection.__orangeOrmQueue = Promise.resolve();
-			connection.__orangeOrmQueue = connection.__orangeOrmQueue.then(() => new Promise((resolve) => {
-				try {
-					task(resolve);
-				}
-				catch (_e) {
-					resolve();
-				}
-			})).catch(() => {});
-		}
-	}
-
-	function extractError(e) {
-		if (e && e.errors) {
-			return e.errors[0];
-		} else {
-			return e;
-		}
-	}
-
-	function replaceParamChar(sql, params) {
-		if (params.length === 0) return sql;
-		var splitted = sql.split('?');
-		sql = '';
-		var lastIndex = splitted.length - 1;
-		for (var i = 0; i < lastIndex; i++) {
-			sql += splitted[i] + '@' + i;
-		}
-		sql += splitted[lastIndex];
-		return sql;
-	}
-
-	function addParameters(request, params, TYPES) {
-		const res = [];
-		for (let i = 0; i < params.length; i++) {
-			const p = [`${i}`, toType(params[i]), params[i]];
-			request.addParameter.apply(request, p);
-			res.push(p);
-		}
-		return res;
-
-		function toType(p) {
-			if (typeof p === 'string') return TYPES.VarChar;
-			else if (Number.isInteger(p)) {
-				if (p >= -2147483648 && p <= 2147483647) {
-					return TYPES.Int;
-				} else {
-					return TYPES.BigInt;
-				}
-			} else if (typeof p === 'number') return TYPES.Money;
-			else if (p instanceof Date && !isNaN(p)) return TYPES.Date;
-			else if (Array.isArray(p)) return TYPES.NVarChar;
-			else if (Buffer.isBuffer(p)) return TYPES.VarBinary;
-			else if (typeof p === 'object' && p instanceof Object) return TYPES.NVarChar;
-			else throw new Error('Unknown data type');
-		}
-	}
-
-	wrapCommand_1$1 = wrapCommand;
-	return wrapCommand_1$1;
-}
-
-var formatDateTzOut;
-var hasRequiredFormatDateTzOut;
-
-function requireFormatDateTzOut () {
-	if (hasRequiredFormatDateTzOut) return formatDateTzOut;
-	hasRequiredFormatDateTzOut = 1;
-	const quote = requireQuote$2();
-
-	function formatDateOut(column, alias) {
-		if (alias)
-			return `FORMAT(${alias}.${quote(column._dbName)}, 'yyyy-MM-ddTHH:mm:sszzz')`;
-		// return `LEFT(CONVERT(varchar(33), ${alias}.${quote(column._dbName)}, 127), 25)`;
-		else
-			return `FORMAT(${quote(column._dbName)}, 'yyyy-MM-ddTHH:mm:sszzz')`;
-			// return `LEFT(CONVERT(varchar(33), ${quote(column._dbName)}, 127), 25)`;
-
-
-	}
-
-	formatDateTzOut = formatDateOut;
-	return formatDateTzOut;
-}
-
-var newTransaction$2;
-var hasRequiredNewTransaction$2;
-
-function requireNewTransaction$2 () {
-	if (hasRequiredNewTransaction$2) return newTransaction$2;
-	hasRequiredNewTransaction$2 = 1;
-	var wrapQuery = requireWrapQuery$1();
-	var wrapCommand = requireWrapCommand$1();
-	var encodeBoolean = requireEncodeBoolean$2();
-	var deleteFromSql = requireDeleteFromSql$2();
-	var selectForUpdateSql = requireSelectForUpdateSql$2();
-	const limitAndOffset = requireLimitAndOffset$2();
-	const insertSql = requireInsertSql$2();
-	const formatDateOut = requireFormatDateOut$2();
-	const formatDateTzOut = requireFormatDateTzOut();
-	const formatBigintOut = requireFormatBigintOut$2();
-	const formatJSONOut = requireFormatJSONOut();
-	const insert = requireInsert$2();
-	const quote = requireQuote$2();
-
-	function newResolveTransaction(domain, pool, { readonly = false } = {}) {
-		var rdb = {poolFactory: pool};
-		if (!pool.connect) {
-			pool = pool();
-			rdb.pool = pool;
-		}
-		rdb.engine = 'mssql';
-		rdb.maxParameters = 2098;
-		rdb.encodeBoolean = encodeBoolean;
-		rdb.decodeJSON = decodeJSON;
-		rdb.encodeJSON = JSON.stringify;
-		rdb.deleteFromSql = deleteFromSql;
-		rdb.selectForUpdateSql = selectForUpdateSql;
-		rdb.lastInsertedIsSeparate = false;
-		rdb.insertSql = insertSql;
-		rdb.insert = insert;
-		rdb.formatDateOut = formatDateOut;
-		rdb.formatDateTzOut = formatDateTzOut;
-		rdb.formatBigintOut = formatBigintOut;
-		rdb.formatJSONOut = formatJSONOut;
-		rdb.multipleStatements = true;
-		rdb.begin = 'BEGIN TRANSACTION';
-		rdb.limit = (span) => {
-			if (span.offset)
-				return '';
-			else if (span.limit || span.limit === 0)
-				return 'TOP ' + span.limit;
-			else
-				return '';
-		};
-		rdb.limitAndOffset = limitAndOffset;
-		rdb.accept = function(caller) {
-			caller.visitSqlite();
-		};
-		rdb.aggregateCount = 0;
-		rdb.quote = quote;
-		rdb.cache = {};
-		rdb.changes = [];
-
-		if (readonly) {
-			rdb.dbClient = {
-				executeQuery: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							wrapQuery(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				},
-				executeCommand: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							wrapCommand(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				}
-			};
-			domain.rdb = rdb;
-			return (onSuccess) => onSuccess();
-		}
-
-		return function(onSuccess, onError) {
-			pool.connect(onConnected);
-
-			function onConnected(err, client, done) {
-				try {
-					if (err) {
-						onError(err);
-						return;
-					}
-					client.executeQuery = wrapQuery(domain, client);
-					client.executeCommand = wrapCommand(domain, client);
-					rdb.dbClient = client;
-					rdb.dbClientDone = done;
-					domain.rdb = rdb;
-					onSuccess();
-				} catch (e) {
-					onError(e);
-				}
-			}
-		};
-	}
-	function decodeJSON(value){
-		return JSON.parse(value);
-	}
-
-	newTransaction$2 = newResolveTransaction;
-	return newTransaction$2;
-}
-
-var end$2;
-var hasRequiredEnd$2;
-
-function requireEnd$2 () {
-	if (hasRequiredEnd$2) return end$2;
-	hasRequiredEnd$2 = 1;
-	var pools = requirePools();
-
-	function endPool(genericPool, id, done) {
-		genericPool.drain(onDrained);
-
-		function onDrained() {
-			genericPool.destroyAllNow();
-			delete pools[id];
-			done();
-		}
-	}
-
-	end$2 = endPool;
-	return end$2;
-}
-
-var require$$0 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(connectionString);
-
-var parseConnectionString_1;
-var hasRequiredParseConnectionString;
-
-function requireParseConnectionString () {
-	if (hasRequiredParseConnectionString) return parseConnectionString_1;
-	hasRequiredParseConnectionString = 1;
-	var { parseConnectionString } = require$$0;
-
-	function parse(connectionString) {
-		const config = { options: {useUTC: false}, authentication: { type: 'default', options: {} } };
-		const elements = parseConnectionString(connectionString);
-		for (const key in elements) {
-			const value = elements[key];
-			switch (key) {
-			case 'uid':
-				config.authentication.options.userName = value;
-				break;
-			case 'pwd':
-				config.authentication.options.password = value;
-				break;
-			case 'server':
-				config.server = value.split(',')[0];
-				if (value.split(',')[1] !== undefined)
-					config.options.port = Number.parseInt(value.split(',')[1]);
-				break;
-			case 'database':
-				config.options.database = value;
-				break;
-			case 'trustservercertificate':
-				config.options.trustServerCertificate = value.toLowerCase() === 'yes';
-				break;
-			case 'app':
-				config.options.appName = value;
-				break;
-			case 'appname':
-				config.options.appName = value;
-				break;
-			}
-		}
-		return config;
-	}
-
-	parseConnectionString_1 = parse;
-	return parseConnectionString_1;
-}
-
-var newGenericPool_1$1;
-var hasRequiredNewGenericPool$1;
-
-function requireNewGenericPool$1 () {
-	if (hasRequiredNewGenericPool$1) return newGenericPool_1$1;
-	hasRequiredNewGenericPool$1 = 1;
-	// @ts-nocheck
-	/* eslint-disable no-prototype-builtins */
-
-	var defaults = requirePoolDefaults();
-	var genericPool = requireGenericPool();
-	var tedious;
-	var parseConnectionString = requireParseConnectionString();
-
-	function newGenericPool(connectionString, poolOptions) {
-		if (typeof connectionString === 'string')
-			connectionString = parseConnectionString(connectionString);
-		if (typeof connectionString === 'object')
-			connectionString.options = { ...connectionString.options, ...{ useColumnNames: true } };
-		poolOptions = poolOptions || {};
-		var pool = genericPool.Pool({
-			min: poolOptions.min || 0,
-			max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
-			idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
-			reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
-			log: poolOptions.log || defaults.poolLog,
-			create: async function(cb) {
-				try {
-					if (!tedious)
-						tedious = await import('tedious');
-				} catch (err) {
-					return cb(err, null);
-				}
-				var client = new tedious.Connection(connectionString);
-				client.on('connect', onConnected);
-				client.connect();
-
-				function onConnected(err) {
-					if (err) {
-						if (err.errors)
-							return cb(err.errors[0], null);
-						else
-							return cb(err, null);
-					}
-					client.poolCount = 0;
-					return cb(null, client);
-				}
-			},
-
-			destroy: function(client) {
-				client.poolCount = undefined;
-				client.close();
-			}
-		});
-		//monkey-patch with connect method
-		pool.connect = function(cb) {
-			pool.acquire(function(err, client) {
-				if (err) return cb(err, null, function() {/*NOOP*/ });
-				client.poolCount++;
-				cb(null, client, function(err) {
-					if (err) {
-						pool.destroy(client);
-					} else {
-						pool.release(client);
-					}
-				});
-			});
-		};
-		return pool;
-	}
-
-	newGenericPool_1$1 = newGenericPool;
-	return newGenericPool_1$1;
-}
-
-var newPool_1$2;
-var hasRequiredNewPool$2;
-
-function requireNewPool$2 () {
-	if (hasRequiredNewPool$2) return newPool_1$2;
-	hasRequiredNewPool$2 = 1;
-	const promisify = requirePromisify();
-	const pools = requirePools();
-	const end = requireEnd$2();
-	const newGenericPool = requireNewGenericPool$1();
-	const newId = requireNewId();
-
-	function newPool(connectionString, poolOptions) {
-		let pool = newGenericPool(connectionString, poolOptions);
-		let id = newId();
-		let boundEnd = end.bind(null, pool, id);
-		let c = {};
-
-		c.connect = pool.connect;
-		c.end = promisify(boundEnd);
-		pools[id] = c;
-		return c;
-	}
-
-	newPool_1$2 = newPool;
-	return newPool_1$2;
-}
-
-var newDatabase_1$2;
-var hasRequiredNewDatabase$2;
-
-function requireNewDatabase$2 () {
-	if (hasRequiredNewDatabase$2) return newDatabase_1$2;
-	hasRequiredNewDatabase$2 = 1;
-	let createDomain = requireCreateDomain();
-	let newTransaction = requireNewTransaction$2();
-	let _begin = requireBegin();
-	let commit = requireCommit();
-	let rollback = requireRollback();
-	let newPool = requireNewPool$2();
-	let express = requireHostExpress();
-	let hono = requireHostHono();
-	let hostLocal = requireHostLocal();
-	let doQuery = requireQuery();
-	let releaseDbClient = requireReleaseDbClient();
-
-	function newDatabase(connectionString, poolOptions) {
-		if (!connectionString)
-			throw new Error('Connection string cannot be empty');
-		poolOptions = poolOptions || { min: 1 };
-		var pool = newPool(connectionString, poolOptions);
-
-		let c = { poolFactory: pool, hostLocal, express, hono };
-
-		c.transaction = function(options, fn) {
-			if ((arguments.length === 1) && (typeof options === 'function')) {
-				fn = options;
-				options = undefined;
-			}
-			let domain = createDomain();
-
-			if (!fn)
-				throw new Error('transaction requires a function');
-			return domain.run(runInTransaction);
-
-			function begin() {
-				return _begin(domain, options);
-			}
-
-			async function runInTransaction() {
-				let result;
-				let transaction = newTransaction(domain, pool, options);
-				await new Promise(transaction)
-					.then(begin)
-					.then(() => fn(domain))
-					.then((res) => result = res)
-					.then(() => c.commit(domain))
-					.then(null, (e) => c.rollback(domain,e));
-				return result;
-			}
-
-
-
-		};
-
-		c.createTransaction = function(options) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
-			let p = domain.run(() => new Promise(transaction).then(begin));
-
-			function run(fn) {
-				return p.then(domain.run.bind(domain, fn));
-			}
-
-			run.rollback = rollback.bind(null, domain);
-			run.commit = commit.bind(null, domain);
-			return run;
-
-
-			function begin() {
-				return _begin(domain, options);
-			}
-
-		};
-
-		c.query = function(query) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
-			let p = domain.run(() => new Promise(transaction)
-				.then(() => doQuery(domain, query).then(onResult, onError)));
-			return p;
-
-			function onResult(result) {
-				releaseDbClient(domain);
-				return result;
-			}
-
-			function onError(e) {
-				releaseDbClient(domain);
-				throw e;
-			}
-		};
-
-
-		c.rollback = rollback;
-		c.commit = commit;
-
-		c.end = function() {
-			if (poolOptions)
-				return pool.end();
-			else
-				return Promise.resolve();
-		};
-
-		c.accept = function(caller) {
-			caller.visitSqlite();
-		};
-
-
-		return c;
-	}
-
-	newDatabase_1$2 = newDatabase;
-	return newDatabase_1$2;
-}
-
-var encodeBoolean_1$1;
-var hasRequiredEncodeBoolean$1;
-
-function requireEncodeBoolean$1 () {
-	if (hasRequiredEncodeBoolean$1) return encodeBoolean_1$1;
-	hasRequiredEncodeBoolean$1 = 1;
-	function encodeBoolean(bool) {
-		if (bool)
-			return 1;
-		return 0;
-	}
-
-	encodeBoolean_1$1 = encodeBoolean;
-	return encodeBoolean_1$1;
-}
-
-var formatBigintIn_1;
-var hasRequiredFormatBigintIn;
-
-function requireFormatBigintIn () {
-	if (hasRequiredFormatBigintIn) return formatBigintIn_1;
-	hasRequiredFormatBigintIn = 1;
-	function formatBigintIn(value) {
-		return `CONVERT(BIGINT, ${value})`;
-	}
-
-	formatBigintIn_1 = formatBigintIn;
-	return formatBigintIn_1;
-}
-
-var quote$1;
-var hasRequiredQuote$1;
-
-function requireQuote$1 () {
-	if (hasRequiredQuote$1) return quote$1;
-	hasRequiredQuote$1 = 1;
-	quote$1 = (name) => `[${name}]`;
-	return quote$1;
-}
-
-var formatBigintOut_1$1;
-var hasRequiredFormatBigintOut$1;
-
-function requireFormatBigintOut$1 () {
-	if (hasRequiredFormatBigintOut$1) return formatBigintOut_1$1;
-	hasRequiredFormatBigintOut$1 = 1;
-	const quote = requireQuote$1();
-
-	function formatBigintOut(column, alias) {
-		const quotedCol = quote(column._dbName);
-		if (alias)
-			return `CONVERT(VARCHAR(20), ${alias}.${quotedCol})`;
-		else
-			return `CONVERT(NVARCHAR(20), ${quotedCol})`;
-	}
-
-	formatBigintOut_1$1 = formatBigintOut;
-	return formatBigintOut_1$1;
-}
-
-var deleteFromSql_1$1;
-var hasRequiredDeleteFromSql$1;
-
-function requireDeleteFromSql$1 () {
-	if (hasRequiredDeleteFromSql$1) return deleteFromSql_1$1;
-	hasRequiredDeleteFromSql$1 = 1;
-	var format = 'delete from %s from %s as %s %s';
-	const formatString = requireFormat();
-	const quote = requireQuote$1();
-
-	function deleteFromSql(table, alias, whereSql) {
-		var name = quote(table._dbName);
-		alias = quote(alias)	;
-		return formatString(format, name, name, alias, whereSql);
-	}
-	deleteFromSql_1$1 = deleteFromSql;
-	return deleteFromSql_1$1;
-}
-
-var selectForUpdateSql$1;
-var hasRequiredSelectForUpdateSql$1;
-
-function requireSelectForUpdateSql$1 () {
-	if (hasRequiredSelectForUpdateSql$1) return selectForUpdateSql$1;
-	hasRequiredSelectForUpdateSql$1 = 1;
-	selectForUpdateSql$1 = function(_context, lock) {
-		if (lock)
-			throw new Error('select for update is not supported by SAP ASE');
-		return '';
-	};
-	return selectForUpdateSql$1;
-}
-
-var lastInsertedSql_1$1;
-var hasRequiredLastInsertedSql$1;
-
-function requireLastInsertedSql$1 () {
-	if (hasRequiredLastInsertedSql$1) return lastInsertedSql_1$1;
-	hasRequiredLastInsertedSql$1 = 1;
-	function lastInsertedSql(context, table, keyValues) {
-		return keyValues.map((value, i) => {
-			let column = table._primaryColumns[i];
-			if (value === undefined && column.tsType === 'NumberColumn')
-				return `${column._dbName}=@@identity`;
-			else
-				return column.eq(context, value);
-		});
-
-	}
-
-	lastInsertedSql_1$1 = lastInsertedSql;
-	return lastInsertedSql_1$1;
-}
-
-var formatDateOut_1;
-var hasRequiredFormatDateOut$1;
-
-function requireFormatDateOut$1 () {
-	if (hasRequiredFormatDateOut$1) return formatDateOut_1;
-	hasRequiredFormatDateOut$1 = 1;
-	const quote = requireQuote$1();
-
-	function formatDateOut(column, alias) {
-		if (alias)
-			return `CONVERT(VARCHAR, ${alias}.${quote(column._dbName)}, 23)`;
-		else
-			return `CONVERT(VARCHAR, ${quote(column._dbName)}, 23)`;
-	}
-
-	formatDateOut_1 = formatDateOut;
-	return formatDateOut_1;
-}
-
-var mergeSql$1;
-var hasRequiredMergeSql$1;
-
-function requireMergeSql$1 () {
-	if (hasRequiredMergeSql$1) return mergeSql$1;
-	hasRequiredMergeSql$1 = 1;
-	const quote = requireQuote$1();
-
-	function insertSql(context, table, row, options) {
-		let columnNames = [];
-		let conflictColumnUpdateSql = '';
-		let values = [];
-		addDiscriminators();
-		addColumns();
-
-		const matched = whenMatched();
-		let sql;
-		if (matched)
-			sql = `MERGE INTO ${quote(table._dbName)} AS target USING (SELECT ${values.join(',')}) AS source ON ${join()} WHEN MATCHED THEN ${matched} WHEN NOT MATCHED THEN ${whenNotMatched()};`;
-		else
-			sql = `MERGE INTO ${quote(table._dbName)} AS target USING (SELECT ${values.join(',')}) AS source ON ${join()} WHEN NOT MATCHED THEN ${whenNotMatched()};`;
-
-		return sql;
-
-		function join() {
-			const discriminators = table._columnDiscriminators.map(x => {
-				const name = quote(x.split('=')[0]);
-
-				return `target.${name}=source.${name}`;
-			});
-			const primaries = table._primaryColumns.map(x => `target.${quote(x._dbName)}=source.${quote(x._dbName)}`);
-			return [...discriminators, ...primaries].join(' AND ');
-		}
-
-		function whenMatched() {
-			if (options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite') {
-				return conflictColumnUpdateSql;
-			}
-			else return '';
-		}
-
-		function whenNotMatched() {
-			return `INSERT (${columnNames.join(',')}) VALUES (${columnNames.map(name => 'source.' + name)})`;
-		}
-
-		function addDiscriminators() {
-			let discriminators = table._columnDiscriminators;
-			for (let i = 0; i < discriminators.length; i++) {
-				let parts = discriminators[i].split('=');
-				columnNames.push(quote(parts[0]));
-				values.push(`${parts[1]} AS ${parts[0]}`);
-			}
-		}
-
-		function addColumns() {
-			let conflictColumnUpdates = [];
-			let columns = table._columns;
-			for (let i = 0; i < columns.length; i++) {
-				let column = columns[i];
-				const columnName = quote(column._dbName);
-				if (row['__' + column.alias] !== undefined) {
-					columnNames.push(columnName);
-					values.push(`%s AS ${quote(column.alias)}`);
-					addConflictUpdate(column);
-				}
-			}
-			if (conflictColumnUpdates.length > 0)
-				conflictColumnUpdateSql = 'UPDATE SET ' + conflictColumnUpdates.join(',');
-
-			function addConflictUpdate(column) {
-				let concurrency = options[column.alias]?.concurrency || options.concurrency;
-				const columnName = quote(column._dbName);
-				if (concurrency === 'overwrite')
-					conflictColumnUpdates.push(`target.${columnName}=source.${columnName}`);
-				else if (concurrency === 'optimistic')
-					conflictColumnUpdates.push(`target.${columnName} = CASE WHEN target.${columnName} <> source.${columnName} THEN CAST('12345678-1234-1234-1234-123456789012Conflict when updating ${columnName}12345678-1234-1234-1234-123456789012' AS INTEGER) ELSE target.${columnName} END`);
-			}
-		}
-	}
-
-	mergeSql$1 = insertSql;
-	return mergeSql$1;
-}
-
-var insertSql_1$1;
-var hasRequiredInsertSql$1;
-
-function requireInsertSql$1 () {
-	if (hasRequiredInsertSql$1) return insertSql_1$1;
-	hasRequiredInsertSql$1 = 1;
-	const mergeSql = requireMergeSql$1();
-	const quote = requireQuote$1();
-
-	function getSqlTemplate(_context, _table, _row, options) {
-
-		if (hasConcurrency(_table, options) && hasColumns())
-			return mergeSql.apply(null, [...arguments]);
-		else
-			return insertSql.apply(null, [...arguments].slice(1));
-
-		function hasColumns() {
-			for(let p in _row) {
-				let alias = _table[p]?.alias;
-				if (alias &&  _row['__' + alias] !== undefined && _table[p]?.equal)
-					return true;
-			}
-		}
-	}
-
-	function hasConcurrency(table,options) {
-		for (let i = 0; i < table._primaryColumns.length; i++) {
-			const concurrency = options[table._primaryColumns[i]]?.concurrency;
-			if ( concurrency === 'skipOnConflict' || concurrency === 'overwrite' )
-				return true;
-		}
-		return options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite';
-	}
-
-	function insertSql(table, row) {
-		let columnNames = [];
-		let regularColumnNames = [];
-		let values = [];
-		let sql = 'INSERT INTO ' + quote(table._dbName) + ' ';
-		addDiscriminators();
-		addColumns();
-		if (columnNames.length === 0)
-			sql += ' VALUES()';
-		else
-			sql = sql + '('+ columnNames.join(',') + ')' + ' VALUES (' + values.join(',') + ')';
-		return sql;
-
-		function addDiscriminators() {
-			let discriminators = table._columnDiscriminators;
-			for (let i = 0; i < discriminators.length; i++) {
-				let parts = discriminators[i].split('=');
-				columnNames.push(quote(parts[0]));
-				values.push(parts[1]);
-			}
-		}
-
-		function addColumns() {
-			let columns = table._columns;
-			for (let i = 0; i < columns.length; i++) {
-				let column = columns[i];
-				const columnName = quote(column._dbName);
-				regularColumnNames.push(column._dbName);
-				if (row['__' + column.alias] !== undefined) {
-					columnNames.push(columnName);
-					values.push('%s');
-				}
-			}
-		}
-
-	}
-
-	insertSql_1$1 = getSqlTemplate;
-	return insertSql_1$1;
-}
-
-var insert;
-var hasRequiredInsert$1;
-
-function requireInsert$1 () {
-	if (hasRequiredInsert$1) return insert;
-	hasRequiredInsert$1 = 1;
-	let newInsertCommand = requireNewInsertCommand();
-	let newInsertCommandCore = requireNewInsertCommandCore$1();
-	let newGetLastInsertedCommand = requireNewGetLastInsertedCommand();
-	let executeQueries = requireExecuteQueries();
-	let pushCommand = requirePushCommand();
-
-
-	function insertDefault(context, table, row, options) {
-		let commands = [];
-		let insertCmd = newInsertCommand(newInsertCommandCore.bind(null, context), table, row, options);
-		insertCmd.disallowCompress = true;
-		pushCommand(context, insertCmd);
-
-		let selectCmd = newGetLastInsertedCommand(context, table, row, insertCmd);
-		commands.push(selectCmd);
-
-		return executeQueries(context, commands).then((result) => result[result.length - 1]);
-
-	}
-
-	insert = insertDefault;
-	return insert;
-}
-
-var limitAndOffset_1$1;
-var hasRequiredLimitAndOffset$1;
-
-function requireLimitAndOffset$1 () {
-	if (hasRequiredLimitAndOffset$1) return limitAndOffset_1$1;
-	hasRequiredLimitAndOffset$1 = 1;
-	function limitAndOffset(span) {
-		if (span.offset)
-			return ` ROWS ${limit()} OFFSET ${span.offset}`;
-		else
-			return '';
-
-		function limit() {
-			if (span.limit || span.limit === 0)
-				return ` LIMIT ${span.limit}`;
-			else
-				return '';
-		}
-
-	}
-
-	limitAndOffset_1$1 = limitAndOffset;
-	return limitAndOffset_1$1;
-}
-
-var newTransaction$1;
-var hasRequiredNewTransaction$1;
-
-function requireNewTransaction$1 () {
-	if (hasRequiredNewTransaction$1) return newTransaction$1;
-	hasRequiredNewTransaction$1 = 1;
-	const wrapQuery = requireWrapQuery$2();
-	const wrapCommand = requireWrapCommand$2();
-	const encodeBoolean = requireEncodeBoolean$1();
-	const formatBigintIn = requireFormatBigintIn();
-	const formatBigintOut = requireFormatBigintOut$1();
-	const deleteFromSql = requireDeleteFromSql$1();
-	const selectForUpdateSql = requireSelectForUpdateSql$1();
-	const lastInsertedSql = requireLastInsertedSql$1();
-	const formatDateOut = requireFormatDateOut$1();
-	const insertSql = requireInsertSql$1();
-	const insert = requireInsert$1();
-	const limitAndOffset = requireLimitAndOffset$1();
-	const quote = requireQuote$1();
-
-	function newResolveTransaction(domain, pool, { readonly = false } = {}) {
-		var rdb = {poolFactory: pool};
-		if (!pool.connect) {
-			pool = pool();
-			rdb.pool = pool;
-		}
-		rdb.engine = 'sap';
-		rdb.encodeBoolean = encodeBoolean;
-		rdb.formatBigintIn = formatBigintIn;
-		rdb.formatBigintOut = formatBigintOut;
-		rdb.decodeJSON = decodeJSON;
-		rdb.encodeJSON = JSON.stringify;
-		rdb.deleteFromSql = deleteFromSql;
-		rdb.selectForUpdateSql = selectForUpdateSql;
-		rdb.formatDateOut = formatDateOut;
-		rdb.lastInsertedSql = lastInsertedSql;
-		rdb.insertSql = insertSql;
-		rdb.insert = insert;
-		rdb.lastInsertedIsSeparate = true;
-		rdb.multipleStatements = false;
-		rdb.begin = 'BEGIN TRANSACTION';
-		rdb.limit = (span) => {
-			if (span.offset)
-				return '';
-			else if (span.limit || span.limit === 0)
-				return 'TOP ' + span.limit;
-			else
-				return '';
-		};
-		rdb.limitAndOffset = limitAndOffset;
-		rdb.accept = function(caller) {
-			caller.visitSap();
-		};
-		rdb.aggregateCount = 0;
-		rdb.quote = quote;
-		rdb.cache = {};
-		rdb.changes = [];
-
-		if (readonly) {
-			rdb.dbClient = {
-				executeQuery: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							wrapQuery(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				},
-				executeCommand: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							wrapCommand(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				}
-			};
-			domain.rdb = rdb;
-			return (onSuccess) => onSuccess();
-		}
-
-
-		return function(onSuccess, onError) {
-			pool.connect(onConnected);
-
-			function onConnected(err, client, done) {
-				try {
-					if (err) {
-						onError(err);
-						return;
-					}
-					client.executeQuery = wrapQuery(domain, client);
-					client.executeCommand = wrapCommand(domain, client);
-					rdb.dbClient = client;
-					rdb.dbClientDone = done;
-					domain.rdb = rdb;
-					onSuccess();
-				} catch (e) {
-					onError(e);
-				}
-			}
-		};
-	}
-
-	function decodeJSON(value) {
-		return JSON.parse(value);
-	}
-
-	newTransaction$1 = newResolveTransaction;
-	return newTransaction$1;
-}
-
-var end$1;
-var hasRequiredEnd$1;
-
-function requireEnd$1 () {
-	if (hasRequiredEnd$1) return end$1;
-	hasRequiredEnd$1 = 1;
-	var pools = requirePools();
-
-	function endPool(genericPool, id, done) {
-		genericPool.drain(onDrained);
-
-		function onDrained() {
-			genericPool.destroyAllNow();
-			delete pools[id];
-			done();
-		}
-	}
-
-	end$1 = endPool;
-	return end$1;
-}
-
-var newPool_1$1;
-var hasRequiredNewPool$1;
-
-function requireNewPool$1 () {
-	if (hasRequiredNewPool$1) return newPool_1$1;
-	hasRequiredNewPool$1 = 1;
-	const promisify = requirePromisify();
-	var pools = requirePools();
-	var end = requireEnd$1();
-	var newGenericPool = requireNewGenericPool$2();
-	var newId = requireNewId();
-
-	function newPool(connectionString, poolOptions) {
-		var pool = newGenericPool(connectionString, poolOptions);
-		var id = newId();
-		var boundEnd = end.bind(null, pool, id);
-		var c = {};
-
-		c.connect = pool.connect;
-		c.end = promisify(boundEnd);
-		pools[id] = c;
-		return c;
-	}
-
-	newPool_1$1 = newPool;
-	return newPool_1$1;
-}
-
-var newDatabase_1$1;
-var hasRequiredNewDatabase$1;
-
-function requireNewDatabase$1 () {
-	if (hasRequiredNewDatabase$1) return newDatabase_1$1;
-	hasRequiredNewDatabase$1 = 1;
-	let createDomain = requireCreateDomain();
-	let newTransaction = requireNewTransaction$1();
-	let _begin = requireBegin();
-	let commit = requireCommit();
-	let rollback = requireRollback();
-	let newPool = requireNewPool$1();
-	let express = requireHostExpress();
-	let hono = requireHostHono();
-	let hostLocal = requireHostLocal();
-	let doQuery = requireQuery();
-	let releaseDbClient = requireReleaseDbClient();
-
-	function newDatabase(connectionString, poolOptions) {
-		if (!connectionString)
-			throw new Error('Connection string cannot be empty');
-		poolOptions = poolOptions || { min: 1 };
-		var pool = newPool(connectionString, poolOptions);
-
-		let c = { poolFactory: pool, hostLocal, express, hono };
-
-		c.transaction = function(options, fn) {
-			if ((arguments.length === 1) && (typeof options === 'function')) {
-				fn = options;
-				options = undefined;
-			}
-			let domain = createDomain();
-
-			if (!fn)
-				throw new Error('transaction requires a function');
-			return domain.run(runInTransaction);
-
-
-			function begin() {
-				return _begin(domain, options);
-			}
-
-			async function runInTransaction() {
-				let result;
-				let transaction = newTransaction(domain, pool, options);
-				await new Promise(transaction)
-					.then(begin)
-					.then(() => fn(domain))
-					.then((res) => result = res)
-					.then(() => commit(domain))
-					.then(null, (e) => rollback(domain, e));
-				return result;
-
-			}
-
-
-		};
-
-		c.createTransaction = function(options) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
-			let p = domain.run(() => new Promise(transaction).then(begin));
-
-			function run(fn) {
-				return p.then(() => fn(domain));
-			}
-
-			function begin() {
-				return _begin(domain, options);
-			}
-
-			run.rollback = rollback.bind(null, domain);
-			run.commit = commit.bind(null, domain);
-
-			return run;
-
-		};
-
-
-
-		c.query = function(query) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
-			let p = domain.run(() => new Promise(transaction)
-				.then(() => doQuery(domain, query).then(onResult, onError)));
-			return p;
-
-			function onResult(result) {
-				releaseDbClient(domain);
-				return result;
-			}
-
-			function onError(e) {
-				releaseDbClient(domain);
-				throw e;
-			}
-		};
-
-		c.rollback = rollback;
-		c.commit = commit;
-
-		c.end = function() {
-			if (poolOptions)
-				return pool.end();
-			else
-				return Promise.resolve();
-		};
-
-		c.accept = function(caller) {
-			caller.visitSap();
-		};
-
-		return c;
-	}
-
 	newDatabase_1$1 = newDatabase;
 	return newDatabase_1$1;
-}
-
-var replaceParamChar_1;
-var hasRequiredReplaceParamChar;
-
-function requireReplaceParamChar () {
-	if (hasRequiredReplaceParamChar) return replaceParamChar_1;
-	hasRequiredReplaceParamChar = 1;
-	function replaceParamChar(query, params) {
-		if (params.length === 0)
-			return query.sql();
-		var splitted = query.sql().split('?');
-		var sql = '';
-		var lastIndex = splitted.length - 1;
-		for (var i = 0; i < lastIndex; i++) {
-			sql += splitted[i] + ':p' + (i + 1);
-		}
-		sql += splitted[lastIndex];
-		return sql;
-	}
-
-	replaceParamChar_1 = replaceParamChar;
-	return replaceParamChar_1;
 }
 
 var wrapQuery_1;
@@ -37867,31 +31675,30 @@ function requireWrapQuery () {
 	var replaceParamChar = requireReplaceParamChar();
 
 	function wrapQuery(_context, connection) {
-		var runOriginalQuery = connection.execute;
+		var runOriginalQuery = connection.query;
 		return runQuery;
 
 		function runQuery(query, onCompleted) {
 			var params = query.parameters;
-			var completeQuery = log.startQuery({sql: query.sql(), parameters: params});
+			var originalSql = query.sql();
+			var completeQuery = log.startQuery({ sql: originalSql, parameters: params });
 			var sql = replaceParamChar(query, params);
+			query = {
+				text: sql,
+				values: params,
+				types: query.types
+			};
 
-			runOriginalQuery.call(connection, sql, params, {
-				fetchTypeHandler: function(metaData) {
-					// Tells the database to return column names in lowercase
-					metaData.name = metaData.name.toLowerCase();
-				}
-			}, onInnerCompleted);
+			runOriginalQuery.call(connection, query, onInnerCompleted);
 
-			function onInnerCompleted(err, rows) {
+			function onInnerCompleted(err, result) {
 				completeQuery(err);
 				if (err)
 					onCompleted(err);
 				else {
-					if (rows.rows)
-						rows = rows.rows;
-					else
-						rows = [rows];
-					onCompleted(null, rows);
+					if (Array.isArray(result))
+						result = result[result.length-1];
+					onCompleted(null, result.rows);
 				}
 			}
 		}
@@ -37912,37 +31719,31 @@ function requireWrapCommand () {
 	var replaceParamChar = requireReplaceParamChar();
 
 	function wrapCommand(_context, connection) {
-		var runOriginalQuery = connection.execute;
-		return runQuery;
+		var runOriginalQuery = connection.query;
+		return runCommand;
 
-		function runQuery(query, onCompleted) {
+		function runCommand(query, onCompleted) {
 			var params = query.parameters;
 			var completeQuery = log.startQuery({ sql: query.sql(), parameters: params });
-
 			var sql = replaceParamChar(query, params);
+			query = {
+				text: sql,
+				values: params,
+				types: query.types
+			};
 
-			runOriginalQuery.call(
-				connection,
-				sql,
-				params,
-				{
-					fetchTypeHandler: function(metaData) {
-						metaData.name = metaData.name.toLowerCase();
-					},
-				},
-				onInnerCompleted
-			);
+			runOriginalQuery.call(connection, query, onInnerCompleted);
 
 			function onInnerCompleted(err, result) {
 				completeQuery(err);
-				if (err) return onCompleted(err);
+				if (err)
+					onCompleted(err);
+				else
+					onCompleted(null, { rowsAffected: result.rowCount });
 
-				var affectedRows =
-	        typeof result.rowsAffected === 'number' ? result.rowsAffected : 0;
-
-				return onCompleted(null, { rowsAffected: affectedRows });
 			}
 		}
+
 	}
 
 	wrapCommand_1 = wrapCommand;
@@ -37956,394 +31757,35 @@ function requireEncodeBoolean () {
 	if (hasRequiredEncodeBoolean) return encodeBoolean_1;
 	hasRequiredEncodeBoolean = 1;
 	function encodeBoolean(bool) {
-		if (bool)
-			return 1;
-		return 0;
+		return bool.toString();
 	}
 
 	encodeBoolean_1 = encodeBoolean;
 	return encodeBoolean_1;
 }
 
-var quote;
-var hasRequiredQuote;
+var encodeJSON;
+var hasRequiredEncodeJSON;
 
-function requireQuote () {
-	if (hasRequiredQuote) return quote;
-	hasRequiredQuote = 1;
-	quote = (name) => `"${name}"`;
-	return quote;
-}
-
-var deleteFromSql_1;
-var hasRequiredDeleteFromSql;
-
-function requireDeleteFromSql () {
-	if (hasRequiredDeleteFromSql) return deleteFromSql_1;
-	hasRequiredDeleteFromSql = 1;
-	const format = 'delete from %s where %s.rowId in (SELECT %s.rowId FROM %s %s%s)';
-	const formatString = requireFormat();
-	const quote = requireQuote();
-
-	function deleteFromSql(table, alias, whereSql) {
-		const name = quote(table._dbName);
-		alias = quote(alias);
-		return formatString(format, name, name, alias, name, alias, whereSql);
-	}
-	deleteFromSql_1 = deleteFromSql;
-	return deleteFromSql_1;
-}
-
-var selectForUpdateSql;
-var hasRequiredSelectForUpdateSql;
-
-function requireSelectForUpdateSql () {
-	if (hasRequiredSelectForUpdateSql) return selectForUpdateSql;
-	hasRequiredSelectForUpdateSql = 1;
-	selectForUpdateSql = function(_context, lock) {
-		if (typeof lock === 'string')
-			lock = { forUpdate: true };
-		let sql = '';
-		if (lock.forUpdate)
-			sql = ' FOR UPDATE';
-		if (lock.skipLocked)
-			sql += ' SKIP LOCKED';
-		return sql;
-	};
-	return selectForUpdateSql;
-}
-
-var lastInsertedSql_1;
-var hasRequiredLastInsertedSql;
-
-function requireLastInsertedSql () {
-	if (hasRequiredLastInsertedSql) return lastInsertedSql_1;
-	hasRequiredLastInsertedSql = 1;
-	let getSessionSingleton = requireGetSessionSingleton();
-
-	function lastInsertedSql(context,table, keyValues) {
-		return keyValues.map((value,i) => {
-			let column = table._primaryColumns[i];
-			if (value === undefined)
-				return `ROWID='${getSessionSingleton(context, 'lastRowid')}'`;
-			else
-				return column.eq(context, value);
-		});
-
-	}
-
-	lastInsertedSql_1 = lastInsertedSql;
-	return lastInsertedSql_1;
-}
-
-var limitAndOffset_1;
-var hasRequiredLimitAndOffset;
-
-function requireLimitAndOffset () {
-	if (hasRequiredLimitAndOffset) return limitAndOffset_1;
-	hasRequiredLimitAndOffset = 1;
-	function limitAndOffset(span) {
-		if (span.offset)
-			return ` OFFSET ${span.offset} ROWS FETCH NEXT ${limit()} ROWS ONLY`;
-		else if (span.limit || span.limit === 0)
-			return ` FETCH FIRST ${span.limit} ROWS ONLY`;
+function requireEncodeJSON () {
+	if (hasRequiredEncodeJSON) return encodeJSON;
+	hasRequiredEncodeJSON = 1;
+	function encode(arg) {
+		if (Array.isArray(arg))
+			return new JsonBArrayParam(arg);
 		else
-			return '';
-
-		function limit() {
-			if (span.limit || span.limit === 0)
-				return span.limit;
-			else
-				return '';
-		}
-
+			return arg;
 	}
 
-	limitAndOffset_1 = limitAndOffset;
-	return limitAndOffset_1;
-}
-
-var mergeSql;
-var hasRequiredMergeSql;
-
-function requireMergeSql () {
-	if (hasRequiredMergeSql) return mergeSql;
-	hasRequiredMergeSql = 1;
-	const quote = requireQuote();
-
-	function insertSql(context, table, row, options) {
-		let columnNames = [];
-		let conflictColumnUpdateSql = '';
-		let values = [];
-		addDiscriminators();
-		addColumns();
-
-		const matched = whenMatched();
-		let sql;
-		if (matched)
-			sql = `MERGE INTO ${quote(table._dbName)} target USING (SELECT ${values.join(',')} FROM DUAL) source ON (${join()}) WHEN MATCHED THEN ${matched} WHEN NOT MATCHED THEN ${whenNotMatched()}`;
-		else
-			sql = `MERGE INTO ${quote(table._dbName)} target USING (SELECT ${values.join(',')} FROM DUAL) source ON (${join()}) WHEN NOT MATCHED THEN ${whenNotMatched()}`;
-		return sql;
-
-		function join() {
-			const discriminators = table._columnDiscriminators.map(x => {
-				const name = x.split('=')[0];
-				return `target."${name}"=source."${name}"`;
-			});
-			const primaries = table._primaryColumns.map(x => `target.${quote(x._dbName)}=source.${quote(x._dbName)}`);
-			return [...discriminators, ...primaries].join(' AND ');
-		}
-
-		function whenMatched() {
-			if (options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite') {
-				return conflictColumnUpdateSql;
-			}
-			else return '';
-		}
-
-		function whenNotMatched() {
-			return `INSERT (${columnNames.join(',')}) VALUES (${columnNames.map(name => 'source.' + name)})`;
-		}
-
-		function addDiscriminators() {
-			let discriminators = table._columnDiscriminators;
-			for (let i = 0; i < discriminators.length; i++) {
-				let parts = discriminators[i].split('=');
-				columnNames.push(quote(parts[0]));
-				values.push(`${parts[1]} ${quote(parts[0])}`);
-			}
-		}
-
-		function addColumns() {
-			let conflictColumnUpdates = [];
-			let columns = table._columns;
-			for (let i = 0; i < columns.length; i++) {
-				let column = columns[i];
-				const columnName = quote(column._dbName);
-				if (row['__' + column.alias] !== undefined) {
-					columnNames.push(columnName);
-					values.push(`%s ${quote(column.alias)}`);
-					if (!column.isPrimary)
-						addConflictUpdate(column);
-				}
-			}
-
-			if (conflictColumnUpdates.length > 0)
-				conflictColumnUpdateSql = 'UPDATE SET ' + conflictColumnUpdates.join(',');
-
-
-			function addConflictUpdate(column) {
-				let concurrency = options[column.alias]?.concurrency || options.concurrency;
-				const columnName = quote(column._dbName);
-				if (concurrency === 'overwrite')
-					conflictColumnUpdates.push(`target.${columnName}=source.${columnName}`);
-				else if (concurrency === 'optimistic')
-					conflictColumnUpdates.push(`target.${columnName} = CASE WHEN target.${columnName} <> source.${columnName} THEN 1/0 ELSE target.${columnName} END`);
-
-			}
+	class JsonBArrayParam {
+		constructor(actualArray) { this.actualArray = actualArray; }
+		toPostgres() {
+			return JSON.stringify(this.actualArray);
 		}
 	}
 
-	mergeSql = insertSql;
-	return mergeSql;
-}
-
-var insertSql_1;
-var hasRequiredInsertSql;
-
-function requireInsertSql () {
-	if (hasRequiredInsertSql) return insertSql_1;
-	hasRequiredInsertSql = 1;
-	let mergeSql = requireMergeSql();
-	const quote = requireQuote();
-
-	function getSqlTemplate(context, _table, _row, options) {
-		if (hasConcurrency(_table, options) && hasColumns())
-			return mergeSql.apply(null, [...arguments]);
-		else
-			return insertSql.apply(null, [...arguments].slice(1));
-
-		function hasColumns() {
-			for(let p in _row) {
-				let alias = _table[p]?.alias;
-				if (alias &&  _row['__' + alias] !== undefined && _table[p]?.equal)
-					return true;
-			}
-		}
-	}
-
-	function hasConcurrency(table,options) {
-		for (let i = 0; i < table._primaryColumns.length; i++) {
-			const concurrency = options[table._primaryColumns[i]]?.concurrency;
-			if ( concurrency === 'skipOnConflict' || concurrency === 'overwrite' )
-				return true;
-		}
-		return options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite';
-	}
-
-	function insertSql(table, row) {
-		let columnNames = [];
-		let values = [];
-		let sql = 'INSERT INTO "' + table._dbName + '" ';
-		addDiscriminators();
-		addColumns();
-		if (columnNames.length === 0)
-			sql += ` (${quote(table._primaryColumns[0]._dbName)}) VALUES(DEFAULT)`;
-		else
-			sql = sql + '('+ columnNames.join(',') + ')'  +  ' VALUES (' + values.join(',') + ')';
-		return sql;
-
-		function addDiscriminators() {
-			let discriminators = table._columnDiscriminators;
-			for (let i = 0; i < discriminators.length; i++) {
-				let parts = discriminators[i].split('=');
-				columnNames.push(quote(parts[0]));
-				values.push(parts[1]);
-			}
-		}
-
-		function addColumns() {
-			let columns = table._columns;
-			for (let i = 0; i < columns.length; i++) {
-				let column = columns[i];
-				const columnName = quote(column._dbName);
-				if (row['__' + column.alias] !== undefined) {
-					columnNames.push(columnName);
-					if (column.tsType === 'DateColumn')
-						values.push('TO_TIMESTAMP(%s, \'YYYY-MM-DD"T"HH24:MI:SS.FF6\')');
-					else
-						values.push('%s');
-				}
-			}
-		}
-
-	}
-
-	insertSql_1 = getSqlTemplate;
-	return insertSql_1;
-}
-
-var newInsertCommandCore_1;
-var hasRequiredNewInsertCommandCore;
-
-function requireNewInsertCommandCore () {
-	if (hasRequiredNewInsertCommandCore) return newInsertCommandCore_1;
-	hasRequiredNewInsertCommandCore = 1;
-	var newParameterized = requireNewParameterized();
-	var insertSql = requireInsertSql();
-	const formatString = requireFormat();
-
-	function newInsertCommandCore(context,table, row, options = {}) {
-		var parameters = [];
-		var values = [insertSql(context,table, row, options)];
-
-		var columns = table._columns;
-		for (var i = 0; i < columns.length; i++) {
-			var column = columns[i];
-			var alias = column.alias;
-			if (row['__' + column.alias] !== undefined) {
-				var encoded = column.encode(context, row[alias]);
-				if (encoded.parameters.length > 0) {
-					values.push('?');
-					parameters.push(encoded.parameters[0]);
-				} else
-					values.push(encoded.sql());
-			}
-		}
-
-		var sql = formatString.apply(null, values);
-		return newParameterized(sql, parameters);
-	}
-
-	newInsertCommandCore_1 = newInsertCommandCore;
-	return newInsertCommandCore_1;
-}
-
-var insert_1;
-var hasRequiredInsert;
-
-function requireInsert () {
-	if (hasRequiredInsert) return insert_1;
-	hasRequiredInsert = 1;
-	const newInsertCommand = requireNewInsertCommand();
-	const newInsertCommandCore = requireNewInsertCommandCore();
-	const setSessionSingleton = requireSetSessionSingleton();
-	const newGetLastInsertedCommand = requireNewGetLastInsertedCommand();
-	const executeQueries = requireExecuteQueries();
-
-	function insert(context, table, row, options) {
-
-		return new Promise((res, rej) => {
-			const cmd = newInsertCommand(newInsertCommandCore.bind(null, context), table, row, options);
-			cmd.disallowCompress = true;
-			executeQueries(context, [cmd]).then((result) => result[0]).then(onResult).then(res, rej);
-
-			function onResult([result]) {
-				setSessionSingleton(context, 'lastRowid', result.lastRowid);
-				const selectCmd = newGetLastInsertedCommand(context, table, row, cmd);
-				return executeQueries(context, [selectCmd]).then((result) => res(result[0]));
-			}
-
-		});
-	}
-
-	insert_1 = insert;
-	return insert_1;
-}
-
-var formatBigintOut_1;
-var hasRequiredFormatBigintOut;
-
-function requireFormatBigintOut () {
-	if (hasRequiredFormatBigintOut) return formatBigintOut_1;
-	hasRequiredFormatBigintOut = 1;
-	const quote = requireQuote();
-
-	function formatBigintOut(column, alias) {
-		const quotedCol = quote(column._dbName);
-		if (alias)
-			return `TO_CHAR(${alias}.${quotedCol})`;
-		else
-			return `TO_CHAR(${quotedCol})`;
-	}
-
-
-	formatBigintOut_1 = formatBigintOut;
-	return formatBigintOut_1;
-}
-
-var formatDateOut;
-var hasRequiredFormatDateOut;
-
-function requireFormatDateOut () {
-	if (hasRequiredFormatDateOut) return formatDateOut;
-	hasRequiredFormatDateOut = 1;
-	const quote = requireQuote();
-
-	function formatDateColumn(column, alias) {
-		if (alias)
-			return `TO_CHAR(${alias}.${quote(column._dbName)}, 'YYYY-MM-DD"T"HH24:MI:SS.FF3')`;
-		else
-			return `TO_CHAR(${quote(column._dbName)}, 'YYYY-MM-DD"T"HH24:MI:SS.FF3')`;
-	}
-
-	formatDateOut = formatDateColumn;
-	return formatDateOut;
-}
-
-var formatDateIn;
-var hasRequiredFormatDateIn;
-
-function requireFormatDateIn () {
-	if (hasRequiredFormatDateIn) return formatDateIn;
-	hasRequiredFormatDateIn = 1;
-	function formatDateColumn(value) {
-		return `TO_TIMESTAMP(${value}, 'YYYY-MM-DD"T"HH24:MI:SS.FF3')`;
-	}
-
-	formatDateIn = formatDateColumn;
-	return formatDateIn;
+	encodeJSON = encode;
+	return encodeJSON;
 }
 
 var newTransaction;
@@ -38352,46 +31794,40 @@ var hasRequiredNewTransaction;
 function requireNewTransaction () {
 	if (hasRequiredNewTransaction) return newTransaction;
 	hasRequiredNewTransaction = 1;
-	const wrapQuery = requireWrapQuery();
-	const wrapCommand = requireWrapCommand();
-	const encodeBoolean = requireEncodeBoolean();
-	const deleteFromSql = requireDeleteFromSql();
-	const selectForUpdateSql = requireSelectForUpdateSql();
-	const lastInsertedSql = requireLastInsertedSql();
-	const limitAndOffset = requireLimitAndOffset();
-	const insertSql = requireInsertSql();
-	const insert = requireInsert();
-	const formatBigintOut = requireFormatBigintOut();
-	const formatDateOut = requireFormatDateOut();
-	const formatDateIn = requireFormatDateIn();
-	const quote = requireQuote();
+	var wrapQuery = requireWrapQuery();
+	var wrapCommand = requireWrapCommand();
+	var encodeDate = requireEncodeDate();
+	var encodeBoolean = requireEncodeBoolean();
+	var deleteFromSql = requireDeleteFromSql();
+	var selectForUpdateSql = requireSelectForUpdateSql();
+	var limitAndOffset = requireLimitAndOffset();
+	var formatDateOut = requireFormatDateOut();
+	var encodeJSON = requireEncodeJSON();
+	var insertSql = requireInsertSql();
+	var insert = requireInsert();
+	var quote = requireQuote();
 
 	function newResolveTransaction(domain, pool, { readonly = false } = {}) {
-		var rdb = {poolFactory: pool};
+		var rdb = { poolFactory: pool };
 		if (!pool.connect) {
 			pool = pool();
 			rdb.pool = pool;
 		}
 
-		rdb.begin = 'SET TRANSACTION ISOLATION LEVEL READ COMMITTED';
-		rdb.engine = 'oracle';
-		rdb.maxParameters = 32768;
+		rdb.engine = 'pg';
 		rdb.encodeBoolean = encodeBoolean;
-		rdb.decodeJSON = decodeJSON;
-		rdb.encodeJSON = JSON.stringify;
+		rdb.encodeDate = encodeDate;
+		rdb.encodeJSON = encodeJSON;
 		rdb.formatDateOut = formatDateOut;
-		rdb.formatDateIn = formatDateIn;
-		rdb.formatBigintOut = formatBigintOut;
 		rdb.deleteFromSql = deleteFromSql;
 		rdb.selectForUpdateSql = selectForUpdateSql;
-		rdb.lastInsertedSql = lastInsertedSql;
+		rdb.lastInsertedIsSeparate = false;
 		rdb.insertSql = insertSql;
 		rdb.insert = insert;
-		rdb.lastInsertedIsSeparate = true;
-		rdb.multipleStatements = false;
+		rdb.multipleStatements = true;
 		rdb.limitAndOffset = limitAndOffset;
 		rdb.accept = function(caller) {
-			caller.visitSqlite();
+			caller.visitPg();
 		};
 		rdb.aggregateCount = 0;
 		rdb.quote = quote;
@@ -38437,7 +31873,6 @@ function requireNewTransaction () {
 			return (onSuccess) => onSuccess();
 		}
 
-
 		return function(onSuccess, onError) {
 			pool.connect(onConnected);
 
@@ -38452,17 +31887,12 @@ function requireNewTransaction () {
 					rdb.dbClient = client;
 					rdb.dbClientDone = done;
 					domain.rdb = rdb;
-
 					onSuccess();
 				} catch (e) {
 					onError(e);
 				}
 			}
 		};
-	}
-
-	function decodeJSON(value) {
-		return JSON.parse(value);
 	}
 
 	newTransaction = newResolveTransaction;
@@ -38477,11 +31907,11 @@ function requireEnd () {
 	hasRequiredEnd = 1;
 	var pools = requirePools();
 
-	function endPool(genericPool, id, done) {
-		genericPool.drain(onDrained);
+	function endPool(pgPool, id, done) {
+		pgPool.drain(onDrained);
 
 		function onDrained() {
-			genericPool.destroyAllNow();
+			pgPool.destroyAllNow();
 			delete pools[id];
 			done();
 		}
@@ -38491,21 +31921,45 @@ function requireEnd () {
 	return end;
 }
 
-var newGenericPool_1;
-var hasRequiredNewGenericPool;
+var parseSearchPathParam_1;
+var hasRequiredParseSearchPathParam;
 
-function requireNewGenericPool () {
-	if (hasRequiredNewGenericPool) return newGenericPool_1;
-	hasRequiredNewGenericPool = 1;
-	// @ts-nocheck
-	/* eslint-disable no-prototype-builtins */
+function requireParseSearchPathParam () {
+	if (hasRequiredParseSearchPathParam) return parseSearchPathParam_1;
+	hasRequiredParseSearchPathParam = 1;
+	function parseSearchPathParam(connectionString = '') {
+		const [, queryString] = connectionString.split('?');
+		if (!queryString)
+			return;
+		const params = new URLSearchParams(queryString);
+		const searchPath = params.get('search_path');
+		return searchPath;
+	}
+
+	parseSearchPathParam_1 = parseSearchPathParam;
+	return parseSearchPathParam_1;
+}
+
+/* eslint-disable no-prototype-builtins */
+
+var newPgPool_1;
+var hasRequiredNewPgPool;
+
+function requireNewPgPool () {
+	if (hasRequiredNewPgPool) return newPgPool_1;
+	hasRequiredNewPgPool = 1;
+	//slightly modified code from github.com/brianc/node-postgres
+	var log = requireLog();
 
 	var defaults = requirePoolDefaults();
 	var genericPool = requireGenericPool();
-	var oracle;
+	var pg;
+	var parseSearchPathParam = requireParseSearchPathParam();
 
-	function newGenericPool(connectionString, poolOptions) {
+	function newPgPool(connectionString, poolOptions) {
 		poolOptions = poolOptions || {};
+
+		// @ts-ignore
 		var pool = genericPool.Pool({
 			min: poolOptions.min || 0,
 			max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
@@ -38513,37 +31967,61 @@ function requireNewGenericPool () {
 			reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
 			log: poolOptions.log,
 			create: async function(cb) {
-				var client;
 				try {
-					if (!oracle) {
-						oracle = await import('oracledb');
-						oracle = oracle.default || oracle;
-						oracle.outFormat = oracle.OUT_FORMAT_OBJECT;
-						oracle.fetchAsBuffer = [ oracle.BLOB ];
+					if (!pg) {
+						pg = await import('pg');
+						pg  = pg.default || pg;
+						let types = pg.types;
+						types.setTypeParser(1700, function(val) {
+							return parseFloat(val);
+						});
 					}
 				}
-				catch (err) {
-					return cb(err, null);
+				catch(e) {
+					return cb(e, null);
 				}
-				oracle.getConnection(connectionString, onConnected);
-				function onConnected(err, _client) {
-					client = _client;
-					if (err)
-						return cb(err, null);
-					client.poolCount = 0;
-					return cb(null, client);
-				}
-			},
+				var client = new pg.Client(connectionString);
+				client.connect(function(err) {
+					if (err) return cb(err, null);
 
+					//handle connected client background errors by emitting event
+					//via the pg object and then removing errored client from the pool
+					client.on('error', function(e) {
+						pool.emit('error', e, client);
+
+						// If the client is already being destroyed, the error
+						// occurred during stream ending. Do not attempt to destroy
+						// the client again.
+						if (!client._destroying) {
+							pool.destroy(client);
+						}
+					});
+
+					// Remove connection from pool on disconnect
+					client.on('end', function(_e) {
+						// Do not enter infinite loop between pool.destroy
+						// and client 'end' event...
+						if (!client._destroying) {
+							pool.destroy(client);
+						}
+					});
+					client.poolCount = 0;
+					negotiateSearchPath(client, connectionString, (err) => cb(err, client));
+
+				});
+			},
 			destroy: function(client) {
+				client._destroying = true;
 				client.poolCount = undefined;
-				client.close();
+				client.end();
 			}
 		});
 		//monkey-patch with connect method
 		pool.connect = function(cb) {
 			pool.acquire(function(err, client) {
-				if (err) return cb(err, null, function() {/*NOOP*/ });
+				if (err) return cb(err, null, function() {
+					/*NOOP*/
+				});
 				client.poolCount++;
 				cb(null, client, function(err) {
 					if (err) {
@@ -38557,8 +32035,24 @@ function requireNewGenericPool () {
 		return pool;
 	}
 
-	newGenericPool_1 = newGenericPool;
-	return newGenericPool_1;
+	function negotiateSearchPath(client, connectionString, cb) {
+		const searchPath = parseSearchPathParam(connectionString);
+		if (searchPath) {
+			const sql = `set search_path to ${searchPath}`;
+			const completeQuery = log.startQuery({sql, parameters: []});
+			return client.query(sql, (err, result) => {
+				completeQuery(err);
+				cb(err, result);
+			});
+		}
+		else
+			cb();
+
+
+	}
+
+	newPgPool_1 = newPgPool;
+	return newPgPool_1;
 }
 
 var newPool_1;
@@ -38570,11 +32064,11 @@ function requireNewPool () {
 	const promisify = requirePromisify();
 	const pools = requirePools();
 	const end = requireEnd();
-	const newGenericPool = requireNewGenericPool();
+	const newPgPool = requireNewPgPool();
 	const newId = requireNewId();
 
 	function newPool(connectionString, poolOptions) {
-		let pool = newGenericPool(connectionString, poolOptions);
+		let pool = newPgPool(connectionString, poolOptions);
 		let id = newId();
 		let boundEnd = end.bind(null, pool, id);
 		let c = {};
@@ -38601,6 +32095,8 @@ function requireNewDatabase () {
 	let commit = requireCommit();
 	let rollback = requireRollback();
 	let newPool = requireNewPool();
+	let lock = requireLock();
+	let executeSchema = requireSchema();
 	let express = requireHostExpress();
 	let hono = requireHostHono();
 	let hostLocal = requireHostLocal();
@@ -38626,42 +32122,56 @@ function requireNewDatabase () {
 				throw new Error('transaction requires a function');
 			return domain.run(runInTransaction);
 
-
-			function begin() {
-				return _begin(domain, options);
-			}
-
 			async function runInTransaction() {
 				let result;
 				let transaction = newTransaction(domain, pool, options);
 				await new Promise(transaction)
 					.then(begin)
+					.then(negotiateSchema)
 					.then(() => fn(domain))
 					.then((res) => result = res)
 					.then(() => commit(domain))
-					.then(null, (e) => rollback(domain, e));
+					.then(null, (e) => rollback(domain,e));
 				return result;
-
 			}
-
-
-		};
-
-		c.createTransaction = function(options) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
-			let p = domain.run(() => new Promise(transaction).then(begin));
-
-			function run(fn) {
-				return p.then(() => fn(domain));
-			}
-			run.rollback = rollback.bind(null, domain);
-			run.commit = commit.bind(null, domain);
-			return run;
 
 			function begin() {
 				return _begin(domain, options);
 			}
+
+			function negotiateSchema(previous) {
+				let schema = options && options.schema;
+				if (!schema)
+					return previous;
+				return executeSchema(domain, schema);
+			}
+		};
+
+		c.createTransaction = function(options) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool, options);
+			let p = domain.run(() => new Promise(transaction)
+				.then(begin).then(negotiateSchema));
+
+			function run(fn) {
+				return p.then(domain.run.bind(domain, fn));
+			}
+
+			function begin() {
+				return _begin(domain, options);
+			}
+
+			function negotiateSchema(previous) {
+				let schema = options && options.schema;
+				if (!schema)
+					return previous;
+				return executeSchema(domain,schema);
+			}
+
+			run.rollback = rollback.bind(null, domain);
+			run.commit = commit.bind(null, domain);
+
+			return run;
 		};
 
 		c.query = function(query) {
@@ -38684,6 +32194,8 @@ function requireNewDatabase () {
 
 		c.rollback = rollback;
 		c.commit = commit;
+		c.lock = lock;
+		c.schema = executeSchema;
 
 		c.end = function() {
 			if (poolOptions)
@@ -38693,7 +32205,7 @@ function requireNewDatabase () {
 		};
 
 		c.accept = function(caller) {
-			caller.visitSqlite();
+			caller.visitPg();
 		};
 
 		return c;
@@ -38703,40 +32215,28 @@ function requireNewDatabase () {
 	return newDatabase_1;
 }
 
-var src;
-var hasRequiredSrc;
+var indexBrowser;
+var hasRequiredIndexBrowser;
 
-function requireSrc () {
-	if (hasRequiredSrc) return src;
-	hasRequiredSrc = 1;
+function requireIndexBrowser () {
+	if (hasRequiredIndexBrowser) return indexBrowser;
+	hasRequiredIndexBrowser = 1;
 	const hostExpress = requireHostExpress();
 	const hostHono = requireHostHono();
 	const hostLocal = requireHostLocal();
 	const client = requireClient();
 	const map = requireMap();
-	const runtimes = requireRuntimes();
-
-	let _mySql;
-	let _mariadb;
+	let _d1;
 	let _pg;
 	let _pglite;
-	let _sqlite;
 	let _sqliteOPFS;
-	let _mssqlNative;
-	let _sap;
-	let _mssql;
-	let _oracle;
-	let _d1;
 
-	var connectViaPool = function(connectionString) {
-		if (connectionString.indexOf && connectionString.indexOf('mariadb') === 0)
-			return connectViaPool.mariadb.apply(null, arguments);
-		else if (connectionString.indexOf && connectionString.indexOf('mysql') === 0)
-			return connectViaPool.mySql.apply(null, arguments);
-		else if (connectionString.indexOf && connectionString.indexOf('postgres') === 0)
-			connectViaPool.pg.apply(null, arguments);
-		else
-			return client.apply(null, arguments);
+	globalThis.__orangeOrmSqliteOPFSModuleUrl = new URL('../../@sqlite.org/sqlite-wasm/dist/index.mjs?import', import.meta.url).href;
+	globalThis.__orangeOrmManagedSyncWorkerUrl = new URL('./managed-sync-worker.mjs', import.meta.url).href;
+
+
+	var connectViaPool = function() {
+		return client.apply(null, arguments);
 	};
 	connectViaPool.createPatch = client.createPatch;
 	connectViaPool.createDbWorkerClient = requireDbWorkerClient();
@@ -38763,42 +32263,35 @@ function requireSrc () {
 		return url;
 	};
 
-	Object.defineProperty(connectViaPool, 'mysql', {
+
+	Object.defineProperty(connectViaPool, 'd1', {
 		get: function() {
-			if (!_mySql)
-				_mySql = requireNewDatabase$d();
-			return _mySql;
+			if (!_d1)
+				_d1 = requireNewDatabase$3();
+			return _d1;
 		}
 	});
 
-	Object.defineProperty(connectViaPool, 'mySql', {
-		get: function() {
-			if (!_mySql)
-				_mySql = requireNewDatabase$d();
-			return _mySql;
-		}
-	});
-	Object.defineProperty(connectViaPool, 'mariadb', {
-		get: function() {
-			if (!_mariadb)
-				_mariadb = requireNewDatabase$c();
-			return _mariadb;
-		}
-	});
 	Object.defineProperty(connectViaPool, 'pglite', {
 		get: function() {
 			if (!_pglite)
-				_pglite = requireNewDatabase$b();
+				_pglite = requireNewDatabase$2();
 			return _pglite;
 		}
 	});
+
+	Object.defineProperty(connectViaPool, 'sqliteOPFS', {
+		get: function() {
+			if (!_sqliteOPFS)
+				_sqliteOPFS = requireNewDatabase$1();
+			return _sqliteOPFS;
+		}
+	});
+
 	Object.defineProperty(connectViaPool, 'postgres', {
 		get: function() {
 			if (!_pg)
-				if (runtimes.bun)
-					_pg = requireNewDatabase$a();
-				else
-					_pg = requireNewDatabase$9();
+				_pg = requireNewDatabase();
 			return _pg;
 		}
 	});
@@ -38806,86 +32299,174 @@ function requireSrc () {
 	Object.defineProperty(connectViaPool, 'pg', {
 		get: function() {
 			if (!_pg)
-				if (runtimes.bun)
-					_pg = requireNewDatabase$a();
-				else
-					_pg = requireNewDatabase$9();
+				_pg = requireNewDatabase();
 			return _pg;
 		}
 	});
 
-	Object.defineProperty(connectViaPool, 'sqlite', {
-		get: function() {
-			if (!_sqlite) {
-				if (runtimes.deno || (runtimes.node && (runtimes.node.major > 22 || (runtimes.node.major === 22 && runtimes.node.minor >= 5))))
-					_sqlite = requireNewDatabase$8();
-				else if (runtimes.bun)
-					_sqlite = requireNewDatabase$7();
-				else if (runtimes.node)
-					_sqlite = requireNewDatabase$6();
-				else
-					throw new Error('SQLite is not supported in this environment');
-			}
-			return _sqlite;
-		}
-	});
-
-	Object.defineProperty(connectViaPool, 'sqliteOPFS', {
-		get: function() {
-			if (!_sqliteOPFS)
-				_sqliteOPFS = requireNewDatabase$5();
-			return _sqliteOPFS;
-		}
-	});
-
-	Object.defineProperty(connectViaPool, 'd1', {
-		get: function() {
-			if (!_d1)
-				_d1 = requireNewDatabase$4();
-			return _d1;
-		}
-	});
-
-	Object.defineProperty(connectViaPool, 'mssqlNative', {
-		get: function() {
-			if (!_mssqlNative)
-				_mssqlNative = requireNewDatabase$3();
-			return _mssqlNative;
-		}
-	});
-
-	Object.defineProperty(connectViaPool, 'mssql', {
-		get: function() {
-			if (!_mssql)
-				_mssql = requireNewDatabase$2();
-			return _mssql;
-		}
-	});
-
-	Object.defineProperty(connectViaPool, 'sap', {
-		get: function() {
-			if (!_sap)
-				_sap = requireNewDatabase$1();
-			return _sap;
-		}
-	});
-
-	Object.defineProperty(connectViaPool, 'oracle', {
-		get: function() {
-			if (!_oracle)
-				_oracle = requireNewDatabase();
-			return _oracle;
-		}
-	});
 
 	connectViaPool.express = hostExpress.bind(null, hostLocal);
 	connectViaPool.hono = hostHono.bind(null, hostLocal);
 
-	src = connectViaPool;
-	return src;
+	indexBrowser = connectViaPool;
+	return indexBrowser;
 }
 
-var srcExports = requireSrc();
-var index = /*@__PURE__*/getDefaultExportFromCjs(srcExports);
+var mapFromSyncSchema_1;
+var hasRequiredMapFromSyncSchema;
 
-export { index as default };
+function requireMapFromSyncSchema () {
+	if (hasRequiredMapFromSyncSchema) return mapFromSyncSchema_1;
+	hasRequiredMapFromSyncSchema = 1;
+	function mapFromSyncSchema(rdb, schema) {
+		const schemaTables = Array.isArray(schema && schema.tables) ? schema.tables : [];
+		const tableNameByDbName = new Map(schemaTables.map(table => [table.dbName, table.name]));
+		let mapped = rdb.map(({ table }) => Object.fromEntries(schemaTables.map(tableSchema => [
+			tableSchema.name,
+			table(tableSchema.dbName).map(({ column }) => Object.fromEntries(
+				(tableSchema.columns || []).map(columnSchema => [
+					columnSchema.name,
+					mapColumn(column(columnSchema.dbName), columnSchema)
+				])
+			))
+		])));
+
+		mapped = mapped.map(tables => Object.fromEntries(schemaTables.map(tableSchema => [
+			tableSchema.name,
+			tables[tableSchema.name].map(({ references }) => {
+				const relations = {};
+				for (let i = 0; i < (tableSchema.foreignKeys || []).length; i++) {
+					const foreignKey = tableSchema.foreignKeys[i];
+					const referencedName = tableNameByDbName.get(foreignKey.referencesTable);
+					if (!referencedName || !tables[referencedName])
+						continue;
+					const relationName = relationNameForForeignKey(tableSchema, foreignKey, i);
+					let relation = references(tables[referencedName]).by(...foreignKey.columns);
+					if (foreignKeyIsNotNull(tableSchema, foreignKey))
+						relation = relation.notNull();
+					relations[relationName] = relation;
+				}
+				return relations;
+			})
+		])));
+
+		return mapped;
+	}
+
+	function mapColumn(column, schema) {
+		const type = schema && schema.type;
+		if (type === 'number')
+			column = column.numeric();
+		else if (type === 'boolean')
+			column = column.boolean();
+		else if (type === 'bigint')
+			column = column.bigint();
+		else if (type === 'binary')
+			column = column.binary();
+		else if (type === 'json')
+			column = column.json();
+		else if (type === 'uuid')
+			column = column.uuid();
+		else if (type === 'datetime-tz')
+			column = column.dateWithTimeZone();
+		else if (type === 'datetime')
+			column = column.date();
+		else
+			column = column.string();
+		if (schema && schema.primary)
+			column = column.primary();
+		if (schema && schema.notNull)
+			column = column.notNull();
+		else if (schema && schema.notNullExceptInsert)
+			column = column.notNullExceptInsert();
+		return column;
+	}
+
+	function relationNameForForeignKey(tableSchema, foreignKey, index) {
+		const indexes = Array.isArray(tableSchema && tableSchema.indexes) ? tableSchema.indexes : [];
+		const relationIndex = indexes.find(item => item
+			&& typeof item.name === 'string'
+			&& item.name.startsWith('relation:')
+			&& sameStrings(item.columns, foreignKey.columns));
+		if (relationIndex)
+			return relationIndex.name.slice('relation:'.length);
+		return `__orangeSyncReference${index + 1}`;
+	}
+
+	function foreignKeyIsNotNull(tableSchema, foreignKey) {
+		const columns = Array.isArray(tableSchema && tableSchema.columns) ? tableSchema.columns : [];
+		return foreignKey.columns.every(name => {
+			const column = columns.find(item => item && item.dbName === name);
+			return column && column.notNull === true;
+		});
+	}
+
+	function sameStrings(left, right) {
+		if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length)
+			return false;
+		for (let i = 0; i < left.length; i++) {
+			if (left[i] !== right[i])
+				return false;
+		}
+		return true;
+	}
+
+	mapFromSyncSchema_1 = mapFromSyncSchema;
+	return mapFromSyncSchema_1;
+}
+
+var hasRequiredManagedSyncWorkerEntry;
+
+function requireManagedSyncWorkerEntry () {
+	if (hasRequiredManagedSyncWorkerEntry) return managedSyncWorkerEntry$1;
+	hasRequiredManagedSyncWorkerEntry = 1;
+	const rdb = requireIndexBrowser();
+	const mapFromSyncSchema = requireMapFromSyncSchema();
+
+	let handler;
+	const pendingEvents = [];
+
+	globalThis.onmessage = function(event) {
+		const message = event && event.data;
+		if (message && message.type === 'orange-managed-sync-init') {
+			initialize(message);
+			return;
+		}
+		if (!handler) {
+			pendingEvents.push(event);
+			return;
+		}
+		void handler.handleMessage(event);
+	};
+
+	function initialize(message) {
+		if (handler)
+			throw new Error('Managed sync worker is already initialized.');
+		const portByConnectionString = new Map(
+			(message.sqlConnections || []).map(entry => [entry.connectionString, entry.port])
+		);
+		const map = mapFromSyncSchema(rdb, message.schema);
+		const db = map({
+			db: con => con.sqliteOPFS(message.connectionString, {
+				...(message.sqliteOptions || {}),
+				createWorker(connectionString) {
+					const port = portByConnectionString.get(connectionString);
+					if (!port)
+						throw new Error(`Managed sync worker has no SQLite connection for "${connectionString}".`);
+					return port;
+				},
+				closeDbOnClose: false,
+				singleWorker: true
+			})
+		});
+		handler = rdb.createSyncWorkerHandler(db.syncClient);
+		while (pendingEvents.length > 0)
+			void handler.handleMessage(pendingEvents.shift());
+	}
+	return managedSyncWorkerEntry$1;
+}
+
+var managedSyncWorkerEntryExports = requireManagedSyncWorkerEntry();
+var managedSyncWorkerEntry = /*@__PURE__*/getDefaultExportFromCjs(managedSyncWorkerEntryExports);
+
+export { managedSyncWorkerEntry as default };

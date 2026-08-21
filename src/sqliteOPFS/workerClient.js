@@ -1,5 +1,6 @@
 const log = require('../table/log');
 const createInlineSqliteOPFSWorker = require('./inlineWorker');
+const connectWorkerPort = require('./connectWorkerPort');
 const normalizeOpfsSahPoolOptions = require('./normalizeOpfsSahPoolOptions');
 
 function createSqliteOPFSWorkerClient(connectionString, options = {}) {
@@ -24,6 +25,7 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 	return {
 		executeQuery,
 		executeCommand,
+		connectPort,
 		cloneDatabaseTo,
 		suspendDatabase,
 		checkout,
@@ -33,6 +35,12 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 		reset,
 		ready
 	};
+
+	function connectPort() {
+		if (closed)
+			throw new Error('sqliteOPFS worker client is closed.');
+		return connectWorkerPort(worker);
+	}
 
 	function executeQuery(query, callback) {
 		executeQueryCore(query, callback);

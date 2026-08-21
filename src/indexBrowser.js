@@ -9,6 +9,7 @@ let _pglite;
 let _sqliteOPFS;
 
 globalThis.__orangeOrmSqliteOPFSModuleUrl = new URL('../../@sqlite.org/sqlite-wasm/dist/index.mjs?import', import.meta.url).href;
+globalThis.__orangeOrmManagedSyncWorkerUrl = new URL('./managed-sync-worker.mjs', import.meta.url).href;
 
 
 var connectViaPool = function() {
