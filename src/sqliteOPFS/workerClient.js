@@ -202,6 +202,7 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 		const response = await request('open', {
 			connectionString,
 			busyTimeoutMs: options.busyTimeoutMs || 5000,
+			opfsAccessTimeoutMs: options.opfsAccessTimeoutMs || 300000,
 			vfs,
 			opfsSahPoolOptions: vfs === 'opfs-sahpool' ? opfsSahPoolOptions : undefined
 		});
@@ -466,7 +467,7 @@ async function dispatchTimed(message) {
 
 async function dispatch(message) {
 	if (message.method === 'open')
-		return openDb(message.connectionString, message.busyTimeoutMs, message.vfs, message.opfsSahPoolOptions);
+		return openDb(message.connectionString, message.busyTimeoutMs, message.vfs, message.opfsSahPoolOptions, message.opfsAccessTimeoutMs);
 	if (message.method === 'close')
 		return closeDb();
 	if (message.method === 'suspendDatabase')
@@ -488,13 +489,13 @@ async function dispatch(message) {
 	throw new Error('Unknown sqliteOPFS worker method "' + message.method + '".');
 }
 
-async function openDb(connectionString, busyTimeoutMs = 5000, vfs, opfsSahPoolOptions) {
+async function openDb(connectionString, busyTimeoutMs = 5000, vfs, opfsSahPoolOptions, opfsAccessTimeoutMs) {
 	if (db)
 		return { opened: true, reused: true, ...(dbOpenInfo || {}) };
-	dbOpenOptions = { connectionString, busyTimeoutMs, vfs, opfsSahPoolOptions };
+	dbOpenOptions = { connectionString, busyTimeoutMs, vfs, opfsSahPoolOptions, opfsAccessTimeoutMs };
 	const sqlite3 = await getSqlite3();
 	const filename = normalizeFilename(connectionString);
-	const dbInfo = await createDb(sqlite3, filename, vfs, opfsSahPoolOptions);
+	const dbInfo = await createDb(sqlite3, filename, vfs, opfsSahPoolOptions, opfsAccessTimeoutMs);
 	db = dbInfo.db;
 	dbVfsSuspender = dbInfo.suspend;
 	db.exec('PRAGMA busy_timeout=' + (Number.parseInt(busyTimeoutMs, 10) || 5000));
@@ -525,29 +526,51 @@ async function suspendDatabase() {
 
 function openDbFromLastOptions(connectionString) {
 	const options = dbOpenOptions || { connectionString: connectionString || 'orange.sqlite3' };
-	return openDb(options.connectionString, options.busyTimeoutMs, options.vfs, options.opfsSahPoolOptions);
+	return openDb(options.connectionString, options.busyTimeoutMs, options.vfs, options.opfsSahPoolOptions, options.opfsAccessTimeoutMs);
 }
 
-async function createDb(sqlite3, filename, vfs, opfsSahPoolOptions) {
+async function createDb(sqlite3, filename, vfs, opfsSahPoolOptions, opfsAccessTimeoutMs) {
 	if (!vfs || vfs === 'opfs-wl')
-		return createOpfsWlDb(sqlite3, filename);
+		return createOpfsWlDb(sqlite3, filename, opfsAccessTimeoutMs);
 	if (vfs === 'opfs-sahpool')
 		return createOpfsSahPoolDb(sqlite3, filename, opfsSahPoolOptions);
 	throw new Error('sqliteOPFS vfs "' + vfs + '" is not supported. Use "opfs-wl" or "opfs-sahpool".');
 }
 
-function createOpfsWlDb(sqlite3, filename) {
+async function createOpfsWlDb(sqlite3, filename, opfsAccessTimeoutMs) {
 	const DbClass = sqlite3.oo1 && sqlite3.oo1.OpfsWlDb;
 	if (typeof DbClass !== 'function')
 		throw new Error('sqliteOPFS vfs "opfs-wl" is not available in this sqlite-wasm build.');
+	const db = await openOpfsWlDb(DbClass, filename, opfsAccessTimeoutMs);
 	return {
-		db: new DbClass(filename),
+		db,
 		vfs: 'opfs-wl',
 		opfs: true,
 		importDatabase: typeof DbClass.importDb === 'function'
 			? (bytes) => DbClass.importDb(filename, bytes)
 			: undefined
 	};
+}
+
+async function openOpfsWlDb(DbClass, filename, timeoutMs) {
+	const startedAt = Date.now();
+	for (;;) {
+		try {
+			return new DbClass(filename);
+		}
+		catch (error) {
+			if (!isOpfsAccessHandleBusyError(error)
+				|| Date.now() - startedAt >= (Number.parseInt(timeoutMs, 10) || 300000))
+				throw error;
+			await new Promise(resolve => setTimeout(resolve, 25));
+		}
+	}
+}
+
+function isOpfsAccessHandleBusyError(error) {
+	const message = error && error.message || '';
+	return message.includes('createSyncAccessHandle')
+		&& message.includes('another open Access Handle or Writable stream');
 }
 
 async function createOpfsSahPoolDb(sqlite3, filename, opfsSahPoolOptions) {

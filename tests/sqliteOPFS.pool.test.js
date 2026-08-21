@@ -552,6 +552,49 @@ describe('sqliteOPFS pool', () => {
 		expect(closes).toEqual(['/opfs-wl.sqlite3']);
 	});
 
+	test('retries a transient access-handle conflict when opening opfs-wl', async () => {
+		let openAttempts = 0;
+		const pool = newPool('retry-opfs-wl.sqlite3', {
+			vfs: 'opfs-wl',
+			inlineWorker: true,
+			prewarmRead: false,
+			opfsAccessTimeoutMs: 200,
+			sqlite3InitModule() {
+				const sqlite3 = newFakeSqlite3();
+				const BaseDb = sqlite3.oo1.OpfsWlDb;
+				sqlite3.oo1.OpfsWlDb = class extends BaseDb {
+					constructor(filename) {
+						openAttempts += 1;
+						if (openAttempts === 1) {
+							throw new Error('Failed to execute \'createSyncAccessHandle\' on \'FileSystemFileHandle\': Access Handles cannot be created if there is another open Access Handle or Writable stream associated with the same file.');
+						}
+						super(filename);
+					}
+				};
+				return sqlite3;
+			}
+		});
+
+		try {
+			const rows = await new Promise((resolve, reject) => {
+				pool.connect((err, client, done) => {
+					if (err)
+						return reject(err);
+					client.executeQuery(newSql('SELECT 1'), (err, result) => {
+						done(err);
+						err ? reject(err) : resolve(result);
+					});
+				});
+			});
+
+			expect(rows).toEqual([{ value: 1 }]);
+			expect(openAttempts).toBe(2);
+		}
+		finally {
+			await pool.end();
+		}
+	});
+
 	test('defers opfs-wl open until checkout and closes it after checkout release', async () => {
 		const messages = [];
 		const pool = newPool('deferred-opfs-wl.sqlite3', {
