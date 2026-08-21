@@ -269,6 +269,34 @@ describe('sync client auto start', () => {
 		]);
 	});
 
+	test('does not let a notification listener fail sync or skip later listeners', async () => {
+		const events = [];
+		const db = {
+			__sqliteSync: { url: '/rdb', auto: false, tables: ['customer'] },
+			query: async () => []
+		};
+		const client = newSyncClient({
+			transaction: async (fn) => fn({
+				customer: { patch: async () => ({ changed: [] }) },
+				query: async () => []
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async () => ({
+					data: { phase: 'keys', items: [], done: true, cursor: 'cursor-1' }
+				});
+			}
+		});
+		client.on('sync', () => {
+			throw new Error('listener failed');
+		});
+		client.on('sync', payload => events.push(payload.method));
+
+		await expect(client.sync()).resolves.toBeUndefined();
+
+		expect(events).toEqual(['sync']);
+	});
+
 	test('sets low priority on direct sync database queries', async () => {
 		const queryOptions = [];
 		const db = {
@@ -420,6 +448,39 @@ describe('sync client auto start', () => {
 			['credentials', 'include'],
 			['error', 401]
 		]);
+	});
+
+	test('stop cancels an initial sync waiting on a request interceptor', async () => {
+		let interceptorStarted = false;
+		const db = {
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				crossTabLock: false,
+				tables: ['customer']
+			},
+			query: async () => []
+		};
+		const client = newSyncClient({
+			transaction: async (fn) => fn({
+				customer: { patch: async () => ({ changed: [] }) },
+				query: async () => []
+			})
+		}, async () => db, {});
+		client.interceptors.request.use(() => {
+			interceptorStarted = true;
+			return new Promise(() => {});
+		});
+
+		const start = client.start();
+		await waitFor(() => interceptorStarted);
+		await Promise.race([
+			client.stop(),
+			new Promise((_resolve, reject) => setTimeout(() => reject(new Error('stop did not cancel initial sync')), 1000))
+		]);
+		await start;
+
+		await expect(client.isRunning()).resolves.toBe(false);
 	});
 
 	test('serializes sync operations with web locks', async () => {

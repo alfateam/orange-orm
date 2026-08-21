@@ -17,9 +17,16 @@ const {
 	finalizeSyncOperationMemory,
 	withSyncOperationMemory
 } = require('../sync/operationContext');
+const {
+	awaitWithSyncAbort,
+	isSyncAbortError,
+	syncAbortSignalSymbol,
+	throwIfSyncAborted
+} = require('./syncAbort');
 
 const maxPushBatchesPerSync = 1000;
 const maxStableBaseKeysPerStatement = 1000;
+const outboxReplayPageSize = 1000;
 const pullJournalRecoveryPageSize = 1000;
 const streamPullPendingStatus = 'stream-pending';
 const streamPullReadyStatus = 'stream-ready';
@@ -118,13 +125,22 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 
 	function withCrossTabSyncLock(fn) {
 		return async function lockedSyncMethod(options) {
+			const signal = options && options[syncAbortSignalSymbol];
+			throwIfSyncAborted(signal);
 			const db = await getDb();
+			throwIfSyncAborted(signal);
 			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
 			if (!syncConfig)
 				return fn(options);
 			const lock = await resolveRuntimeCrossTabSyncLock(db, syncConfig);
 			const lockConfig = withRuntimeCrossTabLockConfig(lock.config, options);
-			return runWithCrossTabLock(lock.name, lockConfig, () => fn(options));
+			return awaitWithSyncAbort(
+				runWithCrossTabLock(lock.name, lockConfig, () => {
+					throwIfSyncAborted(signal);
+					return fn(options);
+				}),
+				signal
+			);
 		};
 	}
 
@@ -132,7 +148,11 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		let tail = Promise.resolve();
 		return function serializeAsyncMethod(fn) {
 			return function serializedAsyncMethod(options) {
-				const run = tail.then(() => fn(options));
+				const signal = options && options[syncAbortSignalSymbol];
+				const run = awaitWithSyncAbort(tail, signal).then(() => {
+					throwIfSyncAborted(signal);
+					return fn(options);
+				});
 				tail = run.catch(() => {});
 				return run;
 			};
@@ -166,6 +186,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 	}
 
 	async function pushPendingOnly(options = {}) {
+		throwIfSyncAborted(options[syncAbortSignalSymbol]);
 		const db = toSyncDb(await getDb());
 		const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
 		if (!syncConfig)
@@ -193,11 +214,14 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		return localSchemaReadyResultToPublic(result);
 	}
 
-	async function ensureLocalSchemaReady() {
-		const result = await getLocalSchemaReady({
+	async function ensureLocalSchemaReady(options = {}) {
+		const signal = options[syncAbortSignalSymbol];
+		throwIfSyncAborted(signal);
+		const result = await awaitWithSyncAbort(getLocalSchemaReady({
 			allowMissingSync: true,
 			fileSnapshotRollback: fileSnapshotRollbackDefault
-		});
+		}), signal);
+		throwIfSyncAborted(signal);
 		return localSchemaReadyResultToPublic(result);
 	}
 
@@ -254,6 +278,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 				return result;
 			}
 			catch (error) {
+				if (isSyncAbortError(error))
+					throw error;
 				const payload = { method, error };
 				emit(method + '-error', payload);
 				emit('error', payload);
@@ -266,12 +292,19 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		const listeners = eventListeners.get(event);
 		if (!listeners)
 			return;
-		for (const listener of Array.from(listeners))
-			listener(payload);
+		for (const listener of Array.from(listeners)) {
+			try {
+				listener(payload);
+			}
+			catch (_error) {
+				// Notifications must never change sync control flow or skip other listeners.
+			}
+		}
 	}
 
 	async function pull(options = {}) {
 		const normalizedOptions = normalizePullOptions(options);
+		throwIfSyncAborted(normalizedOptions[syncAbortSignalSymbol]);
 		if (options && options._capturePullJournal)
 			normalizedOptions._capturePullJournal = true;
 		if (options && typeof options._capturePullJournalChunk === 'function')
@@ -296,18 +329,25 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		} = await prepareLocalSyncSchema(normalizedOptions, {
 			fileSnapshotRollback: usesFileSnapshotRollback(normalizedOptions)
 		});
+		throwIfSyncAborted(normalizedOptions[syncAbortSignalSymbol]);
 		const hadStableBase = usesFileSnapshotRollback(normalizedOptions)
 			|| await hasStableBase(db, configuredTables);
 		if (!hadStableBase)
-			return runSyncMaintenance(db, () => pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, normalizedOptions));
+			return awaitWithSyncAbort(
+				runSyncMaintenance(db, () => pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, normalizedOptions)),
+				normalizedOptions[syncAbortSignalSymbol]
+			);
 		return pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, normalizedOptions);
 	}
 
 	async function prepareLocalSyncSchema(options = {}, prepareOptions = {}) {
-		const result = await getLocalSchemaReady({
+		const signal = options[syncAbortSignalSymbol];
+		throwIfSyncAborted(signal);
+		const result = await awaitWithSyncAbort(getLocalSchemaReady({
 			...prepareOptions,
 			fileSnapshotRollback: usesFileSnapshotRollback(options)
-		});
+		}), signal);
+		throwIfSyncAborted(signal);
 		if (result.skipped) {
 			if (prepareOptions.allowMissingSync)
 				return result;
@@ -378,8 +418,11 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 	}
 
 	async function pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, options = {}) {
+		const signal = options[syncAbortSignalSymbol];
+		throwIfSyncAborted(signal);
 		if (options._skipPushBeforePull !== true)
-			await pushBeforePull(db, syncConfig, hadStableBase);
+			await pushBeforePull(db, syncConfig, hadStableBase, undefined, options);
+		throwIfSyncAborted(signal);
 		const pullStartedAtMs = Date.now();
 		await maybeEmitInitialReady(syncConfig, configuredTables, db, 'persisted');
 		const currentSince = await getScopeSince(configuredTables, db);
@@ -397,7 +440,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 			_onPullStagingSummary: options._onPullStagingSummary,
 			_onPullSnapshot: options._onPullSnapshot,
 			_syncInterceptors: interceptors,
-			_syncAxiosInterceptor: axiosInterceptor
+			_syncAxiosInterceptor: axiosInterceptor,
+			[syncAbortSignalSymbol]: signal
 		};
 		let result;
 		try {
@@ -408,16 +452,19 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 				throw e;
 			result = await pullPatch(pullConfig, requestOptions);
 		}
+		throwIfSyncAborted(signal);
 		if (result && result.since !== undefined && result.checkpointApplied !== true)
 			await setScopeSince(configuredTables, result.since, db);
 		await deleteConfirmedPushedMutations(db, pullStartedAtMs);
 		if (!hadStableBase)
 			await replayLocalOutbox(db);
+		throwIfSyncAborted(signal);
 		await maybeEmitInitialReady(syncConfig, configuredTables, db, 'sync');
 		return result;
 	}
 
 	async function resetLocal(options = {}) {
+		throwIfSyncAborted(options[syncAbortSignalSymbol]);
 		clearLocalSchemaReady();
 		const db = toSyncDb(await getDb());
 		const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
@@ -428,6 +475,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		if (!Array.isArray(configuredTables) || configuredTables.length === 0)
 			throw new Error('Sync resetLocal requires mapped tables or configured tables.');
 		return runSyncMaintenance(db, async () => {
+			throwIfSyncAborted(options[syncAbortSignalSymbol]);
 			const droppedTables = await dropLocalSyncTables(db, client, configuredTables);
 			await dropExistingBaseTables(db);
 			await db.query(`DROP TABLE IF EXISTS "${syncBaseTable}"`);
@@ -525,6 +573,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 	}
 
 	async function applyPullJournalSnapshot(journal, options = {}) {
+		const signal = options[syncAbortSignalSymbol];
+		throwIfSyncAborted(signal);
 		const db = toSyncDb(await getDb());
 		const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
 		if (!syncConfig)
@@ -573,13 +623,14 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 
 		async function applyPullJournalItemsInSingleTransaction() {
 			await client.transaction(async (tx) => {
+				throwIfSyncAborted(signal);
 				await tryDeferForeignKeys(tx);
 				if (!fileSnapshotRollback)
 					await ensureStableBaseTables(tx, configuredTables);
 				const baseByName = fileSnapshotRollback ? undefined : await readStableBaseEntriesByName(tx);
 				let hasItems = false;
 				for (;;) {
-					const batch = await readNextBatch();
+					const batch = await awaitWithSyncAbort(readNextBatch(), signal);
 					if (batch === null)
 						break;
 					if (batch.length === 0)
@@ -603,13 +654,14 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 			const readNextChunk = createSizedJournalBatchReader(readNextBatch, applyConfig.maxRowsPerTransaction);
 			let hasItems = false;
 			for (;;) {
-				const chunk = await readNextChunk();
+				const chunk = await awaitWithSyncAbort(readNextChunk(), signal);
 				if (chunk === null)
 					break;
 				if (chunk.length === 0)
 					continue;
 				hasItems = true;
 				await client.transaction(async (tx) => {
+					throwIfSyncAborted(signal);
 					await tryDeferForeignKeys(tx);
 					if (!fileSnapshotRollback)
 						await ensureStableBaseTables(tx, configuredTables);
@@ -626,6 +678,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 			}
 			assertJournalItemCountComplete();
 			await client.transaction(async (tx) => {
+				throwIfSyncAborted(signal);
 				if (hasItems && applyConfig.foreignKeyCheck === 'final')
 					await validateForeignKeys(tx);
 				if (shouldApplyCheckpoint)
@@ -706,6 +759,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 	}
 
 	async function pushPending(options = {}) {
+		const signal = options[syncAbortSignalSymbol];
+		throwIfSyncAborted(signal);
 		const db = toSyncDb(await getDb());
 		const syncConfig = options._syncConfig || normalizeSyncConfig(db && db.__sqliteSync);
 		if (!syncConfig)
@@ -720,9 +775,12 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		const clientId = typeof options.clientId === 'string' ? options.clientId : await getClientId(db);
 		let result;
 		try {
-			result = await sendPush(pushConfig, clientId, pending);
+			result = await sendPush(pushConfig, clientId, pending, options);
+			throwIfSyncAborted(signal);
 		}
 		catch (e) {
+			if (isSyncAbortError(e))
+				throw e;
 			if (isConflictError(e)) {
 				if (options._skipConflictRestore === true)
 					await markFailedPushBatch(db, pending, e);
@@ -752,6 +810,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		const maxBatches = resolveMaxPushBatches();
 		const results = [];
 		for (let i = 0; i < maxBatches; i++) {
+			throwIfSyncAborted(options[syncAbortSignalSymbol]);
 			const result = await pushPending({
 				...options,
 				_syncConfig: syncConfig,
@@ -809,7 +868,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 	async function rollbackFailedPushBatchCore(db, attemptedMutations, error) {
 		if (!await hasStableBase(db))
 			return;
-		const remaining = await readReplayMutationRows(db, 10000, mutationIdsToSet(attemptedMutations));
+		const remaining = await readAllReplayMutationRows(db, mutationIdsToSet(attemptedMutations));
 		await restoreStableBase(db);
 		await ensureSyncOutboxTable(db);
 		for (let i = 0; i < attemptedMutations.length; i++) {
@@ -838,12 +897,11 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 	}
 
 	async function replayLocalOutbox(db) {
-		const rows = await readReplayMutationRows(db, 10000);
-		for (let i = 0; i < rows.length; i++) {
-			const mutation = rowToMutation(rows[i]);
+		await forEachReplayMutationRow(db, undefined, async (row) => {
+			const mutation = rowToMutation(row);
 			if (mutation)
 				await replayMutation(mutation);
-		}
+		});
 	}
 
 	async function replayMutation(mutation) {
@@ -876,7 +934,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		return entry ? [entry] : [];
 	}
 
-	async function sendPush(pushConfig, clientId, mutations) {
+	async function sendPush(pushConfig, clientId, mutations, options = {}) {
 		return requestPayload({
 			...pushConfig,
 			syncPhase: 'push',
@@ -887,7 +945,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 			}
 		}, {
 			_syncInterceptors: interceptors,
-			_syncAxiosInterceptor: axiosInterceptor
+			_syncAxiosInterceptor: axiosInterceptor,
+			[syncAbortSignalSymbol]: options[syncAbortSignalSymbol]
 		});
 	}
 
@@ -897,6 +956,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 	}
 
 	async function pullStaged(pullConfig, options) {
+		const signal = options[syncAbortSignalSymbol];
+		throwIfSyncAborted(signal);
 		const stagingStartedAtMs = Date.now();
 		const maxRowsPerBatch = normalizeLimit(pullConfig.maxRowsPerBatch, 1000);
 		const maxConcurrentRowRequests = normalizeConcurrency(pullConfig.maxConcurrentRowRequests, 1);
@@ -919,7 +980,9 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		let applied = 0;
 		await ensurePullJournalTables(db);
 		await tryEnableForeignKeys(db);
+		throwIfSyncAborted(signal);
 		const session = await stagePullJournal();
+		throwIfSyncAborted(signal);
 		const capturedPullJournal = options._capturePullJournal
 			? await capturePullJournalSnapshot(session)
 			: null;
@@ -976,6 +1039,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		}
 
 		async function finalizeStreamedPullJournal(session) {
+			throwIfSyncAborted(signal);
 			const hasJournalItems = capturedStreamItemCount > 0;
 			await client.transaction(async (tx) => {
 				if (hasJournalItems && (!applyConfig || applyConfig.foreignKeyCheck === 'final'))
@@ -994,6 +1058,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		}
 
 		async function applyPullJournalInSingleTransaction(session) {
+			throwIfSyncAborted(signal);
 			await client.transaction(async (tx) => {
 				await tryDeferForeignKeys(tx);
 				if (!fileSnapshotRollback)
@@ -1002,6 +1067,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 				const hasJournalItems = batches.length > 0;
 				const touchedTables = new Set();
 				for (let i = 0; i < batches.length; i++) {
+					throwIfSyncAborted(signal);
 					const batch = batches[i];
 					for (let itemIndex = 0; itemIndex < batch.length; itemIndex++)
 						touchedTables.add(batch[itemIndex].table);
@@ -1037,8 +1103,10 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 			}, { suppressSyncOutbox: true });
 			const touchedTables = new Set();
 			for (let offset = 0; offset < items.length; offset += applyConfig.maxRowsPerTransaction) {
+				throwIfSyncAborted(signal);
 				const chunk = items.slice(offset, offset + applyConfig.maxRowsPerTransaction);
 				await client.transaction(async (tx) => {
+					throwIfSyncAborted(signal);
 					await tryDeferForeignKeys(tx);
 					const baseByName = fileSnapshotRollback ? undefined : await readStableBaseEntriesByName(tx);
 					for (let i = 0; i < chunk.length; i++) {
@@ -1125,6 +1193,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 			startPullBatchPump();
 			try {
 				for (;;) {
+					throwIfSyncAborted(signal);
 					if (emptySession) {
 						pipelineStopped = true;
 						rowScheduler.stop();
@@ -1207,6 +1276,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 
 			async function pumpPullBatches() {
 				while (shouldFetchMorePullBatches()) {
+					throwIfSyncAborted(signal);
 					fetchedBatches += 1;
 					if (fetchedBatches > 10000)
 						throw new Error('Sync failed: staged pull exceeded max iterations');
@@ -1418,6 +1488,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 
 			async function runRowJob(job) {
 				try {
+					throwIfSyncAborted(signal);
 					const currentRowsResult = await requestRowsItems(job.items);
 					if (currentRowsResult.error)
 						throw currentRowsResult.error;
@@ -1522,7 +1593,9 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 	}
 
 	async function pullPatch(pullConfig, options) {
+		throwIfSyncAborted(options[syncAbortSignalSymbol]);
 		const payload = await requestPayload(pullConfig, options);
+		throwIfSyncAborted(options[syncAbortSignalSymbol]);
 		const tablePatches = extractTablePatches(payload);
 		const defaultPatchOptions = { ...(pullConfig.patchOptions || {}), concurrency: 'overwrite' };
 		let applied = 0;
@@ -1557,6 +1630,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		const result = {};
 		if (timeoutMs !== undefined)
 			result.timeoutMs = timeoutMs;
+		if (input[syncAbortSignalSymbol])
+			result[syncAbortSignalSymbol] = input[syncAbortSignalSymbol];
 		return result;
 	}
 
@@ -2101,8 +2176,45 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		return readMutationRowsByStatus(db, ['pending'], limit, excludeIds);
 	}
 
-	async function readReplayMutationRows(db, limit, excludeIds) {
-		return readMutationRowsByStatus(db, ['pending', 'pushed'], limit, excludeIds);
+	async function readAllReplayMutationRows(db, excludeIds) {
+		const result = [];
+		await forEachReplayMutationRow(db, excludeIds, (row) => {
+			result.push(row);
+		});
+		return result;
+	}
+
+	async function forEachReplayMutationRow(db, excludeIds, callback) {
+		let after;
+		for (;;) {
+			const page = await readMutationRowsByStatus(
+				db,
+				['pending', 'pushed'],
+				outboxReplayPageSize,
+				undefined,
+				after
+			);
+			if (page.length === 0)
+				return;
+			for (let i = 0; i < page.length; i++) {
+				const row = page[i];
+				const mutationId = outboxRowMutationId(row);
+				if (!excludeIds || !excludeIds.has(mutationId))
+					await callback(row);
+			}
+			if (page.length < outboxReplayPageSize)
+				return;
+			const last = page[page.length - 1];
+			const nextAfter = {
+				createdAtMs: Number(last && (last.created_at_ms ?? last.CREATED_AT_MS)),
+				mutationId: outboxRowMutationId(last)
+			};
+			if (!Number.isFinite(nextAfter.createdAtMs) || typeof nextAfter.mutationId !== 'string')
+				throw new Error('Sync could not page the local outbox safely.');
+			if (after && after.createdAtMs === nextAfter.createdAtMs && after.mutationId === nextAfter.mutationId)
+				throw new Error('Sync outbox paging did not advance.');
+			after = nextAfter;
+		}
 	}
 
 	async function readMutationRowsByStatus(db, statuses, limit, excludeIds, after) {
@@ -3159,7 +3271,12 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 
 	function emitInitialReady(payload) {
 		for (const listener of Array.from(initialReadyListeners)) {
-			listener(payload);
+			try {
+				listener(payload);
+			}
+			catch (_error) {
+				// Readiness notifications must never interrupt sync.
+			}
 		}
 	}
 }
@@ -3451,6 +3568,9 @@ function resolveMaxPushBatches() {
 async function requestPayload(config, options) {
 	const syncInterceptors = options && options._syncInterceptors;
 	const axiosInterceptor = options && options._syncAxiosInterceptor;
+	const signal = options && options[syncAbortSignalSymbol];
+	const interceptorContext = { signal };
+	throwIfSyncAborted(signal);
 	const axios = createFetchClient();
 	if (axiosInterceptor && typeof axiosInterceptor.applyTo === 'function')
 		axiosInterceptor.applyTo(axios);
@@ -3468,15 +3588,23 @@ async function requestPayload(config, options) {
 	request.data = requestBody;
 
 	const interceptedRequest = syncInterceptors && typeof syncInterceptors.applyRequest === 'function'
-		? await syncInterceptors.applyRequest(request)
+		? await awaitWithSyncAbort(syncInterceptors.applyRequest(request, interceptorContext), signal)
 		: request;
+	throwIfSyncAborted(signal);
+	const transportRequest = signal
+		? { ...interceptedRequest, signal }
+		: interceptedRequest;
 	let response;
 	try {
-		response = await axios.request(interceptedRequest);
+		response = await axios.request(transportRequest);
 	}
 	catch (error) {
+		throwIfSyncAborted(signal);
 		if (syncInterceptors && typeof syncInterceptors.applyResponseError === 'function') {
-			const recovered = await syncInterceptors.applyResponseError(error);
+			const recovered = await awaitWithSyncAbort(
+				syncInterceptors.applyResponseError(error, interceptorContext),
+				signal
+			);
 			return recovered && recovered === Object(recovered) && 'data' in recovered
 				? recovered.data
 				: recovered;
@@ -3484,7 +3612,8 @@ async function requestPayload(config, options) {
 		throw error;
 	}
 	if (syncInterceptors && typeof syncInterceptors.applyResponse === 'function')
-		response = await syncInterceptors.applyResponse(response);
+		response = await awaitWithSyncAbort(syncInterceptors.applyResponse(response, interceptorContext), signal);
+	throwIfSyncAborted(signal);
 	return response.data;
 }
 
@@ -3497,12 +3626,21 @@ function createFetchClient() {
 		if (typeof fetch !== 'function')
 			throw new Error('HTTP client requires fetch. Use a runtime with fetch support or provide a fetch polyfill.');
 
-		const abortController = typeof AbortController === 'function' && config.timeout
+		const externalSignal = config.signal;
+		throwIfSyncAborted(externalSignal);
+		const abortController = typeof AbortController === 'function' && (config.timeout || externalSignal)
 			? new AbortController()
 			: undefined;
 		let timeout;
+		let removeExternalAbort;
 		if (abortController)
-			timeout = setTimeout(() => abortController.abort(), config.timeout);
+			if (config.timeout)
+				timeout = setTimeout(() => abortController.abort(), config.timeout);
+		if (abortController && externalSignal) {
+			const abort = () => abortController.abort(externalSignal.reason);
+			externalSignal.addEventListener('abort', abort, { once: true });
+			removeExternalAbort = () => externalSignal.removeEventListener('abort', abort);
+		}
 
 		try {
 			const headers = {
@@ -3514,18 +3652,21 @@ function createFetchClient() {
 				method: config.method?.toUpperCase(),
 				headers,
 				body: config.data === undefined ? undefined : JSON.stringify(config.data),
-				signal: abortController && abortController.signal
+				signal: abortController ? abortController.signal : externalSignal
 			};
 			if (config.credentials !== undefined)
 				fetchOptions.credentials = config.credentials;
 			const response = await fetch(config.url, fetchOptions);
 			const data = await readPayloadResponse(response);
+			const responseConfig = config.signal
+				? withoutRequestSignal(config)
+				: config;
 			const payload = {
 				data,
 				status: response.status,
 				statusText: response.statusText,
 				headers: headersToObject(response.headers),
-				config
+				config: responseConfig
 			};
 			if (!response.ok) {
 				const error = new Error('Request failed with status code ' + response.status);
@@ -3537,7 +3678,15 @@ function createFetchClient() {
 		finally {
 			if (timeout)
 				clearTimeout(timeout);
+			if (removeExternalAbort)
+				removeExternalAbort();
 		}
+	}
+
+	function withoutRequestSignal(config) {
+		const result = { ...config };
+		delete result.signal;
+		return result;
 	}
 }
 

@@ -6,6 +6,7 @@ import path from 'node:path';
 
 const rdb = require('../src/index');
 const newDualSyncDatabase = require('../src/sqliteOPFS/dualSyncDatabase');
+const { dualSyncFaultInjectorSymbol } = newDualSyncDatabase;
 const newSqliteDatabase = require('../src/sqlite3/newDatabase');
 const { setupChangeTracking } = require('../src/sync/setupChangeTracking');
 
@@ -526,7 +527,7 @@ describe('sqliteOPFS dual sync integration', () => {
 			return config;
 		});
 		const injectedCrash = new Error('injected crash before manifest swap');
-		const stopCrash = opened.localDb.syncClient.on('sync-progress', event => {
+		const stopCrash = opened.dualDb[dualSyncFaultInjectorSymbol](event => {
 			if (event.phase === 'waiting-for-write-barrier')
 				throw injectedCrash;
 		});
@@ -581,7 +582,7 @@ describe('sqliteOPFS dual sync integration', () => {
 			return config;
 		});
 		const injectedCrash = new Error('injected crash after conflict clone');
-		const stopCrash = opened.localDb.syncClient.on('sync-progress', event => {
+		const stopCrash = opened.dualDb[dualSyncFaultInjectorSymbol](event => {
 			if (event.phase === 'cloned-clean-staging')
 				throw injectedCrash;
 		});

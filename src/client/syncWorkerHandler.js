@@ -1,6 +1,11 @@
 const { syncAutoStartSymbol } = require('./syncAuto');
 const { ensureLocalSchemaReadySymbol } = require('./syncClient');
 const {
+	createSyncAbortController,
+	syncAbortError,
+	syncAbortSignalSymbol
+} = require('./syncAbort');
+const {
 	alwaysForwardedEvents,
 	deserializeError,
 	serializeError,
@@ -14,6 +19,7 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 	const syncEventUnsubscribers = new Map();
 	const interceptorEjectors = [];
 	const pendingInterceptorRequests = new Map();
+	const requestControllers = new Map();
 	let nextInterceptorRequestId = 1;
 	let autoStarted = false;
 	let clientReady = false;
@@ -50,18 +56,29 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 			handleInterceptorResponse(message);
 			return;
 		}
+		if (message.type === 'orange-sync-worker-cancel') {
+			cancelRequest(message.id);
+			return;
+		}
 		if (message.type !== 'orange-sync-worker-request')
 			return;
+		if (message.method === 'sync')
+			restartPendingRequestInterceptors();
+		const controller = createSyncAbortController();
+		requestControllers.set(message.id, controller);
 		try {
-			const result = await dispatch(message.method, message.args || []);
+			const result = await dispatch(message.method, message.args || [], controller.signal);
 			postResponse(message.id, result);
 		}
 		catch (e) {
 			postResponse(message.id, undefined, e);
 		}
+		finally {
+			requestControllers.delete(message.id);
+		}
 	}
 
-	function dispatch(method, args) {
+	function dispatch(method, args, signal) {
 		if (method === 'on')
 			return subscribeSyncEvent(args[0]);
 		if (method === 'off')
@@ -70,12 +87,18 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 			const ensureReady = syncClient[ensureLocalSchemaReadySymbol];
 			if (typeof ensureReady !== 'function')
 				return { skipped: true };
-			return ensureReady.apply(syncClient, args);
+			return ensureReady.apply(syncClient, withAbortOptions(args, signal));
 		}
 		const fn = syncClient[method];
 		if (typeof fn !== 'function')
 			throw new Error(`Sync worker method "${method}" is not implemented.`);
-		return fn.apply(syncClient, args);
+		return fn.apply(syncClient, methodAcceptsOptions(method) ? withAbortOptions(args, signal) : args);
+	}
+
+	function cancelRequest(id) {
+		const controller = requestControllers.get(id);
+		if (controller)
+			controller.abort(syncAbortError(undefined, 'Sync worker request cancelled.'));
 	}
 
 	function subscribeSyncEvent(event) {
@@ -104,17 +127,20 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 
 	async function stop() {
 		stopped = true;
+		for (const controller of requestControllers.values())
+			controller.abort(syncAbortError(undefined, 'Sync worker handler stopped.'));
+		requestControllers.clear();
+		if (options.stopSyncClient !== false && typeof syncClient.stop === 'function')
+			await syncClient.stop();
 		for (const eject of interceptorEjectors)
 			eject();
 		interceptorEjectors.length = 0;
-		for (const entry of pendingInterceptorRequests.values())
-			entry.reject(new Error('Sync worker interceptor bridge stopped.'));
+		for (const entry of new Set(pendingInterceptorRequests.values()))
+			settleInterceptorRequest(entry, entry.reject, new Error('Sync worker interceptor bridge stopped.'));
 		pendingInterceptorRequests.clear();
 		for (const unsubscribe of syncEventUnsubscribers.values())
 			unsubscribe();
 		syncEventUnsubscribers.clear();
-		if (options.stopSyncClient !== false && typeof syncClient.stop === 'function')
-			await syncClient.stop();
 	}
 
 	function handleClientReady() {
@@ -155,11 +181,11 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 		const interceptors = syncClient.interceptors;
 		if (!interceptors)
 			return;
-		install(interceptors.request, (config) => callClientInterceptor('request', config));
+		install(interceptors.request, (config, context) => callClientInterceptor('request', config, undefined, context));
 		install(
 			interceptors.response,
-			(response) => callClientInterceptor('response', response),
-			(error) => callClientInterceptor('response-error', undefined, error)
+			(response, context) => callClientInterceptor('response', response, undefined, context),
+			(error, context) => callClientInterceptor('response-error', undefined, error, context)
 		);
 
 		function install(manager, onFulfilled, onRejected) {
@@ -171,35 +197,86 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 		}
 	}
 
-	function callClientInterceptor(phase, payload, error) {
-		const id = nextInterceptorRequestId++;
+	function callClientInterceptor(phase, payload, error, context) {
 		return new Promise((resolve, reject) => {
-			pendingInterceptorRequests.set(id, { resolve, reject });
-			try {
-				postMessage({
-					type: 'orange-sync-worker-interceptor-request',
-					id,
-					phase,
-					payload,
-					error: error ? serializeError(error) : undefined
-				});
+			const signal = context && context.signal;
+			const entry = {
+				id: undefined,
+				phase,
+				payload,
+				error,
+				resolve,
+				reject,
+				removeAbort: undefined,
+				settled: false
+			};
+			if (signal) {
+				const abort = () => {
+					settleInterceptorRequest(entry, reject, syncAbortError(signal.reason));
+				};
+				if (signal.aborted) {
+					abort();
+					return;
+				}
+				signal.addEventListener('abort', abort, { once: true });
+				entry.removeAbort = () => signal.removeEventListener('abort', abort);
 			}
-			catch (postError) {
-				pendingInterceptorRequests.delete(id);
-				reject(postError);
-			}
+			postInterceptorRequest(entry);
 		});
+	}
+
+	function restartPendingRequestInterceptors() {
+		const entries = Array.from(new Set(pendingInterceptorRequests.values()));
+		for (const entry of entries) {
+			if (!entry.settled && entry.phase === 'request')
+				postInterceptorRequest(entry);
+		}
+	}
+
+	function postInterceptorRequest(entry) {
+		if (entry.settled)
+			return;
+		if (entry.id !== undefined)
+			pendingInterceptorRequests.delete(entry.id);
+		entry.id = nextInterceptorRequestId++;
+		pendingInterceptorRequests.set(entry.id, entry);
+		try {
+			postMessage({
+				type: 'orange-sync-worker-interceptor-request',
+				id: entry.id,
+				phase: entry.phase,
+				payload: entry.payload,
+				error: entry.error ? serializeError(entry.error) : undefined
+			});
+		}
+		catch (postError) {
+			settleInterceptorRequest(entry, entry.reject, postError);
+		}
 	}
 
 	function handleInterceptorResponse(message) {
 		const entry = pendingInterceptorRequests.get(message.id);
 		if (!entry)
 			return;
-		pendingInterceptorRequests.delete(message.id);
 		if (message.error)
-			entry.reject(deserializeError(message.error, 'Sync worker interceptor failed.'));
+			settleInterceptorRequest(
+				entry,
+				entry.reject,
+				deserializeError(message.error, 'Sync worker interceptor failed.')
+			);
 		else
-			entry.resolve(message.result);
+			settleInterceptorRequest(entry, entry.resolve, message.result);
+	}
+
+	function settleInterceptorRequest(entry, callback, value) {
+		if (entry.settled)
+			return;
+		entry.settled = true;
+		if (entry.id !== undefined)
+			pendingInterceptorRequests.delete(entry.id);
+		if (entry.removeAbort)
+			entry.removeAbort();
+		callback(value);
 	}
 
 	function postResponse(id, result, error) {
@@ -210,6 +287,25 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 			error: error ? serializeError(error) : undefined
 		});
 	}
+}
+
+function methodAcceptsOptions(method) {
+	return method === 'sync'
+		|| method === 'ensureLocalSchema'
+		|| method === 'resetLocal'
+		|| method === 'start';
+}
+
+function withAbortOptions(args, signal) {
+	const result = Array.isArray(args) ? args.slice() : [];
+	const input = result[0] && result[0] === Object(result[0]) ? result[0] : {};
+	const options = { ...input };
+	Object.defineProperty(options, syncAbortSignalSymbol, {
+		value: signal,
+		configurable: true
+	});
+	result[0] = options;
+	return result;
 }
 
 function getPostTarget() {

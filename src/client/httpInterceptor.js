@@ -30,26 +30,35 @@ class InterceptorProxy {
 		};
 	}
 
-	async applyRequest(config) {
+	async applyRequest(config, context) {
 		let result = Promise.resolve(config);
 		for (const { onFulfilled, onRejected } of this.requestInterceptors) {
-			result = result.then(onFulfilled, onRejected);
+			result = result.then(
+				onFulfilled && ((value) => onFulfilled(value, context)),
+				onRejected && ((error) => onRejected(error, context))
+			);
 		}
 		return await result;
 	}
 
-	async applyResponse(response) {
+	async applyResponse(response, context) {
 		let result = Promise.resolve(response);
 		for (const { onFulfilled, onRejected } of this.responseInterceptors) {
-			result = result.then(onFulfilled, onRejected);
+			result = result.then(
+				onFulfilled && ((value) => onFulfilled(value, context)),
+				onRejected && ((error) => onRejected(error, context))
+			);
 		}
 		return await result;
 	}
 
-	async applyResponseError(error) {
+	async applyResponseError(error, context) {
 		let result = Promise.reject(error);
 		for (const { onFulfilled, onRejected } of this.responseInterceptors) {
-			result = result.then(onFulfilled, onRejected);
+			result = result.then(
+				onFulfilled && ((value) => onFulfilled(value, context)),
+				onRejected && ((currentError) => onRejected(currentError, context))
+			);
 		}
 		return await result;
 	}

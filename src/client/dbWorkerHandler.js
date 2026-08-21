@@ -1,6 +1,13 @@
 const { acquireSyncWrite } = require('../sync/writeGate');
 const { syncAutoStartSymbol } = require('./syncAuto');
 const { ensureLocalSchemaReadySymbol } = require('./syncClient');
+const { syncAbortError } = require('./syncAbort');
+const {
+	alwaysForwardedEvents,
+	deserializeError,
+	serializeError,
+	serializeEventPayload
+} = require('./syncWorkerProtocol');
 const {
 	createSyncTransactionContext,
 	flushSyncTransactionContext,
@@ -14,19 +21,23 @@ function createDbWorkerHandler(client, options = {}) {
 
 	const transactions = new Map();
 	const syncEventUnsubscribers = new Map();
+	const interceptorEjectors = [];
+	const pendingInterceptorRequests = new Map();
+	let nextInterceptorRequestId = 1;
+	let autoStarted = false;
+	let clientReady = false;
+	let stopped = false;
+	let hasPendingInitialReady = false;
+	let pendingInitialReady;
 	const postMessage = options.postMessage || ((message) => {
 		const target = getPostTarget();
 		if (target)
 			target.postMessage(message);
 	});
 
-	if (options.autoStart !== false && client.syncClient) {
-		const startAuto = typeof client.syncClient[syncAutoStartSymbol] === 'function'
-			? client.syncClient[syncAutoStartSymbol]
-			: client.syncClient.start;
-		if (typeof startAuto === 'function')
-			void startAuto.call(client.syncClient);
-	}
+	installInterceptorBridge();
+	for (let i = 0; i < alwaysForwardedEvents.length; i++)
+		subscribeSyncEvent(alwaysForwardedEvents[i]);
 
 	return {
 		handleMessage,
@@ -35,8 +46,20 @@ function createDbWorkerHandler(client, options = {}) {
 
 	async function handleMessage(event) {
 		const message = event && event.data;
-		if (!message || message.type !== 'orange-db-request')
+		if (!message)
 			return;
+		if (message.type === 'orange-db-client-ready') {
+			handleClientReady();
+			return;
+		}
+		if (message.type === 'orange-db-interceptor-response') {
+			handleInterceptorResponse(message);
+			return;
+		}
+		if (message.type !== 'orange-db-request')
+			return;
+		if (message.method === 'sync.sync')
+			restartPendingRequestInterceptors();
 		try {
 			const result = await dispatch(message);
 			postResponse(message.id, result);
@@ -166,10 +189,15 @@ function createDbWorkerHandler(client, options = {}) {
 		if (!client.syncClient || typeof client.syncClient.on !== 'function')
 			return;
 		const unsubscribe = client.syncClient.on(event, (payload) => {
+			if (event === 'initial-ready' && !clientReady) {
+				hasPendingInitialReady = true;
+				pendingInitialReady = payload;
+				return;
+			}
 			postMessage({
 				type: 'orange-db-event',
 				event,
-				payload
+				payload: serializeEventPayload(payload)
 			});
 		});
 		syncEventUnsubscribers.set(event, unsubscribe);
@@ -247,7 +275,18 @@ function createDbWorkerHandler(client, options = {}) {
 		}
 	}
 
-	function stop() {
+	async function stop() {
+		if (stopped)
+			return;
+		stopped = true;
+		if (options.stopSyncClient !== false && client.syncClient && typeof client.syncClient.stop === 'function')
+			await client.syncClient.stop();
+		for (const eject of interceptorEjectors)
+			eject();
+		interceptorEjectors.length = 0;
+		for (const entry of new Set(pendingInterceptorRequests.values()))
+			settleInterceptorRequest(entry, entry.reject, syncAbortError(undefined, 'DB worker interceptor bridge stopped.'));
+		pendingInterceptorRequests.clear();
 		for (const unsubscribe of syncEventUnsubscribers.values())
 			unsubscribe();
 		syncEventUnsubscribers.clear();
@@ -255,8 +294,142 @@ function createDbWorkerHandler(client, options = {}) {
 			transactions.delete(id);
 			void Promise.resolve(transaction(transaction.rollback)).finally(() => releaseSyncWrite(transaction));
 		}
-		if (options.stopSyncClient !== false && client.syncClient && typeof client.syncClient.stop === 'function')
-			void client.syncClient.stop();
+	}
+
+	function handleClientReady() {
+		if (clientReady || stopped)
+			return;
+		clientReady = true;
+		if (hasPendingInitialReady) {
+			postMessage({
+				type: 'orange-db-event',
+				event: 'initial-ready',
+				payload: serializeEventPayload(pendingInitialReady)
+			});
+			hasPendingInitialReady = false;
+			pendingInitialReady = undefined;
+		}
+		startAutomaticSync();
+	}
+
+	function startAutomaticSync() {
+		if (autoStarted || stopped || options.autoStart === false || !client.syncClient)
+			return;
+		autoStarted = true;
+		const startAuto = typeof client.syncClient[syncAutoStartSymbol] === 'function'
+			? client.syncClient[syncAutoStartSymbol]
+			: client.syncClient.start;
+		if (typeof startAuto !== 'function')
+			return;
+		void Promise.resolve(startAuto.call(client.syncClient)).catch((error) => {
+			postMessage({
+				type: 'orange-db-event',
+				event: 'error',
+				payload: serializeEventPayload({ method: 'auto-start', error })
+			});
+		});
+	}
+
+	function installInterceptorBridge() {
+		const interceptors = client.syncClient && client.syncClient.interceptors;
+		if (!interceptors)
+			return;
+		install(interceptors.request, (config, context) => callClientInterceptor('request', config, undefined, context));
+		install(
+			interceptors.response,
+			(response, context) => callClientInterceptor('response', response, undefined, context),
+			(error, context) => callClientInterceptor('response-error', undefined, error, context)
+		);
+
+		function install(manager, onFulfilled, onRejected) {
+			if (!manager || typeof manager.use !== 'function')
+				return;
+			const id = manager.use(onFulfilled, onRejected);
+			if (typeof manager.eject === 'function')
+				interceptorEjectors.push(() => manager.eject(id));
+		}
+	}
+
+	function callClientInterceptor(phase, payload, error, context) {
+		return new Promise((resolve, reject) => {
+			const signal = context && context.signal;
+			const entry = {
+				id: undefined,
+				phase,
+				payload,
+				error,
+				resolve,
+				reject,
+				removeAbort: undefined,
+				settled: false
+			};
+			if (signal) {
+				const abort = () => {
+					settleInterceptorRequest(entry, reject, syncAbortError(signal.reason));
+				};
+				if (signal.aborted) {
+					abort();
+					return;
+				}
+				signal.addEventListener('abort', abort, { once: true });
+				entry.removeAbort = () => signal.removeEventListener('abort', abort);
+			}
+			postInterceptorRequest(entry);
+		});
+	}
+
+	function restartPendingRequestInterceptors() {
+		const entries = Array.from(new Set(pendingInterceptorRequests.values()));
+		for (const entry of entries) {
+			if (!entry.settled && entry.phase === 'request')
+				postInterceptorRequest(entry);
+		}
+	}
+
+	function postInterceptorRequest(entry) {
+		if (entry.settled)
+			return;
+		if (entry.id !== undefined)
+			pendingInterceptorRequests.delete(entry.id);
+		entry.id = nextInterceptorRequestId++;
+		pendingInterceptorRequests.set(entry.id, entry);
+		try {
+			postMessage({
+				type: 'orange-db-interceptor-request',
+				id: entry.id,
+				phase: entry.phase,
+				payload: entry.payload,
+				error: entry.error ? serializeError(entry.error) : undefined
+			});
+		}
+		catch (postError) {
+			settleInterceptorRequest(entry, entry.reject, postError);
+		}
+	}
+
+	function handleInterceptorResponse(message) {
+		const entry = pendingInterceptorRequests.get(message.id);
+		if (!entry)
+			return;
+		if (message.error)
+			settleInterceptorRequest(
+				entry,
+				entry.reject,
+				deserializeError(message.error, 'DB worker interceptor failed.')
+			);
+		else
+			settleInterceptorRequest(entry, entry.resolve, message.result);
+	}
+
+	function settleInterceptorRequest(entry, callback, value) {
+		if (entry.settled)
+			return;
+		entry.settled = true;
+		if (entry.id !== undefined)
+			pendingInterceptorRequests.delete(entry.id);
+		if (entry.removeAbort)
+			entry.removeAbort();
+		callback(value);
 	}
 
 	function postResponse(id, result, error) {
@@ -277,23 +450,10 @@ function createDbWorkerHandler(client, options = {}) {
 	}
 }
 
-function serializeError(error) {
-	return {
-		name: error && error.name,
-		message: error && error.message ? error.message : String(error),
-		stack: error && error.stack
-	};
-}
-
 function toError(error) {
 	if (!error)
 		return undefined;
-	const e = new Error(error.message || 'DB worker transaction failed.');
-	if (error.name)
-		e.name = error.name;
-	if (error.stack)
-		e.stack = error.stack;
-	return e;
+	return deserializeError(error, 'DB worker transaction failed.');
 }
 
 function getPostTarget() {

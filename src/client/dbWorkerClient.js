@@ -3,7 +3,14 @@ const {
 	serializeSyncPayload,
 	withSyncOperationMemory
 } = require('../sync/operationContext');
+const createHttpInterceptor = require('./httpInterceptor');
 const { ensureLocalSchemaReadySymbol } = require('./syncClient');
+const {
+	deserializeError,
+	deserializeEventPayload,
+	isAlwaysForwardedEvent,
+	serializeError
+} = require('./syncWorkerProtocol');
 
 function createDbWorkerClient(worker) {
 	if (!worker || typeof worker.postMessage !== 'function')
@@ -12,8 +19,17 @@ function createDbWorkerClient(worker) {
 	let nextId = 1;
 	const pending = new Map();
 	const listeners = new Map();
+	const interceptors = createHttpInterceptor();
+	let hasInitialReady = false;
+	let lastInitialReady;
+	let closed = false;
+	let terminalError;
 
 	worker.addEventListener('message', onMessage);
+	worker.addEventListener('error', onWorkerError);
+	worker.addEventListener('messageerror', onWorkerError);
+	if (typeof worker.start === 'function')
+		worker.start();
 
 	const client = {
 		__orangeDbWorkerClient: true,
@@ -35,11 +51,13 @@ function createDbWorkerClient(worker) {
 			off,
 			once,
 			waitForInitialSync: syncRequest.bind(null, 'waitForInitialSync'),
+			interceptors,
 			[ensureLocalSchemaReadySymbol]: syncRequest.bind(null, 'ensureLocalSchemaReady'),
 			close
 		}
 	};
 
+	worker.postMessage({ type: 'orange-db-client-ready' });
 	return client;
 
 	function __createSyncClient() {
@@ -87,6 +105,10 @@ function createDbWorkerClient(worker) {
 	}
 
 	function request(method, meta, ...args) {
+		if (closed)
+			return Promise.reject(new Error('DB worker client closed.'));
+		if (terminalError)
+			return Promise.reject(terminalError);
 		const id = nextId++;
 		return new Promise((resolve, reject) => {
 			pending.set(id, { resolve, reject });
@@ -112,7 +134,7 @@ function createDbWorkerClient(worker) {
 	}
 
 	function on(event, listener) {
-		if (typeof listener !== 'function')
+		if (typeof event !== 'string' || typeof listener !== 'function')
 			return () => {};
 		let eventListeners = listeners.get(event);
 		if (!eventListeners) {
@@ -120,7 +142,15 @@ function createDbWorkerClient(worker) {
 			listeners.set(event, eventListeners);
 		}
 		eventListeners.add(listener);
-		request('sync.on', {}, event).catch(() => {});
+		if (!isAlwaysForwardedEvent(event))
+			request('sync.on', {}, event).catch(() => {});
+		if (event === 'initial-ready' && hasInitialReady) {
+			const readyPayload = lastInitialReady;
+			Promise.resolve().then(() => {
+				if (eventListeners.has(listener) && hasInitialReady && lastInitialReady === readyPayload)
+					callListener(listener, readyPayload);
+			});
+		}
 		return () => off(event, listener);
 	}
 
@@ -131,7 +161,8 @@ function createDbWorkerClient(worker) {
 		eventListeners.delete(listener);
 		if (eventListeners.size === 0) {
 			listeners.delete(event);
-			request('sync.off', {}, event).catch(() => {});
+			if (!isAlwaysForwardedEvent(event))
+				request('sync.off', {}, event).catch(() => {});
 		}
 	}
 
@@ -146,11 +177,18 @@ function createDbWorkerClient(worker) {
 	}
 
 	function close() {
+		if (closed)
+			return;
+		closed = true;
 		worker.removeEventListener('message', onMessage);
+		worker.removeEventListener('error', onWorkerError);
+		worker.removeEventListener('messageerror', onWorkerError);
 		for (const entry of pending.values())
 			entry.reject(new Error('DB worker client closed.'));
 		pending.clear();
 		listeners.clear();
+		hasInitialReady = false;
+		lastInitialReady = undefined;
 		if (typeof worker.terminate === 'function') {
 			try {
 				worker.terminate();
@@ -173,8 +211,17 @@ function createDbWorkerClient(worker) {
 		const message = event && event.data;
 		if (!message || message.type === undefined)
 			return;
+		if (message.type === 'orange-db-interceptor-request') {
+			void handleInterceptorRequest(message);
+			return;
+		}
 		if (message.type === 'orange-db-event') {
-			emit(message.event, message.payload);
+			const payload = deserializeEventPayload(message.payload);
+			if (message.event === 'initial-ready') {
+				hasInitialReady = true;
+				lastInitialReady = payload;
+			}
+			emit(message.event, payload);
 			return;
 		}
 		if (message.type !== 'orange-db-response')
@@ -184,21 +231,109 @@ function createDbWorkerClient(worker) {
 			return;
 		pending.delete(message.id);
 		if (message.error)
-			entry.reject(toError(message.error));
+			entry.reject(deserializeError(message.error, 'DB worker request failed.'));
 		else
 			entry.resolve(message.result);
 	}
 
 	function emit(event, payload) {
-		if (event === 'operation' || event && event.startsWith && event.startsWith('operation:')) {
+		if (event === 'operation') {
 			payload = withSyncOperationMemory(payload);
-			finalizeSyncOperationMemory(payload);
+			try {
+				emitToListeners('operation', payload);
+				if (payload && typeof payload.operation === 'string')
+					emitToListeners(`operation:${payload.operation}`, payload);
+			}
+			finally {
+				finalizeSyncOperationMemory(payload);
+			}
+			return;
 		}
+		if (event && event.startsWith && event.startsWith('operation:')) {
+			payload = withSyncOperationMemory(payload);
+			try {
+				emitToListeners(event, payload);
+			}
+			finally {
+				finalizeSyncOperationMemory(payload);
+			}
+			return;
+		}
+		emitToListeners(event, payload);
+	}
+
+	function emitToListeners(event, payload) {
 		const eventListeners = listeners.get(event);
 		if (!eventListeners)
 			return;
 		for (const listener of Array.from(eventListeners))
+			callListener(listener, payload);
+	}
+
+	function callListener(listener, payload) {
+		try {
 			listener(payload);
+		}
+		catch (_error) {
+			// Notifications must never interrupt worker message handling or other listeners.
+		}
+	}
+
+	async function handleInterceptorRequest(message) {
+		try {
+			const result = await applyInterceptor(message);
+			postInterceptorResponse(message.id, result);
+		}
+		catch (error) {
+			postInterceptorResponse(message.id, undefined, error);
+		}
+	}
+
+	function applyInterceptor(message) {
+		if (message.phase === 'request')
+			return interceptors.applyRequest(message.payload);
+		if (message.phase === 'response')
+			return interceptors.applyResponse(message.payload);
+		if (message.phase === 'response-error')
+			return interceptors.applyResponseError(deserializeError(message.error, 'DB worker HTTP request failed.'));
+		throw new Error(`Unknown DB worker interceptor phase "${message.phase}".`);
+	}
+
+	function postInterceptorResponse(id, result, error) {
+		if (closed || terminalError)
+			return;
+		try {
+			worker.postMessage({
+				type: 'orange-db-interceptor-response',
+				id,
+				result,
+				error: error ? serializeError(error) : undefined
+			});
+		}
+		catch (postError) {
+			if (!error) {
+				try {
+					worker.postMessage({
+						type: 'orange-db-interceptor-response',
+						id,
+						error: serializeError(postError)
+					});
+				}
+				catch (_ignored) {
+					// The worker cannot be notified when even the serialized error cannot be posted.
+				}
+			}
+		}
+	}
+
+	function onWorkerError(event) {
+		if (closed || terminalError)
+			return;
+		terminalError = toWorkerError(event);
+		for (const entry of pending.values())
+			entry.reject(terminalError);
+		pending.clear();
+		emit('error', { method: 'worker', error: terminalError });
 	}
 }
 
@@ -206,23 +341,12 @@ function getTransactionId(transaction) {
 	return transaction && transaction.__orangeDbWorkerTransactionId;
 }
 
-function serializeError(error) {
-	if (!error)
-		return undefined;
-	return {
-		name: error.name,
-		message: error.message || String(error),
-		stack: error.stack
-	};
-}
-
-function toError(error) {
-	const e = new Error(error && error.message ? error.message : 'DB worker request failed.');
-	if (error && error.name)
-		e.name = error.name;
-	if (error && error.stack)
-		e.stack = error.stack;
-	return e;
+function toWorkerError(event) {
+	if (event && event.error instanceof Error)
+		return event.error;
+	return new Error(event && event.message
+		? event.message
+		: 'DB worker failed before completing the request.');
 }
 
 module.exports = createDbWorkerClient;

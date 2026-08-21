@@ -1,6 +1,14 @@
 import { describe, expect, test } from 'vitest';
 
-const { createSyncAuto, normalizeAutoConfig } = require('../src/client/syncAuto');
+const {
+	isSyncAbortError,
+	syncAbortError
+} = require('../src/client/syncAbort');
+const {
+	createSyncAuto,
+	normalizeAutoConfig,
+	syncAbortSignalSymbol
+} = require('../src/client/syncAuto');
 
 describe('sync auto scheduler', () => {
 	test('defaults to enabled sync when sync is configured', () => {
@@ -105,6 +113,83 @@ describe('sync auto scheduler', () => {
 		expect(syncs).toBe(1);
 	});
 
+	test('stop cancels and waits for the initial sync to unwind', async () => {
+		let signal;
+		const auto = createSyncAuto({
+			sync: async (options) => {
+				signal = options[syncAbortSignalSymbol];
+				await new Promise((_resolve, reject) => {
+					signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+				});
+			}
+		}, async () => ({ url: '/rdb', auto: { intervalMs: 0 } }));
+
+		const start = auto.start();
+		await waitUntil(() => !!signal);
+		await auto.stop();
+		await start;
+
+		expect(signal.aborted).toBe(true);
+		await expect(auto.isRunning()).resolves.toBe(false);
+	});
+
+	test('stop waits for a later active sync without cancelling it', async () => {
+		const later = newDeferred();
+		let calls = 0;
+		let laterSignal;
+		const auto = createSyncAuto({
+			sync: async (options) => {
+				calls += 1;
+				if (calls === 1)
+					return;
+				laterSignal = options[syncAbortSignalSymbol];
+				await later.promise;
+			}
+		}, async () => ({ url: '/rdb', auto: { intervalMs: 0 } }));
+
+		await auto.start();
+		const sync = auto.runNow();
+		await waitUntil(() => !!laterSignal);
+		let stopped = false;
+		const stop = auto.stop().then(() => {
+			stopped = true;
+		});
+		await Promise.resolve();
+
+		expect(stopped).toBe(false);
+		expect(laterSignal.aborted).toBe(false);
+		later.resolve();
+		await sync;
+		await stop;
+		expect(stopped).toBe(true);
+	});
+
+	test('stop prevents a pending start from beginning sync after config resolves', async () => {
+		const config = newDeferred();
+		let syncs = 0;
+		const auto = createSyncAuto({
+			sync: async () => {
+				syncs += 1;
+			}
+		}, async () => config.promise);
+
+		const start = auto.start();
+		await Promise.resolve();
+		await auto.stop();
+		await start;
+
+		expect(syncs).toBe(0);
+		await expect(auto.isRunning()).resolves.toBe(false);
+	});
+
+	test('does not classify an unrelated AbortError as an intentional sync stop', () => {
+		const transportAbort = new Error('HTTP request timed out.');
+		transportAbort.name = 'AbortError';
+
+		expect(isSyncAbortError(transportAbort)).toBe(false);
+		expect(isSyncAbortError(syncAbortError())).toBe(true);
+	});
+
 	test('passes normalized automatic sync configuration to a custom runner', async () => {
 		const configs = [];
 		const auto = createSyncAuto({
@@ -160,3 +245,22 @@ describe('sync auto scheduler', () => {
 		await auto.stop();
 	});
 });
+
+function newDeferred() {
+	let resolve;
+	let reject;
+	const promise = new Promise((resolvePromise, rejectPromise) => {
+		resolve = resolvePromise;
+		reject = rejectPromise;
+	});
+	return { promise, reject, resolve };
+}
+
+async function waitUntil(predicate) {
+	for (let i = 0; i < 100; i++) {
+		if (predicate())
+			return;
+		await new Promise((resolve) => setTimeout(resolve, 0));
+	}
+	throw new Error('Timed out waiting for condition.');
+}

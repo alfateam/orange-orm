@@ -21,6 +21,8 @@ function createSyncWorkerClient(worker, options = {}) {
 	const interceptors = createHttpInterceptor();
 	let hasInitialReady = false;
 	let lastInitialReady;
+	let closed = false;
+	let terminalError;
 
 	worker.addEventListener('message', onMessage);
 	worker.addEventListener('error', onWorkerError);
@@ -48,9 +50,13 @@ function createSyncWorkerClient(worker, options = {}) {
 	return client;
 
 	function request(method, ...args) {
+		if (closed)
+			return Promise.reject(new Error('Sync worker client closed.'));
+		if (terminalError)
+			return Promise.reject(terminalError);
 		const id = nextId++;
 		return new Promise((resolve, reject) => {
-			const timeoutMs = resolveRequestTimeoutMs(method, args, options);
+			const timeoutMs = resolveRequestTimeoutMs(method, options);
 			const timeoutId = timeoutMs
 				? setTimeout(() => rejectTimedOutRequest(id, method, timeoutMs), timeoutMs)
 				: undefined;
@@ -75,6 +81,7 @@ function createSyncWorkerClient(worker, options = {}) {
 		if (!entry)
 			return;
 		pending.delete(id);
+		postCancel(id);
 		entry.reject(new Error(`Sync worker request "${method}" timed out after ${Math.round(timeoutMs / 1000)} seconds.`));
 	}
 
@@ -93,7 +100,7 @@ function createSyncWorkerClient(worker, options = {}) {
 			const readyPayload = lastInitialReady;
 			Promise.resolve().then(() => {
 				if (eventListeners.has(listener) && hasInitialReady && lastInitialReady === readyPayload)
-					listener(readyPayload);
+					callListener(listener, readyPayload);
 			});
 		}
 		return () => off(event, listener);
@@ -122,13 +129,18 @@ function createSyncWorkerClient(worker, options = {}) {
 	}
 
 	function close() {
+		if (closed)
+			return;
+		closed = true;
+		const closeError = new Error('Sync worker client closed.');
 		worker.removeEventListener('message', onMessage);
 		worker.removeEventListener('error', onWorkerError);
 		worker.removeEventListener('messageerror', onWorkerError);
-		for (const entry of pending.values()) {
+		for (const [id, entry] of pending) {
+			postCancel(id);
 			if (entry.timeoutId)
 				clearTimeout(entry.timeoutId);
-			entry.reject(new Error('Sync worker client closed.'));
+			entry.reject(closeError);
 		}
 		pending.clear();
 		listeners.clear();
@@ -179,7 +191,10 @@ function createSyncWorkerClient(worker, options = {}) {
 	}
 
 	function onWorkerError(event) {
+		if (terminalError)
+			return;
 		const error = toWorkerError(event);
+		terminalError = error;
 		for (const entry of pending.values()) {
 			if (entry.timeoutId)
 				clearTimeout(entry.timeoutId);
@@ -220,7 +235,16 @@ function createSyncWorkerClient(worker, options = {}) {
 		if (!eventListeners)
 			return;
 		for (const listener of Array.from(eventListeners))
+			callListener(listener, payload);
+	}
+
+	function callListener(listener, payload) {
+		try {
 			listener(payload);
+		}
+		catch (_error) {
+			// Notifications must never interrupt worker message handling or other listeners.
+		}
 	}
 
 	async function handleInterceptorRequest(message) {
@@ -244,6 +268,8 @@ function createSyncWorkerClient(worker, options = {}) {
 	}
 
 	function postInterceptorResponse(id, result, error) {
+		if (closed || terminalError)
+			return;
 		try {
 			worker.postMessage({
 				type: 'orange-sync-worker-interceptor-response',
@@ -267,21 +293,31 @@ function createSyncWorkerClient(worker, options = {}) {
 			}
 		}
 	}
+
+	function postCancel(id) {
+		if (terminalError)
+			return;
+		try {
+			worker.postMessage({
+				type: 'orange-sync-worker-cancel',
+				id
+			});
+		}
+		catch (_error) {
+			// The original request is already being rejected locally.
+		}
+	}
 }
 
-function resolveRequestTimeoutMs(method, args, options) {
-	const methodOptions = args && args[0];
-	const configured = methodOptions && methodOptions === Object(methodOptions)
-		? normalizePositiveInteger(methodOptions.timeoutMs)
-		: undefined;
-	if (configured)
-		return configured + 1000;
+function resolveRequestTimeoutMs(method, options) {
 	const fallback = normalizePositiveInteger(options.requestTimeoutMs);
 	if (fallback)
 		return fallback;
-	if (method === 'on' || method === 'off' || method === 'isRunning' || method === 'stop')
+	if (method === 'on' || method === 'off' || method === 'isRunning')
 		return 10000;
-	return 300000;
+	if (method === 'ensureLocalSchema' || method === 'ensureLocalSchemaReady' || method === 'resetLocal')
+		return 300000;
+	return undefined;
 }
 
 function normalizePositiveInteger(value) {

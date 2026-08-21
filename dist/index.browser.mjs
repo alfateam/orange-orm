@@ -5527,26 +5527,35 @@ function requireHttpInterceptor () {
 			};
 		}
 
-		async applyRequest(config) {
+		async applyRequest(config, context) {
 			let result = Promise.resolve(config);
 			for (const { onFulfilled, onRejected } of this.requestInterceptors) {
-				result = result.then(onFulfilled, onRejected);
+				result = result.then(
+					onFulfilled && ((value) => onFulfilled(value, context)),
+					onRejected && ((error) => onRejected(error, context))
+				);
 			}
 			return await result;
 		}
 
-		async applyResponse(response) {
+		async applyResponse(response, context) {
 			let result = Promise.resolve(response);
 			for (const { onFulfilled, onRejected } of this.responseInterceptors) {
-				result = result.then(onFulfilled, onRejected);
+				result = result.then(
+					onFulfilled && ((value) => onFulfilled(value, context)),
+					onRejected && ((error) => onRejected(error, context))
+				);
 			}
 			return await result;
 		}
 
-		async applyResponseError(error) {
+		async applyResponseError(error, context) {
 			let result = Promise.reject(error);
 			for (const { onFulfilled, onRejected } of this.responseInterceptors) {
-				result = result.then(onFulfilled, onRejected);
+				result = result.then(
+					onFulfilled && ((value) => onFulfilled(value, context)),
+					onRejected && ((currentError) => onRejected(currentError, context))
+				);
 			}
 			return await result;
 		}
@@ -5575,6 +5584,105 @@ function requireFlags () {
 
 var syncClient = {exports: {}};
 
+var syncAbort;
+var hasRequiredSyncAbort;
+
+function requireSyncAbort () {
+	if (hasRequiredSyncAbort) return syncAbort;
+	hasRequiredSyncAbort = 1;
+	const syncAbortSignalSymbol = typeof Symbol === 'function'
+		? Symbol.for('orange-orm.syncClient.abortSignal')
+		: '__orangeOrmSyncClientAbortSignal';
+	const syncAbortCode = 'ORANGE_SYNC_ABORT';
+
+	function createSyncAbortController() {
+		if (typeof AbortController === 'function')
+			return new AbortController();
+
+		const listeners = new Set();
+		const signal = {
+			aborted: false,
+			reason: undefined,
+			addEventListener(event, listener) {
+				if (event === 'abort' && typeof listener === 'function')
+					listeners.add(listener);
+			},
+			removeEventListener(event, listener) {
+				if (event === 'abort')
+					listeners.delete(listener);
+			}
+		};
+		return {
+			signal,
+			abort(reason) {
+				if (signal.aborted)
+					return;
+				signal.aborted = true;
+				signal.reason = reason;
+				for (const listener of Array.from(listeners))
+					listener.call(signal, { type: 'abort', target: signal });
+				listeners.clear();
+			}
+		};
+	}
+
+	function syncAbortError(reason, fallbackMessage = 'Sync stopped.') {
+		const error = reason instanceof Error
+			? reason
+			: new Error(typeof reason === 'string' && reason.length > 0 ? reason : fallbackMessage);
+		if (!(reason instanceof Error))
+			error.name = 'AbortError';
+		try {
+			error.code = syncAbortCode;
+		}
+		catch (_error) {
+			// Built-in error objects are writable in supported runtimes; retain the AbortError fallback otherwise.
+		}
+		return error;
+	}
+
+	function throwIfSyncAborted(signal) {
+		if (signal && signal.aborted)
+			throw syncAbortError(signal.reason);
+	}
+
+	function awaitWithSyncAbort(value, signal) {
+		if (!signal)
+			return Promise.resolve(value);
+		throwIfSyncAborted(signal);
+		return new Promise((resolve, reject) => {
+			let settled = false;
+			const finish = (callback, result) => {
+				if (settled)
+					return;
+				settled = true;
+				signal.removeEventListener('abort', onAbort);
+				callback(result);
+			};
+			const onAbort = () => finish(reject, syncAbortError(signal.reason));
+			signal.addEventListener('abort', onAbort, { once: true });
+			Promise.resolve(value).then(
+				(result) => finish(resolve, result),
+				(error) => finish(reject, error)
+			);
+		});
+	}
+
+	function isSyncAbortError(error) {
+		return !!error && error.code === syncAbortCode;
+	}
+
+	syncAbort = {
+		awaitWithSyncAbort,
+		createSyncAbortController,
+		isSyncAbortError,
+		syncAbortError,
+		syncAbortSignalSymbol,
+		throwIfSyncAborted
+	};
+	return syncAbort;
+}
+
 var syncAuto;
 var hasRequiredSyncAuto;
 
@@ -5584,6 +5692,14 @@ function requireSyncAuto () {
 	const syncAutoStartSymbol = typeof Symbol === 'function'
 		? Symbol.for('orange-orm.syncClient.autoStart')
 		: '__orangeOrmSyncClientAutoStart';
+	const {
+		awaitWithSyncAbort,
+		createSyncAbortController,
+		isSyncAbortError,
+		syncAbortError,
+		syncAbortSignalSymbol,
+		throwIfSyncAborted
+	} = requireSyncAbort();
 
 	function createSyncAuto(syncClient, getConfig, options = {}) {
 		const timers = options.timers || globalThis;
@@ -5591,6 +5707,9 @@ function requireSyncAuto () {
 		let running = false;
 		let forceRunning = false;
 		let activeRun = null;
+		let initialSyncCompleted = false;
+		let lifecycleVersion = 0;
+		const pendingStartControllers = new Set();
 		let intervalId = null;
 		let unsubscribeOnline = null;
 
@@ -5602,35 +5721,73 @@ function requireSyncAuto () {
 			runNow
 		};
 
-		async function start() {
-			return startCore(true);
+		async function start(options) {
+			return startCore(true, options);
 		}
 
-		async function startFromConfig() {
-			return startCore(false);
+		async function startFromConfig(options) {
+			return startCore(false, options);
 		}
 
-		async function startCore(forceEnabled) {
-			if (running) {
-				if (activeRun)
-					await activeRun;
-				return;
+		async function startCore(forceEnabled, options) {
+			const startVersion = lifecycleVersion;
+			const externalSignal = options && options[syncAbortSignalSymbol];
+			const controller = createSyncAbortController();
+			let removeExternalAbort;
+			if (externalSignal) {
+				const abort = () => controller.abort(syncAbortError(externalSignal.reason));
+				if (externalSignal.aborted)
+					abort();
+				else {
+					externalSignal.addEventListener('abort', abort, { once: true });
+					removeExternalAbort = () => externalSignal.removeEventListener('abort', abort);
+				}
 			}
-			const config = normalizeAutoConfig(await getConfig(), { forceEnabled });
-			if (!config.enabled)
-				return;
-			running = true;
-			forceRunning = forceEnabled;
-			if (config.intervalMs > 0 && timers && typeof timers.setInterval === 'function') {
-				intervalId = timers.setInterval(() => {
-					void runNow().catch(() => {});
-				}, config.intervalMs);
+			pendingStartControllers.add(controller);
+			try {
+				const signal = controller.signal;
+				throwIfSyncAborted(signal);
+				if (running) {
+					if (activeRun)
+						await awaitWithSyncAbort(activeRun.promise, signal);
+					return;
+				}
+				const config = normalizeAutoConfig(await awaitWithSyncAbort(getConfig(), signal), { forceEnabled });
+				if (startVersion !== lifecycleVersion)
+					return;
+				if (running) {
+					if (activeRun)
+						await awaitWithSyncAbort(activeRun.promise, signal);
+					return;
+				}
+				if (!config.enabled)
+					return;
+				running = true;
+				forceRunning = forceEnabled;
+				if (config.intervalMs > 0 && timers && typeof timers.setInterval === 'function') {
+					intervalId = timers.setInterval(() => {
+						void runNow().catch(() => {});
+					}, config.intervalMs);
+				}
+				subscribeOnline();
+				await runNow(signal);
 			}
-			subscribeOnline();
-			await runNow();
+			catch (error) {
+				if (startVersion !== lifecycleVersion && isSyncAbortError(error))
+					return;
+				throw error;
+			}
+			finally {
+				pendingStartControllers.delete(controller);
+				if (removeExternalAbort)
+					removeExternalAbort();
+			}
 		}
 
 		async function stop() {
+			lifecycleVersion += 1;
+			for (const controller of pendingStartControllers)
+				controller.abort(syncAbortError(undefined, 'Initial sync stopped.'));
 			running = false;
 			forceRunning = false;
 			if (intervalId !== null && timers && typeof timers.clearInterval === 'function') {
@@ -5641,28 +5798,63 @@ function requireSyncAuto () {
 				unsubscribeOnline();
 				unsubscribeOnline = null;
 			}
+			const run = activeRun;
+			if (!run)
+				return;
+			if (run.initial)
+				run.controller.abort(syncAbortError(undefined, 'Initial sync stopped.'));
+			await run.promise.catch(() => {});
 		}
 
 		async function isRunning() {
 			return running;
 		}
 
-		async function runNow() {
+		async function runNow(externalSignal) {
 			if (activeRun)
-				return activeRun;
-			activeRun = runCycle()
+				return activeRun.promise;
+			const initial = !initialSyncCompleted;
+			const controller = createSyncAbortController();
+			let removeExternalAbort;
+			if (externalSignal) {
+				const abort = () => controller.abort(syncAbortError(externalSignal.reason));
+				if (externalSignal.aborted)
+					abort();
+				else {
+					externalSignal.addEventListener('abort', abort, { once: true });
+					removeExternalAbort = () => externalSignal.removeEventListener('abort', abort);
+				}
+			}
+			const run = {
+				controller,
+				initial,
+				promise: null
+			};
+			activeRun = run;
+			run.promise = runCycle(controller.signal)
+				.then((result) => {
+					if (initial)
+						initialSyncCompleted = true;
+					return result;
+				})
 				.finally(() => {
-					activeRun = null;
+					if (removeExternalAbort)
+						removeExternalAbort();
+					if (activeRun === run)
+						activeRun = null;
 				});
-			return activeRun;
+			return run.promise;
 		}
 
-		async function runCycle() {
-			const config = normalizeAutoConfig(await getConfig(), { forceEnabled: forceRunning });
+		async function runCycle(signal) {
+			throwIfSyncAborted(signal);
+			const config = normalizeAutoConfig(await awaitWithSyncAbort(getConfig(), signal), { forceEnabled: forceRunning });
+			throwIfSyncAborted(signal);
+			const syncOptions = { [syncAbortSignalSymbol]: signal };
 			if (config.enabled && typeof options.runSync === 'function')
-				return options.runSync(config);
+				return options.runSync(config, syncOptions);
 			if (config.enabled)
-				return syncClient.sync();
+				return syncClient.sync(syncOptions);
 			return { skipped: true };
 		}
 
@@ -5704,6 +5896,7 @@ function requireSyncAuto () {
 	syncAuto = {
 		createSyncAuto,
 		normalizeAutoConfig,
+		syncAbortSignalSymbol,
 		syncAutoStartSymbol
 	};
 	return syncAuto;
@@ -6130,9 +6323,16 @@ function requireSyncClient () {
 		finalizeSyncOperationMemory,
 		withSyncOperationMemory
 	} = requireOperationContext();
+	const {
+		awaitWithSyncAbort,
+		isSyncAbortError,
+		syncAbortSignalSymbol,
+		throwIfSyncAborted
+	} = requireSyncAbort();
 
 	const maxPushBatchesPerSync = 1000;
 	const maxStableBaseKeysPerStatement = 1000;
+	const outboxReplayPageSize = 1000;
 	const pullJournalRecoveryPageSize = 1000;
 	const streamPullPendingStatus = 'stream-pending';
 	const streamPullReadyStatus = 'stream-ready';
@@ -6231,13 +6431,22 @@ function requireSyncClient () {
 
 		function withCrossTabSyncLock(fn) {
 			return async function lockedSyncMethod(options) {
+				const signal = options && options[syncAbortSignalSymbol];
+				throwIfSyncAborted(signal);
 				const db = await getDb();
+				throwIfSyncAborted(signal);
 				const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
 				if (!syncConfig)
 					return fn(options);
 				const lock = await resolveRuntimeCrossTabSyncLock(db, syncConfig);
 				const lockConfig = withRuntimeCrossTabLockConfig(lock.config, options);
-				return runWithCrossTabLock(lock.name, lockConfig, () => fn(options));
+				return awaitWithSyncAbort(
+					runWithCrossTabLock(lock.name, lockConfig, () => {
+						throwIfSyncAborted(signal);
+						return fn(options);
+					}),
+					signal
+				);
 			};
 		}
 
@@ -6245,7 +6454,11 @@ function requireSyncClient () {
 			let tail = Promise.resolve();
 			return function serializeAsyncMethod(fn) {
 				return function serializedAsyncMethod(options) {
-					const run = tail.then(() => fn(options));
+					const signal = options && options[syncAbortSignalSymbol];
+					const run = awaitWithSyncAbort(tail, signal).then(() => {
+						throwIfSyncAborted(signal);
+						return fn(options);
+					});
 					tail = run.catch(() => {});
 					return run;
 				};
@@ -6269,6 +6482,8 @@ function requireSyncClient () {
 				pullOptions._onPullBatchProgress = options._onPullBatchProgress;
 			if (typeof options._onPullStagingSummary === 'function')
 				pullOptions._onPullStagingSummary = options._onPullStagingSummary;
+			if (typeof options._onPullSnapshot === 'function')
+				pullOptions._onPullSnapshot = options._onPullSnapshot;
 			if (options._skipPushBeforePull === true)
 				pullOptions._skipPushBeforePull = true;
 			if (usesFileSnapshotRollback(options))
@@ -6277,6 +6492,7 @@ function requireSyncClient () {
 		}
 
 		async function pushPendingOnly(options = {}) {
+			throwIfSyncAborted(options[syncAbortSignalSymbol]);
 			const db = toSyncDb(await getDb());
 			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
 			if (!syncConfig)
@@ -6304,11 +6520,14 @@ function requireSyncClient () {
 			return localSchemaReadyResultToPublic(result);
 		}
 
-		async function ensureLocalSchemaReady() {
-			const result = await getLocalSchemaReady({
+		async function ensureLocalSchemaReady(options = {}) {
+			const signal = options[syncAbortSignalSymbol];
+			throwIfSyncAborted(signal);
+			const result = await awaitWithSyncAbort(getLocalSchemaReady({
 				allowMissingSync: true,
 				fileSnapshotRollback: fileSnapshotRollbackDefault
-			});
+			}), signal);
+			throwIfSyncAborted(signal);
 			return localSchemaReadyResultToPublic(result);
 		}
 
@@ -6365,6 +6584,8 @@ function requireSyncClient () {
 					return result;
 				}
 				catch (error) {
+					if (isSyncAbortError(error))
+						throw error;
 					const payload = { method, error };
 					emit(method + '-error', payload);
 					emit('error', payload);
@@ -6377,12 +6598,19 @@ function requireSyncClient () {
 			const listeners = eventListeners.get(event);
 			if (!listeners)
 				return;
-			for (const listener of Array.from(listeners))
-				listener(payload);
+			for (const listener of Array.from(listeners)) {
+				try {
+					listener(payload);
+				}
+				catch (_error) {
+					// Notifications must never change sync control flow or skip other listeners.
+				}
+			}
 		}
 
 		async function pull(options = {}) {
 			const normalizedOptions = normalizePullOptions(options);
+			throwIfSyncAborted(normalizedOptions[syncAbortSignalSymbol]);
 			if (options && options._capturePullJournal)
 				normalizedOptions._capturePullJournal = true;
 			if (options && typeof options._capturePullJournalChunk === 'function')
@@ -6393,6 +6621,8 @@ function requireSyncClient () {
 				normalizedOptions._onPullBatchProgress = options._onPullBatchProgress;
 			if (options && typeof options._onPullStagingSummary === 'function')
 				normalizedOptions._onPullStagingSummary = options._onPullStagingSummary;
+			if (options && typeof options._onPullSnapshot === 'function')
+				normalizedOptions._onPullSnapshot = options._onPullSnapshot;
 			if (options && options._skipPushBeforePull === true)
 				normalizedOptions._skipPushBeforePull = true;
 			if (usesFileSnapshotRollback(options))
@@ -6405,18 +6635,25 @@ function requireSyncClient () {
 			} = await prepareLocalSyncSchema(normalizedOptions, {
 				fileSnapshotRollback: usesFileSnapshotRollback(normalizedOptions)
 			});
+			throwIfSyncAborted(normalizedOptions[syncAbortSignalSymbol]);
 			const hadStableBase = usesFileSnapshotRollback(normalizedOptions)
 				|| await hasStableBase(db, configuredTables);
 			if (!hadStableBase)
-				return runSyncMaintenance(db, () => pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, normalizedOptions));
+				return awaitWithSyncAbort(
+					runSyncMaintenance(db, () => pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, normalizedOptions)),
+					normalizedOptions[syncAbortSignalSymbol]
+				);
 			return pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, normalizedOptions);
 		}
 
 		async function prepareLocalSyncSchema(options = {}, prepareOptions = {}) {
-			const result = await getLocalSchemaReady({
+			const signal = options[syncAbortSignalSymbol];
+			throwIfSyncAborted(signal);
+			const result = await awaitWithSyncAbort(getLocalSchemaReady({
 				...prepareOptions,
 				fileSnapshotRollback: usesFileSnapshotRollback(options)
-			});
+			}), signal);
+			throwIfSyncAborted(signal);
 			if (result.skipped) {
 				if (prepareOptions.allowMissingSync)
 					return result;
@@ -6487,8 +6724,11 @@ function requireSyncClient () {
 		}
 
 		async function pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, options = {}) {
+			const signal = options[syncAbortSignalSymbol];
+			throwIfSyncAborted(signal);
 			if (options._skipPushBeforePull !== true)
-				await pushBeforePull(db, syncConfig, hadStableBase);
+				await pushBeforePull(db, syncConfig, hadStableBase, undefined, options);
+			throwIfSyncAborted(signal);
 			const pullStartedAtMs = Date.now();
 			await maybeEmitInitialReady(syncConfig, configuredTables, db, 'persisted');
 			const currentSince = await getScopeSince(configuredTables, db);
@@ -6504,8 +6744,10 @@ function requireSyncClient () {
 				_fileSnapshotRollback: options._fileSnapshotRollback === true,
 				_onPullBatchProgress: options._onPullBatchProgress,
 				_onPullStagingSummary: options._onPullStagingSummary,
+				_onPullSnapshot: options._onPullSnapshot,
 				_syncInterceptors: interceptors,
-				_syncAxiosInterceptor: axiosInterceptor
+				_syncAxiosInterceptor: axiosInterceptor,
+				[syncAbortSignalSymbol]: signal
 			};
 			let result;
 			try {
@@ -6516,16 +6758,19 @@ function requireSyncClient () {
 					throw e;
 				result = await pullPatch(pullConfig, requestOptions);
 			}
+			throwIfSyncAborted(signal);
 			if (result && result.since !== undefined && result.checkpointApplied !== true)
 				await setScopeSince(configuredTables, result.since, db);
 			await deleteConfirmedPushedMutations(db, pullStartedAtMs);
 			if (!hadStableBase)
 				await replayLocalOutbox(db);
+			throwIfSyncAborted(signal);
 			await maybeEmitInitialReady(syncConfig, configuredTables, db, 'sync');
 			return result;
 		}
 
 		async function resetLocal(options = {}) {
+			throwIfSyncAborted(options[syncAbortSignalSymbol]);
 			clearLocalSchemaReady();
 			const db = toSyncDb(await getDb());
 			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
@@ -6536,6 +6781,7 @@ function requireSyncClient () {
 			if (!Array.isArray(configuredTables) || configuredTables.length === 0)
 				throw new Error('Sync resetLocal requires mapped tables or configured tables.');
 			return runSyncMaintenance(db, async () => {
+				throwIfSyncAborted(options[syncAbortSignalSymbol]);
 				const droppedTables = await dropLocalSyncTables(db, client, configuredTables);
 				await dropExistingBaseTables(db);
 				await db.query(`DROP TABLE IF EXISTS "${syncBaseTable}"`);
@@ -6633,6 +6879,8 @@ function requireSyncClient () {
 		}
 
 		async function applyPullJournalSnapshot(journal, options = {}) {
+			const signal = options[syncAbortSignalSymbol];
+			throwIfSyncAborted(signal);
 			const db = toSyncDb(await getDb());
 			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
 			if (!syncConfig)
@@ -6681,13 +6929,14 @@ function requireSyncClient () {
 
 			async function applyPullJournalItemsInSingleTransaction() {
 				await client.transaction(async (tx) => {
+					throwIfSyncAborted(signal);
 					await tryDeferForeignKeys(tx);
 					if (!fileSnapshotRollback)
 						await ensureStableBaseTables(tx, configuredTables);
 					const baseByName = fileSnapshotRollback ? undefined : await readStableBaseEntriesByName(tx);
 					let hasItems = false;
 					for (;;) {
-						const batch = await readNextBatch();
+						const batch = await awaitWithSyncAbort(readNextBatch(), signal);
 						if (batch === null)
 							break;
 						if (batch.length === 0)
@@ -6711,13 +6960,14 @@ function requireSyncClient () {
 				const readNextChunk = createSizedJournalBatchReader(readNextBatch, applyConfig.maxRowsPerTransaction);
 				let hasItems = false;
 				for (;;) {
-					const chunk = await readNextChunk();
+					const chunk = await awaitWithSyncAbort(readNextChunk(), signal);
 					if (chunk === null)
 						break;
 					if (chunk.length === 0)
 						continue;
 					hasItems = true;
 					await client.transaction(async (tx) => {
+						throwIfSyncAborted(signal);
 						await tryDeferForeignKeys(tx);
 						if (!fileSnapshotRollback)
 							await ensureStableBaseTables(tx, configuredTables);
@@ -6734,6 +6984,7 @@ function requireSyncClient () {
 				}
 				assertJournalItemCountComplete();
 				await client.transaction(async (tx) => {
+					throwIfSyncAborted(signal);
 					if (hasItems && applyConfig.foreignKeyCheck === 'final')
 						await validateForeignKeys(tx);
 					if (shouldApplyCheckpoint)
@@ -6814,6 +7065,8 @@ function requireSyncClient () {
 		}
 
 		async function pushPending(options = {}) {
+			const signal = options[syncAbortSignalSymbol];
+			throwIfSyncAborted(signal);
 			const db = toSyncDb(await getDb());
 			const syncConfig = options._syncConfig || normalizeSyncConfig(db && db.__sqliteSync);
 			if (!syncConfig)
@@ -6828,9 +7081,12 @@ function requireSyncClient () {
 			const clientId = typeof options.clientId === 'string' ? options.clientId : await getClientId(db);
 			let result;
 			try {
-				result = await sendPush(pushConfig, clientId, pending);
+				result = await sendPush(pushConfig, clientId, pending, options);
+				throwIfSyncAborted(signal);
 			}
 			catch (e) {
+				if (isSyncAbortError(e))
+					throw e;
 				if (isConflictError(e)) {
 					if (options._skipConflictRestore === true)
 						await markFailedPushBatch(db, pending, e);
@@ -6860,6 +7116,7 @@ function requireSyncClient () {
 			const maxBatches = resolveMaxPushBatches();
 			const results = [];
 			for (let i = 0; i < maxBatches; i++) {
+				throwIfSyncAborted(options[syncAbortSignalSymbol]);
 				const result = await pushPending({
 					...options,
 					_syncConfig: syncConfig,
@@ -6917,7 +7174,7 @@ function requireSyncClient () {
 		async function rollbackFailedPushBatchCore(db, attemptedMutations, error) {
 			if (!await hasStableBase(db))
 				return;
-			const remaining = await readReplayMutationRows(db, 10000, mutationIdsToSet(attemptedMutations));
+			const remaining = await readAllReplayMutationRows(db, mutationIdsToSet(attemptedMutations));
 			await restoreStableBase(db);
 			await ensureSyncOutboxTable(db);
 			for (let i = 0; i < attemptedMutations.length; i++) {
@@ -6946,12 +7203,11 @@ function requireSyncClient () {
 		}
 
 		async function replayLocalOutbox(db) {
-			const rows = await readReplayMutationRows(db, 10000);
-			for (let i = 0; i < rows.length; i++) {
-				const mutation = rowToMutation(rows[i]);
+			await forEachReplayMutationRow(db, undefined, async (row) => {
+				const mutation = rowToMutation(row);
 				if (mutation)
 					await replayMutation(mutation);
-			}
+			});
 		}
 
 		async function replayMutation(mutation) {
@@ -6984,7 +7240,7 @@ function requireSyncClient () {
 			return entry ? [entry] : [];
 		}
 
-		async function sendPush(pushConfig, clientId, mutations) {
+		async function sendPush(pushConfig, clientId, mutations, options = {}) {
 			return requestPayload({
 				...pushConfig,
 				syncPhase: 'push',
@@ -6995,7 +7251,8 @@ function requireSyncClient () {
 				}
 			}, {
 				_syncInterceptors: interceptors,
-				_syncAxiosInterceptor: axiosInterceptor
+				_syncAxiosInterceptor: axiosInterceptor,
+				[syncAbortSignalSymbol]: options[syncAbortSignalSymbol]
 			});
 		}
 
@@ -7005,6 +7262,8 @@ function requireSyncClient () {
 		}
 
 		async function pullStaged(pullConfig, options) {
+			const signal = options[syncAbortSignalSymbol];
+			throwIfSyncAborted(signal);
 			const stagingStartedAtMs = Date.now();
 			const maxRowsPerBatch = normalizeLimit(pullConfig.maxRowsPerBatch, 1000);
 			const maxConcurrentRowRequests = normalizeConcurrency(pullConfig.maxConcurrentRowRequests, 1);
@@ -7027,7 +7286,9 @@ function requireSyncClient () {
 			let applied = 0;
 			await ensurePullJournalTables(db);
 			await tryEnableForeignKeys(db);
+			throwIfSyncAborted(signal);
 			const session = await stagePullJournal();
+			throwIfSyncAborted(signal);
 			const capturedPullJournal = options._capturePullJournal
 				? await capturePullJournalSnapshot(session)
 				: null;
@@ -7084,6 +7345,7 @@ function requireSyncClient () {
 			}
 
 			async function finalizeStreamedPullJournal(session) {
+				throwIfSyncAborted(signal);
 				const hasJournalItems = capturedStreamItemCount > 0;
 				await client.transaction(async (tx) => {
 					if (hasJournalItems && (!applyConfig || applyConfig.foreignKeyCheck === 'final'))
@@ -7102,6 +7364,7 @@ function requireSyncClient () {
 			}
 
 			async function applyPullJournalInSingleTransaction(session) {
+				throwIfSyncAborted(signal);
 				await client.transaction(async (tx) => {
 					await tryDeferForeignKeys(tx);
 					if (!fileSnapshotRollback)
@@ -7110,6 +7373,7 @@ function requireSyncClient () {
 					const hasJournalItems = batches.length > 0;
 					const touchedTables = new Set();
 					for (let i = 0; i < batches.length; i++) {
+						throwIfSyncAborted(signal);
 						const batch = batches[i];
 						for (let itemIndex = 0; itemIndex < batch.length; itemIndex++)
 							touchedTables.add(batch[itemIndex].table);
@@ -7145,8 +7409,10 @@ function requireSyncClient () {
 				}, { suppressSyncOutbox: true });
 				const touchedTables = new Set();
 				for (let offset = 0; offset < items.length; offset += applyConfig.maxRowsPerTransaction) {
+					throwIfSyncAborted(signal);
 					const chunk = items.slice(offset, offset + applyConfig.maxRowsPerTransaction);
 					await client.transaction(async (tx) => {
+						throwIfSyncAborted(signal);
 						await tryDeferForeignKeys(tx);
 						const baseByName = fileSnapshotRollback ? undefined : await readStableBaseEntriesByName(tx);
 						for (let i = 0; i < chunk.length; i++) {
@@ -7233,6 +7499,7 @@ function requireSyncClient () {
 				startPullBatchPump();
 				try {
 					for (;;) {
+						throwIfSyncAborted(signal);
 						if (emptySession) {
 							pipelineStopped = true;
 							rowScheduler.stop();
@@ -7315,6 +7582,7 @@ function requireSyncClient () {
 
 				async function pumpPullBatches() {
 					while (shouldFetchMorePullBatches()) {
+						throwIfSyncAborted(signal);
 						fetchedBatches += 1;
 						if (fetchedBatches > 10000)
 							throw new Error('Sync failed: staged pull exceeded max iterations');
@@ -7398,6 +7666,13 @@ function requireSyncClient () {
 				const nextReason = reason === undefined && keysPayload.reason !== undefined
 					? keysPayload.reason
 					: reason;
+				if (!session.token && keysPayload.mode === 'snapshot' && typeof options._onPullSnapshot === 'function') {
+					await options._onPullSnapshot({
+						reason: nextReason,
+						cursor: keysPayload.cursor,
+						tables: Array.isArray(options.tables) ? options.tables.slice() : []
+					});
+				}
 				const keyItems = normalizeKeyItems(keysPayload.items);
 				const token = keysPayload.done || !keysPayload.token ? null : keysPayload.token;
 				const done = keysPayload.done || !keysPayload.token;
@@ -7519,6 +7794,7 @@ function requireSyncClient () {
 
 				async function runRowJob(job) {
 					try {
+						throwIfSyncAborted(signal);
 						const currentRowsResult = await requestRowsItems(job.items);
 						if (currentRowsResult.error)
 							throw currentRowsResult.error;
@@ -7623,7 +7899,9 @@ function requireSyncClient () {
 		}
 
 		async function pullPatch(pullConfig, options) {
+			throwIfSyncAborted(options[syncAbortSignalSymbol]);
 			const payload = await requestPayload(pullConfig, options);
+			throwIfSyncAborted(options[syncAbortSignalSymbol]);
 			const tablePatches = extractTablePatches(payload);
 			const defaultPatchOptions = { ...(pullConfig.patchOptions || {}), concurrency: 'overwrite' };
 			let applied = 0;
@@ -7658,6 +7936,8 @@ function requireSyncClient () {
 			const result = {};
 			if (timeoutMs !== undefined)
 				result.timeoutMs = timeoutMs;
+			if (input[syncAbortSignalSymbol])
+				result[syncAbortSignalSymbol] = input[syncAbortSignalSymbol];
 			return result;
 		}
 
@@ -8202,8 +8482,45 @@ function requireSyncClient () {
 			return readMutationRowsByStatus(db, ['pending'], limit, excludeIds);
 		}
 
-		async function readReplayMutationRows(db, limit, excludeIds) {
-			return readMutationRowsByStatus(db, ['pending', 'pushed'], limit, excludeIds);
+		async function readAllReplayMutationRows(db, excludeIds) {
+			const result = [];
+			await forEachReplayMutationRow(db, excludeIds, (row) => {
+				result.push(row);
+			});
+			return result;
+		}
+
+		async function forEachReplayMutationRow(db, excludeIds, callback) {
+			let after;
+			for (;;) {
+				const page = await readMutationRowsByStatus(
+					db,
+					['pending', 'pushed'],
+					outboxReplayPageSize,
+					undefined,
+					after
+				);
+				if (page.length === 0)
+					return;
+				for (let i = 0; i < page.length; i++) {
+					const row = page[i];
+					const mutationId = outboxRowMutationId(row);
+					if (!excludeIds || !excludeIds.has(mutationId))
+						await callback(row);
+				}
+				if (page.length < outboxReplayPageSize)
+					return;
+				const last = page[page.length - 1];
+				const nextAfter = {
+					createdAtMs: Number(last && (last.created_at_ms ?? last.CREATED_AT_MS)),
+					mutationId: outboxRowMutationId(last)
+				};
+				if (!Number.isFinite(nextAfter.createdAtMs) || typeof nextAfter.mutationId !== 'string')
+					throw new Error('Sync could not page the local outbox safely.');
+				if (after && after.createdAtMs === nextAfter.createdAtMs && after.mutationId === nextAfter.mutationId)
+					throw new Error('Sync outbox paging did not advance.');
+				after = nextAfter;
+			}
 		}
 
 		async function readMutationRowsByStatus(db, statuses, limit, excludeIds, after) {
@@ -9260,7 +9577,12 @@ function requireSyncClient () {
 
 		function emitInitialReady(payload) {
 			for (const listener of Array.from(initialReadyListeners)) {
-				listener(payload);
+				try {
+					listener(payload);
+				}
+				catch (_error) {
+					// Readiness notifications must never interrupt sync.
+				}
 			}
 		}
 	}
@@ -9552,6 +9874,9 @@ function requireSyncClient () {
 	async function requestPayload(config, options) {
 		const syncInterceptors = options && options._syncInterceptors;
 		const axiosInterceptor = options && options._syncAxiosInterceptor;
+		const signal = options && options[syncAbortSignalSymbol];
+		const interceptorContext = { signal };
+		throwIfSyncAborted(signal);
 		const axios = createFetchClient();
 		if (axiosInterceptor && typeof axiosInterceptor.applyTo === 'function')
 			axiosInterceptor.applyTo(axios);
@@ -9569,15 +9894,23 @@ function requireSyncClient () {
 		request.data = requestBody;
 
 		const interceptedRequest = syncInterceptors && typeof syncInterceptors.applyRequest === 'function'
-			? await syncInterceptors.applyRequest(request)
+			? await awaitWithSyncAbort(syncInterceptors.applyRequest(request, interceptorContext), signal)
 			: request;
+		throwIfSyncAborted(signal);
+		const transportRequest = signal
+			? { ...interceptedRequest, signal }
+			: interceptedRequest;
 		let response;
 		try {
-			response = await axios.request(interceptedRequest);
+			response = await axios.request(transportRequest);
 		}
 		catch (error) {
+			throwIfSyncAborted(signal);
 			if (syncInterceptors && typeof syncInterceptors.applyResponseError === 'function') {
-				const recovered = await syncInterceptors.applyResponseError(error);
+				const recovered = await awaitWithSyncAbort(
+					syncInterceptors.applyResponseError(error, interceptorContext),
+					signal
+				);
 				return recovered && recovered === Object(recovered) && 'data' in recovered
 					? recovered.data
 					: recovered;
@@ -9585,7 +9918,8 @@ function requireSyncClient () {
 			throw error;
 		}
 		if (syncInterceptors && typeof syncInterceptors.applyResponse === 'function')
-			response = await syncInterceptors.applyResponse(response);
+			response = await awaitWithSyncAbort(syncInterceptors.applyResponse(response, interceptorContext), signal);
+		throwIfSyncAborted(signal);
 		return response.data;
 	}
 
@@ -9598,12 +9932,21 @@ function requireSyncClient () {
 			if (typeof fetch !== 'function')
 				throw new Error('HTTP client requires fetch. Use a runtime with fetch support or provide a fetch polyfill.');
 
-			const abortController = typeof AbortController === 'function' && config.timeout
+			const externalSignal = config.signal;
+			throwIfSyncAborted(externalSignal);
+			const abortController = typeof AbortController === 'function' && (config.timeout || externalSignal)
 				? new AbortController()
 				: undefined;
 			let timeout;
+			let removeExternalAbort;
 			if (abortController)
-				timeout = setTimeout(() => abortController.abort(), config.timeout);
+				if (config.timeout)
+					timeout = setTimeout(() => abortController.abort(), config.timeout);
+			if (abortController && externalSignal) {
+				const abort = () => abortController.abort(externalSignal.reason);
+				externalSignal.addEventListener('abort', abort, { once: true });
+				removeExternalAbort = () => externalSignal.removeEventListener('abort', abort);
+			}
 
 			try {
 				const headers = {
@@ -9615,18 +9958,21 @@ function requireSyncClient () {
 					method: config.method?.toUpperCase(),
 					headers,
 					body: config.data === undefined ? undefined : JSON.stringify(config.data),
-					signal: abortController && abortController.signal
+					signal: abortController ? abortController.signal : externalSignal
 				};
 				if (config.credentials !== undefined)
 					fetchOptions.credentials = config.credentials;
 				const response = await fetch(config.url, fetchOptions);
 				const data = await readPayloadResponse(response);
+				const responseConfig = config.signal
+					? withoutRequestSignal(config)
+					: config;
 				const payload = {
 					data,
 					status: response.status,
 					statusText: response.statusText,
 					headers: headersToObject(response.headers),
-					config
+					config: responseConfig
 				};
 				if (!response.ok) {
 					const error = new Error('Request failed with status code ' + response.status);
@@ -9638,7 +9984,15 @@ function requireSyncClient () {
 			finally {
 				if (timeout)
 					clearTimeout(timeout);
+				if (removeExternalAbort)
+					removeExternalAbort();
 			}
+		}
+
+		function withoutRequestSignal(config) {
+			const result = { ...config };
+			delete result.signal;
+			return result;
 		}
 	}
 
@@ -21647,6 +22001,112 @@ function requireMap () {
 	return map_1;
 }
 
+var syncWorkerProtocol;
+var hasRequiredSyncWorkerProtocol;
+
+function requireSyncWorkerProtocol () {
+	if (hasRequiredSyncWorkerProtocol) return syncWorkerProtocol;
+	hasRequiredSyncWorkerProtocol = 1;
+	const alwaysForwardedEvents = Object.freeze([
+		'sync',
+		'sync-error',
+		'error',
+		'initial-ready',
+		'sync-progress',
+		'operation'
+	]);
+
+	const errorMarker = '__orangeSyncWorkerError';
+	const preservedErrorProperties = [
+		'status',
+		'code',
+		'response',
+		'config',
+		'syncRecovered',
+		'syncResult',
+		'mutationIds'
+	];
+
+	function serializeError(error) {
+		if (error === undefined || error === null)
+			return undefined;
+		const result = {
+			[errorMarker]: true,
+			name: error && error.name,
+			message: error && error.message ? error.message : String(error),
+			stack: error && error.stack
+		};
+		for (const property of preservedErrorProperties) {
+			if (error && error[property] !== undefined)
+				result[property] = error[property];
+		}
+		if (error && error.cause !== undefined) {
+			result.cause = isErrorLike(error.cause)
+				? serializeError(error.cause)
+				: error.cause;
+		}
+		return result;
+	}
+
+	function deserializeError(error, fallbackMessage = 'Sync worker request failed.') {
+		if (error instanceof Error)
+			return error;
+		const result = new Error(error && error.message ? error.message : fallbackMessage);
+		if (error && error.name)
+			result.name = error.name;
+		if (error && error.stack)
+			result.stack = error.stack;
+		for (const property of preservedErrorProperties) {
+			if (error && error[property] !== undefined)
+				result[property] = error[property];
+		}
+		if (error && error.cause !== undefined) {
+			result.cause = error.cause && error.cause[errorMarker]
+				? deserializeError(error.cause)
+				: error.cause;
+		}
+		return result;
+	}
+
+	function serializeEventPayload(payload) {
+		if (!payload || payload !== Object(payload) || payload.error === undefined)
+			return payload;
+		return {
+			...payload,
+			error: serializeError(payload.error)
+		};
+	}
+
+	function deserializeEventPayload(payload) {
+		if (!payload || payload !== Object(payload) || !payload.error || !payload.error[errorMarker])
+			return payload;
+		return {
+			...payload,
+			error: deserializeError(payload.error)
+		};
+	}
+
+	function isAlwaysForwardedEvent(event) {
+		return alwaysForwardedEvents.includes(event)
+			|| typeof event === 'string' && event.startsWith('operation:');
+	}
+
+	function isErrorLike(value) {
+		return value instanceof Error
+			|| value && value === Object(value) && typeof value.message === 'string';
+	}
+
+	syncWorkerProtocol = {
+		alwaysForwardedEvents,
+		deserializeError,
+		deserializeEventPayload,
+		isAlwaysForwardedEvent,
+		serializeError,
+		serializeEventPayload
+	};
+	return syncWorkerProtocol;
+}
+
 var dbWorkerClient;
 var hasRequiredDbWorkerClient;
 
@@ -21658,7 +22118,14 @@ function requireDbWorkerClient () {
 		serializeSyncPayload,
 		withSyncOperationMemory
 	} = requireOperationContext();
+	const createHttpInterceptor = requireHttpInterceptor();
 	const { ensureLocalSchemaReadySymbol } = requireSyncClient();
+	const {
+		deserializeError,
+		deserializeEventPayload,
+		isAlwaysForwardedEvent,
+		serializeError
+	} = requireSyncWorkerProtocol();
 
 	function createDbWorkerClient(worker) {
 		if (!worker || typeof worker.postMessage !== 'function')
@@ -21667,8 +22134,17 @@ function requireDbWorkerClient () {
 		let nextId = 1;
 		const pending = new Map();
 		const listeners = new Map();
+		const interceptors = createHttpInterceptor();
+		let hasInitialReady = false;
+		let lastInitialReady;
+		let closed = false;
+		let terminalError;
 
 		worker.addEventListener('message', onMessage);
+		worker.addEventListener('error', onWorkerError);
+		worker.addEventListener('messageerror', onWorkerError);
+		if (typeof worker.start === 'function')
+			worker.start();
 
 		const client = {
 			__orangeDbWorkerClient: true,
@@ -21690,11 +22166,13 @@ function requireDbWorkerClient () {
 				off,
 				once,
 				waitForInitialSync: syncRequest.bind(null, 'waitForInitialSync'),
+				interceptors,
 				[ensureLocalSchemaReadySymbol]: syncRequest.bind(null, 'ensureLocalSchemaReady'),
 				close
 			}
 		};
 
+		worker.postMessage({ type: 'orange-db-client-ready' });
 		return client;
 
 		function __createSyncClient() {
@@ -21742,6 +22220,10 @@ function requireDbWorkerClient () {
 		}
 
 		function request(method, meta, ...args) {
+			if (closed)
+				return Promise.reject(new Error('DB worker client closed.'));
+			if (terminalError)
+				return Promise.reject(terminalError);
 			const id = nextId++;
 			return new Promise((resolve, reject) => {
 				pending.set(id, { resolve, reject });
@@ -21767,7 +22249,7 @@ function requireDbWorkerClient () {
 		}
 
 		function on(event, listener) {
-			if (typeof listener !== 'function')
+			if (typeof event !== 'string' || typeof listener !== 'function')
 				return () => {};
 			let eventListeners = listeners.get(event);
 			if (!eventListeners) {
@@ -21775,7 +22257,15 @@ function requireDbWorkerClient () {
 				listeners.set(event, eventListeners);
 			}
 			eventListeners.add(listener);
-			request('sync.on', {}, event).catch(() => {});
+			if (!isAlwaysForwardedEvent(event))
+				request('sync.on', {}, event).catch(() => {});
+			if (event === 'initial-ready' && hasInitialReady) {
+				const readyPayload = lastInitialReady;
+				Promise.resolve().then(() => {
+					if (eventListeners.has(listener) && hasInitialReady && lastInitialReady === readyPayload)
+						callListener(listener, readyPayload);
+				});
+			}
 			return () => off(event, listener);
 		}
 
@@ -21786,7 +22276,8 @@ function requireDbWorkerClient () {
 			eventListeners.delete(listener);
 			if (eventListeners.size === 0) {
 				listeners.delete(event);
-				request('sync.off', {}, event).catch(() => {});
+				if (!isAlwaysForwardedEvent(event))
+					request('sync.off', {}, event).catch(() => {});
 			}
 		}
 
@@ -21801,11 +22292,18 @@ function requireDbWorkerClient () {
 		}
 
 		function close() {
+			if (closed)
+				return;
+			closed = true;
 			worker.removeEventListener('message', onMessage);
+			worker.removeEventListener('error', onWorkerError);
+			worker.removeEventListener('messageerror', onWorkerError);
 			for (const entry of pending.values())
 				entry.reject(new Error('DB worker client closed.'));
 			pending.clear();
 			listeners.clear();
+			hasInitialReady = false;
+			lastInitialReady = undefined;
 			if (typeof worker.terminate === 'function') {
 				try {
 					worker.terminate();
@@ -21828,8 +22326,17 @@ function requireDbWorkerClient () {
 			const message = event && event.data;
 			if (!message || message.type === undefined)
 				return;
+			if (message.type === 'orange-db-interceptor-request') {
+				void handleInterceptorRequest(message);
+				return;
+			}
 			if (message.type === 'orange-db-event') {
-				emit(message.event, message.payload);
+				const payload = deserializeEventPayload(message.payload);
+				if (message.event === 'initial-ready') {
+					hasInitialReady = true;
+					lastInitialReady = payload;
+				}
+				emit(message.event, payload);
 				return;
 			}
 			if (message.type !== 'orange-db-response')
@@ -21839,21 +22346,109 @@ function requireDbWorkerClient () {
 				return;
 			pending.delete(message.id);
 			if (message.error)
-				entry.reject(toError(message.error));
+				entry.reject(deserializeError(message.error, 'DB worker request failed.'));
 			else
 				entry.resolve(message.result);
 		}
 
 		function emit(event, payload) {
-			if (event === 'operation' || event && event.startsWith && event.startsWith('operation:')) {
+			if (event === 'operation') {
 				payload = withSyncOperationMemory(payload);
-				finalizeSyncOperationMemory(payload);
+				try {
+					emitToListeners('operation', payload);
+					if (payload && typeof payload.operation === 'string')
+						emitToListeners(`operation:${payload.operation}`, payload);
+				}
+				finally {
+					finalizeSyncOperationMemory(payload);
+				}
+				return;
 			}
+			if (event && event.startsWith && event.startsWith('operation:')) {
+				payload = withSyncOperationMemory(payload);
+				try {
+					emitToListeners(event, payload);
+				}
+				finally {
+					finalizeSyncOperationMemory(payload);
+				}
+				return;
+			}
+			emitToListeners(event, payload);
+		}
+
+		function emitToListeners(event, payload) {
 			const eventListeners = listeners.get(event);
 			if (!eventListeners)
 				return;
 			for (const listener of Array.from(eventListeners))
+				callListener(listener, payload);
+		}
+
+		function callListener(listener, payload) {
+			try {
 				listener(payload);
+			}
+			catch (_error) {
+				// Notifications must never interrupt worker message handling or other listeners.
+			}
+		}
+
+		async function handleInterceptorRequest(message) {
+			try {
+				const result = await applyInterceptor(message);
+				postInterceptorResponse(message.id, result);
+			}
+			catch (error) {
+				postInterceptorResponse(message.id, undefined, error);
+			}
+		}
+
+		function applyInterceptor(message) {
+			if (message.phase === 'request')
+				return interceptors.applyRequest(message.payload);
+			if (message.phase === 'response')
+				return interceptors.applyResponse(message.payload);
+			if (message.phase === 'response-error')
+				return interceptors.applyResponseError(deserializeError(message.error, 'DB worker HTTP request failed.'));
+			throw new Error(`Unknown DB worker interceptor phase "${message.phase}".`);
+		}
+
+		function postInterceptorResponse(id, result, error) {
+			if (closed || terminalError)
+				return;
+			try {
+				worker.postMessage({
+					type: 'orange-db-interceptor-response',
+					id,
+					result,
+					error: error ? serializeError(error) : undefined
+				});
+			}
+			catch (postError) {
+				if (!error) {
+					try {
+						worker.postMessage({
+							type: 'orange-db-interceptor-response',
+							id,
+							error: serializeError(postError)
+						});
+					}
+					catch (_ignored) {
+						// The worker cannot be notified when even the serialized error cannot be posted.
+					}
+				}
+			}
+		}
+
+		function onWorkerError(event) {
+			if (closed || terminalError)
+				return;
+			terminalError = toWorkerError(event);
+			for (const entry of pending.values())
+				entry.reject(terminalError);
+			pending.clear();
+			emit('error', { method: 'worker', error: terminalError });
 		}
 	}
 
@@ -21861,23 +22456,12 @@ function requireDbWorkerClient () {
 		return transaction && transaction.__orangeDbWorkerTransactionId;
 	}
 
-	function serializeError(error) {
-		if (!error)
-			return undefined;
-		return {
-			name: error.name,
-			message: error.message || String(error),
-			stack: error.stack
-		};
-	}
-
-	function toError(error) {
-		const e = new Error(error && error.message ? error.message : 'DB worker request failed.');
-		if (error && error.name)
-			e.name = error.name;
-		if (error && error.stack)
-			e.stack = error.stack;
-		return e;
+	function toWorkerError(event) {
+		if (event && event.error instanceof Error)
+			return event.error;
+		return new Error(event && event.message
+			? event.message
+			: 'DB worker failed before completing the request.');
 	}
 
 	dbWorkerClient = createDbWorkerClient;
@@ -21893,6 +22477,13 @@ function requireDbWorkerHandler () {
 	const { acquireSyncWrite } = requireWriteGate();
 	const { syncAutoStartSymbol } = requireSyncAuto();
 	const { ensureLocalSchemaReadySymbol } = requireSyncClient();
+	const { syncAbortError } = requireSyncAbort();
+	const {
+		alwaysForwardedEvents,
+		deserializeError,
+		serializeError,
+		serializeEventPayload
+	} = requireSyncWorkerProtocol();
 	const {
 		createSyncTransactionContext,
 		flushSyncTransactionContext,
@@ -21906,19 +22497,23 @@ function requireDbWorkerHandler () {
 
 		const transactions = new Map();
 		const syncEventUnsubscribers = new Map();
+		const interceptorEjectors = [];
+		const pendingInterceptorRequests = new Map();
+		let nextInterceptorRequestId = 1;
+		let autoStarted = false;
+		let clientReady = false;
+		let stopped = false;
+		let hasPendingInitialReady = false;
+		let pendingInitialReady;
 		const postMessage = options.postMessage || ((message) => {
 			const target = getPostTarget();
 			if (target)
 				target.postMessage(message);
 		});
 
-		if (options.autoStart !== false && client.syncClient) {
-			const startAuto = typeof client.syncClient[syncAutoStartSymbol] === 'function'
-				? client.syncClient[syncAutoStartSymbol]
-				: client.syncClient.start;
-			if (typeof startAuto === 'function')
-				void startAuto.call(client.syncClient);
-		}
+		installInterceptorBridge();
+		for (let i = 0; i < alwaysForwardedEvents.length; i++)
+			subscribeSyncEvent(alwaysForwardedEvents[i]);
 
 		return {
 			handleMessage,
@@ -21927,8 +22522,20 @@ function requireDbWorkerHandler () {
 
 		async function handleMessage(event) {
 			const message = event && event.data;
-			if (!message || message.type !== 'orange-db-request')
+			if (!message)
 				return;
+			if (message.type === 'orange-db-client-ready') {
+				handleClientReady();
+				return;
+			}
+			if (message.type === 'orange-db-interceptor-response') {
+				handleInterceptorResponse(message);
+				return;
+			}
+			if (message.type !== 'orange-db-request')
+				return;
+			if (message.method === 'sync.sync')
+				restartPendingRequestInterceptors();
 			try {
 				const result = await dispatch(message);
 				postResponse(message.id, result);
@@ -22058,10 +22665,15 @@ function requireDbWorkerHandler () {
 			if (!client.syncClient || typeof client.syncClient.on !== 'function')
 				return;
 			const unsubscribe = client.syncClient.on(event, (payload) => {
+				if (event === 'initial-ready' && !clientReady) {
+					hasPendingInitialReady = true;
+					pendingInitialReady = payload;
+					return;
+				}
 				postMessage({
 					type: 'orange-db-event',
 					event,
-					payload
+					payload: serializeEventPayload(payload)
 				});
 			});
 			syncEventUnsubscribers.set(event, unsubscribe);
@@ -22139,7 +22751,18 @@ function requireDbWorkerHandler () {
 			}
 		}
 
-		function stop() {
+		async function stop() {
+			if (stopped)
+				return;
+			stopped = true;
+			if (options.stopSyncClient !== false && client.syncClient && typeof client.syncClient.stop === 'function')
+				await client.syncClient.stop();
+			for (const eject of interceptorEjectors)
+				eject();
+			interceptorEjectors.length = 0;
+			for (const entry of new Set(pendingInterceptorRequests.values()))
+				settleInterceptorRequest(entry, entry.reject, syncAbortError(undefined, 'DB worker interceptor bridge stopped.'));
+			pendingInterceptorRequests.clear();
 			for (const unsubscribe of syncEventUnsubscribers.values())
 				unsubscribe();
 			syncEventUnsubscribers.clear();
@@ -22147,8 +22770,142 @@ function requireDbWorkerHandler () {
 				transactions.delete(id);
 				void Promise.resolve(transaction(transaction.rollback)).finally(() => releaseSyncWrite(transaction));
 			}
-			if (options.stopSyncClient !== false && client.syncClient && typeof client.syncClient.stop === 'function')
-				void client.syncClient.stop();
+		}
+
+		function handleClientReady() {
+			if (clientReady || stopped)
+				return;
+			clientReady = true;
+			if (hasPendingInitialReady) {
+				postMessage({
+					type: 'orange-db-event',
+					event: 'initial-ready',
+					payload: serializeEventPayload(pendingInitialReady)
+				});
+				hasPendingInitialReady = false;
+				pendingInitialReady = undefined;
+			}
+			startAutomaticSync();
+		}
+
+		function startAutomaticSync() {
+			if (autoStarted || stopped || options.autoStart === false || !client.syncClient)
+				return;
+			autoStarted = true;
+			const startAuto = typeof client.syncClient[syncAutoStartSymbol] === 'function'
+				? client.syncClient[syncAutoStartSymbol]
+				: client.syncClient.start;
+			if (typeof startAuto !== 'function')
+				return;
+			void Promise.resolve(startAuto.call(client.syncClient)).catch((error) => {
+				postMessage({
+					type: 'orange-db-event',
+					event: 'error',
+					payload: serializeEventPayload({ method: 'auto-start', error })
+				});
+			});
+		}
+
+		function installInterceptorBridge() {
+			const interceptors = client.syncClient && client.syncClient.interceptors;
+			if (!interceptors)
+				return;
+			install(interceptors.request, (config, context) => callClientInterceptor('request', config, undefined, context));
+			install(
+				interceptors.response,
+				(response, context) => callClientInterceptor('response', response, undefined, context),
+				(error, context) => callClientInterceptor('response-error', undefined, error, context)
+			);
+
+			function install(manager, onFulfilled, onRejected) {
+				if (!manager || typeof manager.use !== 'function')
+					return;
+				const id = manager.use(onFulfilled, onRejected);
+				if (typeof manager.eject === 'function')
+					interceptorEjectors.push(() => manager.eject(id));
+			}
+		}
+
+		function callClientInterceptor(phase, payload, error, context) {
+			return new Promise((resolve, reject) => {
+				const signal = context && context.signal;
+				const entry = {
+					id: undefined,
+					phase,
+					payload,
+					error,
+					resolve,
+					reject,
+					removeAbort: undefined,
+					settled: false
+				};
+				if (signal) {
+					const abort = () => {
+						settleInterceptorRequest(entry, reject, syncAbortError(signal.reason));
+					};
+					if (signal.aborted) {
+						abort();
+						return;
+					}
+					signal.addEventListener('abort', abort, { once: true });
+					entry.removeAbort = () => signal.removeEventListener('abort', abort);
+				}
+				postInterceptorRequest(entry);
+			});
+		}
+
+		function restartPendingRequestInterceptors() {
+			const entries = Array.from(new Set(pendingInterceptorRequests.values()));
+			for (const entry of entries) {
+				if (!entry.settled && entry.phase === 'request')
+					postInterceptorRequest(entry);
+			}
+		}
+
+		function postInterceptorRequest(entry) {
+			if (entry.settled)
+				return;
+			if (entry.id !== undefined)
+				pendingInterceptorRequests.delete(entry.id);
+			entry.id = nextInterceptorRequestId++;
+			pendingInterceptorRequests.set(entry.id, entry);
+			try {
+				postMessage({
+					type: 'orange-db-interceptor-request',
+					id: entry.id,
+					phase: entry.phase,
+					payload: entry.payload,
+					error: entry.error ? serializeError(entry.error) : undefined
+				});
+			}
+			catch (postError) {
+				settleInterceptorRequest(entry, entry.reject, postError);
+			}
+		}
+
+		function handleInterceptorResponse(message) {
+			const entry = pendingInterceptorRequests.get(message.id);
+			if (!entry)
+				return;
+			if (message.error)
+				settleInterceptorRequest(
+					entry,
+					entry.reject,
+					deserializeError(message.error, 'DB worker interceptor failed.')
+				);
+			else
+				settleInterceptorRequest(entry, entry.resolve, message.result);
+		}
+
+		function settleInterceptorRequest(entry, callback, value) {
+			if (entry.settled)
+				return;
+			entry.settled = true;
+			if (entry.id !== undefined)
+				pendingInterceptorRequests.delete(entry.id);
+			if (entry.removeAbort)
+				entry.removeAbort();
+			callback(value);
 		}
 
 		function postResponse(id, result, error) {
@@ -22169,23 +22926,10 @@ function requireDbWorkerHandler () {
 		}
 	}
 
-	function serializeError(error) {
-		return {
-			name: error && error.name,
-			message: error && error.message ? error.message : String(error),
-			stack: error && error.stack
-		};
-	}
-
 	function toError(error) {
 		if (!error)
 			return undefined;
-		const e = new Error(error.message || 'DB worker transaction failed.');
-		if (error.name)
-			e.name = error.name;
-		if (error.stack)
-			e.stack = error.stack;
-		return e;
+		return deserializeError(error, 'DB worker transaction failed.');
 	}
 
 	function getPostTarget() {
@@ -22209,7 +22953,14 @@ function requireSyncWorkerClient () {
 		finalizeSyncOperationMemory,
 		withSyncOperationMemory
 	} = requireOperationContext();
+	const createHttpInterceptor = requireHttpInterceptor();
 	const { ensureLocalSchemaReadySymbol } = requireSyncClient();
+	const {
+		deserializeError,
+		deserializeEventPayload,
+		isAlwaysForwardedEvent,
+		serializeError
+	} = requireSyncWorkerProtocol();
 
 	function createSyncWorkerClient(worker, options = {}) {
 		if (!worker || typeof worker.postMessage !== 'function')
@@ -22218,7 +22969,11 @@ function requireSyncWorkerClient () {
 		let nextId = 1;
 		const pending = new Map();
 		const listeners = new Map();
-		const lastEvents = new Map();
+		const interceptors = createHttpInterceptor();
+		let hasInitialReady = false;
+		let lastInitialReady;
+		let closed = false;
+		let terminalError;
 
 		worker.addEventListener('message', onMessage);
 		worker.addEventListener('error', onWorkerError);
@@ -22238,16 +22993,21 @@ function requireSyncWorkerClient () {
 			off,
 			once,
 			close,
-			interceptors: createNoopInterceptors(),
+			interceptors,
 			[ensureLocalSchemaReadySymbol]: request.bind(null, 'ensureLocalSchemaReady')
 		};
 
+		worker.postMessage({ type: 'orange-sync-worker-ready' });
 		return client;
 
 		function request(method, ...args) {
+			if (closed)
+				return Promise.reject(new Error('Sync worker client closed.'));
+			if (terminalError)
+				return Promise.reject(terminalError);
 			const id = nextId++;
 			return new Promise((resolve, reject) => {
-				const timeoutMs = resolveRequestTimeoutMs(method, args, options);
+				const timeoutMs = resolveRequestTimeoutMs(method, options);
 				const timeoutId = timeoutMs
 					? setTimeout(() => rejectTimedOutRequest(id, method, timeoutMs), timeoutMs)
 					: undefined;
@@ -22272,6 +23032,7 @@ function requireSyncWorkerClient () {
 			if (!entry)
 				return;
 			pending.delete(id);
+			postCancel(id);
 			entry.reject(new Error(`Sync worker request "${method}" timed out after ${Math.round(timeoutMs / 1000)} seconds.`));
 		}
 
@@ -22284,12 +23045,13 @@ function requireSyncWorkerClient () {
 				listeners.set(event, eventListeners);
 			}
 			eventListeners.add(listener);
-			request('on', event).catch(() => {});
-			const lastEvent = lastEvents.get(event);
-			if (lastEvent !== undefined) {
+			if (!isAlwaysForwardedEvent(event))
+				request('on', event).catch(() => {});
+			if (event === 'initial-ready' && hasInitialReady) {
+				const readyPayload = lastInitialReady;
 				Promise.resolve().then(() => {
-					if (eventListeners.has(listener) && lastEvents.get(event) === lastEvent)
-						listener(lastEvent);
+					if (eventListeners.has(listener) && hasInitialReady && lastInitialReady === readyPayload)
+						callListener(listener, readyPayload);
 				});
 			}
 			return () => off(event, listener);
@@ -22302,7 +23064,8 @@ function requireSyncWorkerClient () {
 			eventListeners.delete(listener);
 			if (eventListeners.size === 0) {
 				listeners.delete(event);
-				request('off', event).catch(() => {});
+				if (!isAlwaysForwardedEvent(event))
+					request('off', event).catch(() => {});
 			}
 		}
 
@@ -22317,17 +23080,23 @@ function requireSyncWorkerClient () {
 		}
 
 		function close() {
+			if (closed)
+				return;
+			closed = true;
+			const closeError = new Error('Sync worker client closed.');
 			worker.removeEventListener('message', onMessage);
 			worker.removeEventListener('error', onWorkerError);
 			worker.removeEventListener('messageerror', onWorkerError);
-			for (const entry of pending.values()) {
+			for (const [id, entry] of pending) {
+				postCancel(id);
 				if (entry.timeoutId)
 					clearTimeout(entry.timeoutId);
-				entry.reject(new Error('Sync worker client closed.'));
+				entry.reject(closeError);
 			}
 			pending.clear();
 			listeners.clear();
-			lastEvents.clear();
+			hasInitialReady = false;
+			lastInitialReady = undefined;
 			if (typeof worker.terminate === 'function')
 				worker.terminate();
 			else if (typeof worker.close === 'function')
@@ -22338,9 +23107,17 @@ function requireSyncWorkerClient () {
 			const message = event && event.data;
 			if (!message || message.type === undefined)
 				return;
+			if (message.type === 'orange-sync-worker-interceptor-request') {
+				void handleInterceptorRequest(message);
+				return;
+			}
 			if (message.type === 'orange-sync-worker-event') {
-				lastEvents.set(message.event, message.payload);
-				emit(message.event, message.payload);
+				const payload = deserializeEventPayload(message.payload);
+				if (message.event === 'initial-ready') {
+					hasInitialReady = true;
+					lastInitialReady = payload;
+				}
+				emit(message.event, payload);
 				return;
 			}
 			if (message.type !== 'orange-sync-worker-response')
@@ -22350,7 +23127,7 @@ function requireSyncWorkerClient () {
 				return;
 			clearPendingRequest(message.id);
 			if (message.error)
-				entry.reject(toError(message.error));
+				entry.reject(deserializeError(message.error));
 			else
 				entry.resolve(message.result);
 		}
@@ -22365,7 +23142,10 @@ function requireSyncWorkerClient () {
 		}
 
 		function onWorkerError(event) {
+			if (terminalError)
+				return;
 			const error = toWorkerError(event);
+			terminalError = error;
 			for (const entry of pending.values()) {
 				if (entry.timeoutId)
 					clearTimeout(entry.timeoutId);
@@ -22376,31 +23156,119 @@ function requireSyncWorkerClient () {
 		}
 
 		function emit(event, payload) {
-			if (event === 'operation' || event && event.startsWith && event.startsWith('operation:')) {
+			if (event === 'operation') {
 				payload = withSyncOperationMemory(payload);
-				finalizeSyncOperationMemory(payload);
+				try {
+					emitToListeners('operation', payload);
+					if (payload && typeof payload.operation === 'string')
+						emitToListeners(`operation:${payload.operation}`, payload);
+				}
+				finally {
+					finalizeSyncOperationMemory(payload);
+				}
+				return;
 			}
+			if (event && event.startsWith && event.startsWith('operation:')) {
+				payload = withSyncOperationMemory(payload);
+				try {
+					emitToListeners(event, payload);
+				}
+				finally {
+					finalizeSyncOperationMemory(payload);
+				}
+				return;
+			}
+			emitToListeners(event, payload);
+		}
+
+		function emitToListeners(event, payload) {
 			const eventListeners = listeners.get(event);
 			if (!eventListeners)
 				return;
 			for (const listener of Array.from(eventListeners))
+				callListener(listener, payload);
+		}
+
+		function callListener(listener, payload) {
+			try {
 				listener(payload);
+			}
+			catch (_error) {
+				// Notifications must never interrupt worker message handling or other listeners.
+			}
+		}
+
+		async function handleInterceptorRequest(message) {
+			try {
+				const result = await applyInterceptor(message);
+				postInterceptorResponse(message.id, result);
+			}
+			catch (error) {
+				postInterceptorResponse(message.id, undefined, error);
+			}
+		}
+
+		function applyInterceptor(message) {
+			if (message.phase === 'request')
+				return interceptors.applyRequest(message.payload);
+			if (message.phase === 'response')
+				return interceptors.applyResponse(message.payload);
+			if (message.phase === 'response-error')
+				return interceptors.applyResponseError(deserializeError(message.error, 'Sync worker HTTP request failed.'));
+			throw new Error(`Unknown sync worker interceptor phase "${message.phase}".`);
+		}
+
+		function postInterceptorResponse(id, result, error) {
+			if (closed || terminalError)
+				return;
+			try {
+				worker.postMessage({
+					type: 'orange-sync-worker-interceptor-response',
+					id,
+					result,
+					error: error ? serializeError(error) : undefined
+				});
+			}
+			catch (postError) {
+				if (!error) {
+					try {
+						worker.postMessage({
+							type: 'orange-sync-worker-interceptor-response',
+							id,
+							error: serializeError(postError)
+						});
+					}
+					catch (_ignored) {
+						// The worker cannot be notified when even the serialized error cannot be posted.
+					}
+				}
+			}
+		}
+
+		function postCancel(id) {
+			if (terminalError)
+				return;
+			try {
+				worker.postMessage({
+					type: 'orange-sync-worker-cancel',
+					id
+				});
+			}
+			catch (_error) {
+				// The original request is already being rejected locally.
+			}
 		}
 	}
 
-	function resolveRequestTimeoutMs(method, args, options) {
-		const methodOptions = args && args[0];
-		const configured = methodOptions && methodOptions === Object(methodOptions)
-			? normalizePositiveInteger(methodOptions.timeoutMs)
-			: undefined;
-		if (configured)
-			return configured + 1000;
+	function resolveRequestTimeoutMs(method, options) {
 		const fallback = normalizePositiveInteger(options.requestTimeoutMs);
 		if (fallback)
 			return fallback;
-		if (method === 'on' || method === 'off' || method === 'isRunning' || method === 'stop')
+		if (method === 'on' || method === 'off' || method === 'isRunning')
 			return 10000;
-		return 300000;
+		if (method === 'ensureLocalSchema' || method === 'ensureLocalSchemaReady' || method === 'resetLocal')
+			return 300000;
+		return undefined;
 	}
 
 	function normalizePositiveInteger(value) {
@@ -22417,32 +23285,6 @@ function requireSyncWorkerClient () {
 		return new Error(message);
 	}
 
-	function createNoopInterceptors() {
-		return {
-			request: createNoopInterceptorManager(),
-			response: createNoopInterceptorManager()
-		};
-	}
-
-	function createNoopInterceptorManager() {
-		let nextId = 1;
-		return {
-			use() {
-				return `sync-worker-noop-${nextId++}`;
-			},
-			eject() {}
-		};
-	}
-
-	function toError(error) {
-		const e = new Error(error && error.message ? error.message : 'Sync worker request failed.');
-		if (error && error.name)
-			e.name = error.name;
-		if (error && error.stack)
-			e.stack = error.stack;
-		return e;
-	}
-
 	syncWorkerClient = createSyncWorkerClient;
 	return syncWorkerClient;
 }
@@ -22455,37 +23297,44 @@ function requireSyncWorkerHandler () {
 	hasRequiredSyncWorkerHandler = 1;
 	const { syncAutoStartSymbol } = requireSyncAuto();
 	const { ensureLocalSchemaReadySymbol } = requireSyncClient();
+	const {
+		createSyncAbortController,
+		syncAbortError,
+		syncAbortSignalSymbol
+	} = requireSyncAbort();
+	const {
+		alwaysForwardedEvents,
+		deserializeError,
+		serializeError,
+		serializeEventPayload
+	} = requireSyncWorkerProtocol();
 
 	function createSyncWorkerHandler(syncClient, options = {}) {
 		if (!syncClient)
 			throw new Error('Sync worker handler requires a sync client.');
 
 		const syncEventUnsubscribers = new Map();
+		const interceptorEjectors = [];
+		const pendingInterceptorRequests = new Map();
+		const requestControllers = new Map();
+		let nextInterceptorRequestId = 1;
+		let autoStarted = false;
+		let clientReady = false;
+		let stopped = false;
+		let hasPendingInitialReady = false;
+		let pendingInitialReady;
 		const postMessage = options.postMessage || ((message) => {
 			const target = getPostTarget();
 			if (target)
 				target.postMessage(message);
 		});
-		const forwardedEvents = Array.isArray(options.forwardEvents)
-			? options.forwardEvents
-			: ['sync', 'error', 'initial-ready', 'sync-progress'];
+		const forwardedEvents = Array.from(new Set([
+			...alwaysForwardedEvents,
+			...(Array.isArray(options.forwardEvents) ? options.forwardEvents : [])
+		]));
+		installInterceptorBridge();
 		for (let i = 0; i < forwardedEvents.length; i++)
 			subscribeSyncEvent(forwardedEvents[i]);
-
-		if (options.autoStart !== false) {
-			const startAuto = typeof syncClient[syncAutoStartSymbol] === 'function'
-				? syncClient[syncAutoStartSymbol]
-				: syncClient.start;
-			if (typeof startAuto === 'function') {
-				void Promise.resolve(startAuto.call(syncClient)).catch((error) => {
-					postMessage({
-						type: 'orange-sync-worker-event',
-						event: 'error',
-						payload: { method: 'auto-start', error: serializeError(error) }
-					});
-				});
-			}
-		}
 
 		return {
 			handleMessage,
@@ -22494,18 +23343,39 @@ function requireSyncWorkerHandler () {
 
 		async function handleMessage(event) {
 			const message = event && event.data;
-			if (!message || message.type !== 'orange-sync-worker-request')
+			if (!message)
 				return;
+			if (message.type === 'orange-sync-worker-ready') {
+				handleClientReady();
+				return;
+			}
+			if (message.type === 'orange-sync-worker-interceptor-response') {
+				handleInterceptorResponse(message);
+				return;
+			}
+			if (message.type === 'orange-sync-worker-cancel') {
+				cancelRequest(message.id);
+				return;
+			}
+			if (message.type !== 'orange-sync-worker-request')
+				return;
+			if (message.method === 'sync')
+				restartPendingRequestInterceptors();
+			const controller = createSyncAbortController();
+			requestControllers.set(message.id, controller);
 			try {
-				const result = await dispatch(message.method, message.args || []);
+				const result = await dispatch(message.method, message.args || [], controller.signal);
 				postResponse(message.id, result);
 			}
 			catch (e) {
 				postResponse(message.id, undefined, e);
 			}
+			finally {
+				requestControllers.delete(message.id);
+			}
 		}
 
-		function dispatch(method, args) {
+		function dispatch(method, args, signal) {
 			if (method === 'on')
 				return subscribeSyncEvent(args[0]);
 			if (method === 'off')
@@ -22514,12 +23384,18 @@ function requireSyncWorkerHandler () {
 				const ensureReady = syncClient[ensureLocalSchemaReadySymbol];
 				if (typeof ensureReady !== 'function')
 					return { skipped: true };
-				return ensureReady.apply(syncClient, args);
+				return ensureReady.apply(syncClient, withAbortOptions(args, signal));
 			}
 			const fn = syncClient[method];
 			if (typeof fn !== 'function')
 				throw new Error(`Sync worker method "${method}" is not implemented.`);
-			return fn.apply(syncClient, args);
+			return fn.apply(syncClient, methodAcceptsOptions(method) ? withAbortOptions(args, signal) : args);
+		}
+
+		function cancelRequest(id) {
+			const controller = requestControllers.get(id);
+			if (controller)
+				controller.abort(syncAbortError(undefined, 'Sync worker request cancelled.'));
 		}
 
 		function subscribeSyncEvent(event) {
@@ -22528,11 +23404,12 @@ function requireSyncWorkerHandler () {
 			if (typeof syncClient.on !== 'function')
 				return;
 			const unsubscribe = syncClient.on(event, (payload) => {
-				postMessage({
-					type: 'orange-sync-worker-event',
-					event,
-					payload
-				});
+				if (event === 'initial-ready' && !clientReady) {
+					hasPendingInitialReady = true;
+					pendingInitialReady = payload;
+					return;
+				}
+				postEvent(event, payload);
 			});
 			syncEventUnsubscribers.set(event, unsubscribe);
 		}
@@ -22546,11 +23423,157 @@ function requireSyncWorkerHandler () {
 		}
 
 		async function stop() {
+			stopped = true;
+			for (const controller of requestControllers.values())
+				controller.abort(syncAbortError(undefined, 'Sync worker handler stopped.'));
+			requestControllers.clear();
+			if (options.stopSyncClient !== false && typeof syncClient.stop === 'function')
+				await syncClient.stop();
+			for (const eject of interceptorEjectors)
+				eject();
+			interceptorEjectors.length = 0;
+			for (const entry of new Set(pendingInterceptorRequests.values()))
+				settleInterceptorRequest(entry, entry.reject, new Error('Sync worker interceptor bridge stopped.'));
+			pendingInterceptorRequests.clear();
 			for (const unsubscribe of syncEventUnsubscribers.values())
 				unsubscribe();
 			syncEventUnsubscribers.clear();
-			if (options.stopSyncClient !== false && typeof syncClient.stop === 'function')
-				await syncClient.stop();
+		}
+
+		function handleClientReady() {
+			if (clientReady || stopped)
+				return;
+			clientReady = true;
+			if (hasPendingInitialReady) {
+				postEvent('initial-ready', pendingInitialReady);
+				hasPendingInitialReady = false;
+				pendingInitialReady = undefined;
+			}
+			startAutomaticSync();
+		}
+
+		function startAutomaticSync() {
+			if (autoStarted || stopped || options.autoStart === false)
+				return;
+			autoStarted = true;
+			const startAuto = typeof syncClient[syncAutoStartSymbol] === 'function'
+				? syncClient[syncAutoStartSymbol]
+				: syncClient.start;
+			if (typeof startAuto !== 'function')
+				return;
+			void Promise.resolve(startAuto.call(syncClient)).catch((error) => {
+				postEvent('error', { method: 'auto-start', error });
+			});
+		}
+
+		function postEvent(event, payload) {
+			postMessage({
+				type: 'orange-sync-worker-event',
+				event,
+				payload: serializeEventPayload(payload)
+			});
+		}
+
+		function installInterceptorBridge() {
+			const interceptors = syncClient.interceptors;
+			if (!interceptors)
+				return;
+			install(interceptors.request, (config, context) => callClientInterceptor('request', config, undefined, context));
+			install(
+				interceptors.response,
+				(response, context) => callClientInterceptor('response', response, undefined, context),
+				(error, context) => callClientInterceptor('response-error', undefined, error, context)
+			);
+
+			function install(manager, onFulfilled, onRejected) {
+				if (!manager || typeof manager.use !== 'function')
+					return;
+				const id = manager.use(onFulfilled, onRejected);
+				if (typeof manager.eject === 'function')
+					interceptorEjectors.push(() => manager.eject(id));
+			}
+		}
+
+		function callClientInterceptor(phase, payload, error, context) {
+			return new Promise((resolve, reject) => {
+				const signal = context && context.signal;
+				const entry = {
+					id: undefined,
+					phase,
+					payload,
+					error,
+					resolve,
+					reject,
+					removeAbort: undefined,
+					settled: false
+				};
+				if (signal) {
+					const abort = () => {
+						settleInterceptorRequest(entry, reject, syncAbortError(signal.reason));
+					};
+					if (signal.aborted) {
+						abort();
+						return;
+					}
+					signal.addEventListener('abort', abort, { once: true });
+					entry.removeAbort = () => signal.removeEventListener('abort', abort);
+				}
+				postInterceptorRequest(entry);
+			});
+		}
+
+		function restartPendingRequestInterceptors() {
+			const entries = Array.from(new Set(pendingInterceptorRequests.values()));
+			for (const entry of entries) {
+				if (!entry.settled && entry.phase === 'request')
+					postInterceptorRequest(entry);
+			}
+		}
+
+		function postInterceptorRequest(entry) {
+			if (entry.settled)
+				return;
+			if (entry.id !== undefined)
+				pendingInterceptorRequests.delete(entry.id);
+			entry.id = nextInterceptorRequestId++;
+			pendingInterceptorRequests.set(entry.id, entry);
+			try {
+				postMessage({
+					type: 'orange-sync-worker-interceptor-request',
+					id: entry.id,
+					phase: entry.phase,
+					payload: entry.payload,
+					error: entry.error ? serializeError(entry.error) : undefined
+				});
+			}
+			catch (postError) {
+				settleInterceptorRequest(entry, entry.reject, postError);
+			}
+		}
+
+		function handleInterceptorResponse(message) {
+			const entry = pendingInterceptorRequests.get(message.id);
+			if (!entry)
+				return;
+			if (message.error)
+				settleInterceptorRequest(
+					entry,
+					entry.reject,
+					deserializeError(message.error, 'Sync worker interceptor failed.')
+				);
+			else
+				settleInterceptorRequest(entry, entry.resolve, message.result);
+		}
+
+		function settleInterceptorRequest(entry, callback, value) {
+			if (entry.settled)
+				return;
+			entry.settled = true;
+			if (entry.id !== undefined)
+				pendingInterceptorRequests.delete(entry.id);
+			if (entry.removeAbort)
+				entry.removeAbort();
+			callback(value);
 		}
 
 		function postResponse(id, result, error) {
@@ -22563,12 +23586,23 @@ function requireSyncWorkerHandler () {
 		}
 	}
 
-	function serializeError(error) {
-		return {
-			name: error && error.name,
-			message: error && error.message ? error.message : String(error),
-			stack: error && error.stack
-		};
+	function methodAcceptsOptions(method) {
+		return method === 'sync'
+			|| method === 'ensureLocalSchema'
+			|| method === 'resetLocal'
+			|| method === 'start';
+	}
+
+	function withAbortOptions(args, signal) {
+		const result = Array.isArray(args) ? args.slice() : [];
+		const input = result[0] && result[0] === Object(result[0]) ? result[0] : {};
+		const options = { ...input };
+		Object.defineProperty(options, syncAbortSignalSymbol, {
+			value: signal,
+			configurable: true
+		});
+		result[0] = options;
+		return result;
 	}
 
 	function getPostTarget() {
@@ -27411,11 +28445,12 @@ function requireNewPool$1 () {
 	return newPool_1$1;
 }
 
-var dualSyncDatabase;
+var dualSyncDatabase = {exports: {}};
+
 var hasRequiredDualSyncDatabase;
 
 function requireDualSyncDatabase () {
-	if (hasRequiredDualSyncDatabase) return dualSyncDatabase;
+	if (hasRequiredDualSyncDatabase) return dualSyncDatabase.exports;
 	hasRequiredDualSyncDatabase = 1;
 	const hostLocal = requireHostLocal();
 	const express = requireHostExpress();
@@ -27425,6 +28460,12 @@ function requireDualSyncDatabase () {
 	const createHttpInterceptor = requireHttpInterceptor();
 	const newSyncClient = requireSyncClient();
 	const { createSyncAuto, syncAutoStartSymbol } = requireSyncAuto();
+	const {
+		awaitWithSyncAbort,
+		isSyncAbortError,
+		syncAbortSignalSymbol,
+		throwIfSyncAborted
+	} = requireSyncAbort();
 	const {
 		acquireSyncRead,
 		runSyncRead,
@@ -27450,13 +28491,18 @@ function requireDualSyncDatabase () {
 	const deltaTable = 'orange_sync_dual_delta';
 	const deltaChunkTable = 'orange_sync_dual_delta_chunk';
 	const replayTable = 'orange_sync_dual_replay';
+	const recoveryTable = 'orange_sync_dual_recovery';
 	const manifestId = 'default';
+	const recoveryId = 'default';
 	const roleA = 'a';
 	const roleB = 'b';
 	const outboxReplayPageSize = 1000;
 	const deltaItemsPerChunk = 1000;
 	const deltaChunkReadPageSize = 32;
 	const manifestCacheMaxAgeMs = 1000;
+	const dualSyncFaultInjectorSymbol = typeof Symbol === 'function'
+		? Symbol.for('orange-orm.sqliteOPFS.dualSync.faultInjector')
+		: '__orangeOrmDualSyncFaultInjector';
 
 	function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase) {
 		const roleConnectionStrings = {
@@ -27495,6 +28541,7 @@ function requireDualSyncDatabase () {
 		const schemaReadyRoles = new Set();
 		const schemaReadyPromises = new Map();
 		let schemaReadyGeneration = 0;
+		let syncFaultInjector;
 		const dualSyncLockName = `orange-orm:sqliteOPFS:dual-sync:${normalizeLockNamePart(connectionString)}`;
 		const dualWriteLockName = `orange-orm:sqliteOPFS:dual-write:${normalizeLockNamePart(connectionString)}`;
 		const dualReadLockName = `orange-orm:sqliteOPFS:dual-read:${normalizeLockNamePart(connectionString)}`;
@@ -27520,6 +28567,9 @@ function requireDualSyncDatabase () {
 			__orangeCrossTabReadLock: { enabled: true, name: dualReadLockName, timeoutMs: 300000 },
 			__orangeBeforeSyncWrite: refreshManifestBeforeWrite
 		};
+		Object.defineProperty(router, dualSyncFaultInjectorSymbol, {
+			value: setSyncFaultInjector
+		});
 		router.poolFactory = router;
 		installSyncProgressInterceptors();
 
@@ -27639,8 +28689,8 @@ function requireDualSyncDatabase () {
 			return coalesceSync(normalizeSyncOptions(options));
 		}
 
-		function syncAutomatic(config) {
-			return coalesceSync({}, {
+		function syncAutomatic(config, syncOptions) {
+			return coalesceSync(normalizeSyncOptions(syncOptions), {
 				minimumIntervalMs: normalizeAutoSyncIntervalMs(config && config.intervalMs)
 			});
 		}
@@ -27651,11 +28701,11 @@ function requireDualSyncDatabase () {
 			if (pendingSyncRequest) {
 				mergePendingSyncRequest(pendingSyncRequest, normalizedOptions, schedule);
 				emitSyncProgress('coalesced-next', { queueDepth: 1 });
-				return pendingSyncRequest.promise;
+				return awaitWithSyncAbort(pendingSyncRequest.promise, normalizedOptions[syncAbortSignalSymbol]);
 			}
 			pendingSyncRequest = createPendingSyncRequest(normalizedOptions, schedule);
 			emitSyncProgress('queued-next', { queueDepth: 1 });
-			return pendingSyncRequest.promise;
+			return awaitWithSyncAbort(pendingSyncRequest.promise, normalizedOptions[syncAbortSignalSymbol]);
 		}
 
 		function startSyncRun(normalizedOptions, schedule) {
@@ -27700,30 +28750,49 @@ function requireDualSyncDatabase () {
 			const pendingTimeoutMs = normalizeTimeoutMs(pending.normalizedOptions.timeoutMs);
 			const requestedTimeoutMs = normalizeTimeoutMs(normalizedOptions.timeoutMs);
 			const timeoutMs = Math.max(pendingTimeoutMs || 0, requestedTimeoutMs || 0);
+			const pendingSignal = pending.normalizedOptions[syncAbortSignalSymbol];
+			const requestedSignal = normalizedOptions[syncAbortSignalSymbol];
+			const signal = pendingSignal && pendingSignal === requestedSignal
+				? pendingSignal
+				: undefined;
 			pending.normalizedOptions = timeoutMs > 0 ? { timeoutMs } : {};
+			if (signal)
+				pending.normalizedOptions[syncAbortSignalSymbol] = signal;
 			if (!(schedule && schedule.minimumIntervalMs > 0))
 				pending.schedule = {};
 		}
 
 		function queueSync(normalizedOptions, schedule = {}) {
+			const signal = normalizedOptions[syncAbortSignalSymbol];
 			queuedSyncCount += 1;
 			emitSyncProgress('queued', { queueDepth: queuedSyncCount });
-			const run = syncTail.then(() => {
+			let leftQueue = false;
+			const run = awaitWithSyncAbort(syncTail, signal).then(() => {
+				leftQueue = true;
 				queuedSyncCount = Math.max(0, queuedSyncCount - 1);
 				emitSyncProgress('waiting-for-sync-lock', { queueDepth: queuedSyncCount });
-				return observe('sync', () => runWithCrossTabLock(
+				return awaitWithSyncAbort(observe('sync', () => runWithCrossTabLock(
 					dualSyncLockName,
 					toDualSyncLockConfig(poolOptions && poolOptions.sync, normalizedOptions),
-					() => syncScheduled(normalizedOptions, schedule)
-				));
+					() => {
+						throwIfSyncAborted(signal);
+						return syncScheduled(normalizedOptions, schedule);
+					}
+				)), signal);
+			}).catch((error) => {
+				if (!leftQueue)
+					queuedSyncCount = Math.max(0, queuedSyncCount - 1);
+				throw error;
 			});
 			syncTail = run.catch(() => {});
 			return run;
 		}
 
 		async function syncScheduled(options, schedule) {
+			throwIfSyncAborted(options[syncAbortSignalSymbol]);
 			const minimumIntervalMs = schedule && schedule.minimumIntervalMs;
-			if (minimumIntervalMs > 0) {
+			const recovery = await readRecoveryState();
+			if (!recovery && minimumIntervalMs > 0) {
 				const manifest = await getManifest(true);
 				const lastSuccessfulSyncAtMs = manifest.lastSuccessfulSyncAtMs;
 				const elapsedMs = Date.now() - lastSuccessfulSyncAtMs;
@@ -27751,8 +28820,22 @@ function requireDualSyncDatabase () {
 		}
 
 		async function sync(options = {}) {
+			const signal = options[syncAbortSignalSymbol];
+			throwIfSyncAborted(signal);
 			emitSyncProgress('preparing');
-			const manifest = await getManifest(true);
+			let manifest = await getManifest(true);
+			throwIfSyncAborted(signal);
+			const recovery = await readRecoveryState();
+			if (recovery) {
+				if (isPublishedRecovery(manifest, recovery)) {
+					await cleanupRecoveryState(recovery);
+					manifest = await getManifest(true);
+				}
+				else {
+					assertExpectedRecoveryManifest(manifest, recovery);
+					return recoverInterruptedSync(options, manifest, recovery);
+				}
+			}
 			const activeRole = manifest.activeRole;
 			const stagingRole = manifest.stagingRole;
 			const activeSync = getRoleSyncClient(activeRole);
@@ -27761,10 +28844,12 @@ function requireDualSyncDatabase () {
 				activeSync.ensureLocalSchema(options),
 				stagingSync.ensureLocalSchema(options)
 			]);
+			throwIfSyncAborted(signal);
 			await ensureSharedClientId(manifest);
 
 			emitSyncProgress('updating-staging', { activeRole, stagingRole });
-			await applyPendingDeltasToRole(stagingRole);
+			await applyPendingDeltasToRole(stagingRole, undefined, options);
+			throwIfSyncAborted(signal);
 			await recoverAcceptedReplayRows(activeRole, activeSync);
 
 			emitSyncProgress('pushing-active', { activeRole, stagingRole });
@@ -27797,61 +28882,27 @@ function requireDualSyncDatabase () {
 
 			await applyAcceptedReplayRows(stagingRole, stagingSync);
 			await mirrorFailedOutboxMetadata(activeSync, stagingSync);
+			throwIfSyncAborted(signal);
 
-			emitSyncProgress('pulling-staging', { activeRole, stagingRole });
-			const pullStagingStartedAtMs = Date.now();
-			const deltaSink = await createDeltaJournalSink(stagingRole);
-			let result;
-			let journal;
-			let deltaId;
-			let pullStagingSummary;
-			try {
-				result = await stagingSync[syncAndCapturePullJournalSymbol]({
-					...options,
-					_skipPushBeforePull: true,
-					_fileSnapshotRollback: true,
-					_capturePullJournalChunk: deltaSink.write,
-					_onPullBatchProgress(progress) {
-						emitSyncProgress('pull-batch-complete', {
-							activeRole,
-							stagingRole,
-							...progress
-						});
-					},
-					_onPullStagingSummary(summary) {
-						pullStagingSummary = summary;
-					}
-				});
-				journal = result && result.__orangePullJournal;
-				const deltaFinalizeStartedAtMs = Date.now();
-				deltaId = await deltaSink.commit(journal);
-				emitSyncProgress('pull-staging-summary', {
-					activeRole,
-					stagingRole,
-					...(pullStagingSummary || {}),
-					deltaFinalizeMs: Math.max(0, Date.now() - deltaFinalizeStartedAtMs),
-					elapsedMs: Math.max(0, Date.now() - pullStagingStartedAtMs),
-					failed: false
-				});
-			}
-			catch (error) {
-				await deltaSink.abort();
-				emitSyncProgress('pull-staging-summary', {
-					activeRole,
-					stagingRole,
-					...(pullStagingSummary || {}),
-					elapsedMs: Math.max(0, Date.now() - pullStagingStartedAtMs),
-					failed: true
-				});
-				throw error;
-			}
+			await writeRecoveryState(manifest);
+			const pullResult = await pullIntoStaging({
+				activeRole,
+				activeSync,
+				manifest,
+				options,
+				stagingRole,
+				stagingSync
+			});
+			const { result, deltaId } = pullResult;
+			throwIfSyncAborted(signal);
 			let publishedManifest = manifest;
 			let swapped = false;
 			let cloneMs = 0;
 			let deferred;
 
 			emitSyncProgress('waiting-for-write-barrier', { activeRole, stagingRole });
-			await runSyncSwap(router, async () => {
+			await awaitWithSyncAbort(runSyncSwap(router, async () => {
+				throwIfSyncAborted(signal);
 				const currentManifest = await getManifest(true);
 				assertExpectedManifest(currentManifest, manifest);
 				const finalPendingRows = (await readAllOutboxRows(activeSync, ['pending']))
@@ -27860,6 +28911,7 @@ function requireDualSyncDatabase () {
 					const failedRows = (await readAllOutboxRows(activeSync, ['failed']))
 						.filter(row => rejectedMutationIds.has(outboxRowMutationId(row)));
 					const promotionId = randomUuid();
+					await setRecoveryReplayKind(manifest, conflictReplayKind(promotionId));
 					await persistConflictReplayRows(promotionId, finalPendingRows, failedRows);
 					emitSyncProgress('cloning-clean-staging', {
 						activeRole,
@@ -27876,10 +28928,12 @@ function requireDualSyncDatabase () {
 					});
 					await markDeltaCopiedByClone(deltaId, activeRole);
 					await applyConflictReplayRows(promotionId, activeRole, stagingRole);
+					throwIfSyncAborted(signal);
 					emitSyncProgress('swapping', { activeRole, stagingRole });
 					publishedManifest = await publishStagingRole(manifest);
 					swapped = true;
 					await deleteReplayKind(conflictReplayKind(promotionId));
+					await clearRecoveryState();
 					return;
 				}
 				if (finalPendingRows.length > 0) {
@@ -27889,14 +28943,17 @@ function requireDualSyncDatabase () {
 						stagingRole,
 						mutationCount: finalPendingRows.length
 					});
+					await clearRecoveryState();
 					return;
 				}
-				if (deltaId || acceptedMutationCount > 0 || Number(result && result.applied || 0) > 0) {
+				throwIfSyncAborted(signal);
+				if (pullResult.shouldPublish || deltaId || acceptedMutationCount > 0 || Number(result && result.applied || 0) > 0) {
 					emitSyncProgress('swapping', { activeRole, stagingRole });
 					publishedManifest = await publishStagingRole(manifest);
 					swapped = true;
 				}
-			});
+				await clearRecoveryState();
+			}), signal);
 
 			publishedManifest = await markSuccessfulSync();
 			const newActiveRole = publishedManifest.activeRole;
@@ -27920,6 +28977,194 @@ function requireDualSyncDatabase () {
 				throw pushConflictError;
 			}
 			return dualResult;
+		}
+
+		async function pullIntoStaging(context) {
+			const {
+				activeRole,
+				activeSync,
+				manifest,
+				options,
+				stagingRole,
+				stagingSync
+			} = context;
+			let stagingFresh = false;
+			for (let attempt = 0; attempt < 2; attempt++) {
+				emitSyncProgress('pulling-staging', { activeRole, stagingRole, stagingFresh });
+				const pullStagingStartedAtMs = Date.now();
+				const deltaSink = await createDeltaJournalSink(stagingRole);
+				let pullStagingSummary;
+				try {
+					const result = await stagingSync[syncAndCapturePullJournalSymbol]({
+						...options,
+						_skipPushBeforePull: true,
+						_fileSnapshotRollback: true,
+						_capturePullJournalChunk: deltaSink.write,
+						_onPullBatchProgress(progress) {
+							emitSyncProgress('pull-batch-complete', {
+								activeRole,
+								stagingRole,
+								...progress
+							});
+						},
+						_onPullSnapshot(snapshot) {
+							if (!stagingFresh)
+								throw new StagingReloadRequiredError(snapshot && snapshot.reason);
+						},
+						_onPullStagingSummary(summary) {
+							pullStagingSummary = summary;
+						}
+					});
+					const journal = result && result.__orangePullJournal;
+					const deltaFinalizeStartedAtMs = Date.now();
+					const deltaId = await deltaSink.commit(journal);
+					emitSyncProgress('pull-staging-summary', {
+						activeRole,
+						stagingRole,
+						...(pullStagingSummary || {}),
+						deltaFinalizeMs: Math.max(0, Date.now() - deltaFinalizeStartedAtMs),
+						elapsedMs: Math.max(0, Date.now() - pullStagingStartedAtMs),
+						failed: false,
+						stagingFresh
+					});
+					return {
+						result,
+						journal,
+						deltaId,
+						shouldPublish: stagingFresh || hasPullJournalChanges(journal)
+					};
+				}
+				catch (error) {
+					await deltaSink.abort();
+					if (error instanceof StagingReloadRequiredError && !stagingFresh) {
+						emitSyncProgress('reloading-staging', {
+							activeRole,
+							stagingRole,
+							reason: error.reason || 'snapshot'
+						});
+						await resetStagingRole(stagingSync, activeSync, manifest, options);
+						stagingFresh = true;
+						continue;
+					}
+					emitSyncProgress('pull-staging-summary', {
+						activeRole,
+						stagingRole,
+						...(pullStagingSummary || {}),
+						elapsedMs: Math.max(0, Date.now() - pullStagingStartedAtMs),
+						failed: true,
+						stagingFresh
+					});
+					if (canResumePullAfterError(error))
+						await clearRecoveryState();
+					throw error;
+				}
+			}
+			throw new Error('Dual sync could not reload staging for an authoritative snapshot.');
+		}
+
+		async function resetStagingRole(stagingSync, activeSync, manifest, options) {
+			await stagingSync.resetLocal(options);
+			await stagingSync.ensureLocalSchema(options);
+			await ensureSharedClientId(manifest);
+			await mirrorFailedOutboxMetadata(activeSync, stagingSync);
+		}
+
+		async function recoverInterruptedSync(options, manifest, recovery) {
+			const signal = options[syncAbortSignalSymbol];
+			throwIfSyncAborted(signal);
+			const activeRole = manifest.activeRole;
+			const stagingRole = manifest.stagingRole;
+			const activeSync = getRoleSyncClient(activeRole);
+			const stagingSync = getRoleSyncClient(stagingRole);
+			await Promise.all([
+				activeSync.ensureLocalSchema(options),
+				stagingSync.ensureLocalSchema(options)
+			]);
+			throwIfSyncAborted(signal);
+			await ensureSharedClientId(manifest);
+
+			const replayKind = recovery.replayKind || `recovery:${randomUuid()}`;
+			await setRecoveryReplayKind(manifest, replayKind);
+			await persistActiveRecoveryRows(replayKind, activeSync);
+			emitSyncProgress('recovering-staging', { activeRole, stagingRole });
+			await resetStagingRole(stagingSync, activeSync, manifest, options);
+			let pullStagingSummary;
+			const result = await stagingSync[syncAndCapturePullJournalSymbol]({
+				...options,
+				_skipPushBeforePull: true,
+				_fileSnapshotRollback: true,
+				_capturePullJournalChunk() {},
+				_onPullBatchProgress(progress) {
+					emitSyncProgress('pull-batch-complete', {
+						activeRole,
+						stagingRole,
+						...progress
+					});
+				},
+				_onPullStagingSummary(summary) {
+					pullStagingSummary = summary;
+				}
+			});
+			throwIfSyncAborted(signal);
+			emitSyncProgress('pull-staging-summary', {
+				activeRole,
+				stagingRole,
+				...(pullStagingSummary || {}),
+				failed: false,
+				recovered: true,
+				stagingFresh: true
+			});
+
+			let publishedManifest;
+			let cloneMs = 0;
+			await awaitWithSyncAbort(runSyncSwap(router, async () => {
+				throwIfSyncAborted(signal);
+				const currentManifest = await getManifest(true);
+				assertExpectedManifest(currentManifest, manifest);
+				await persistActiveRecoveryRows(replayKind, activeSync);
+				const cloneStartedAtMs = Date.now();
+				await cloneRoleDatabase(stagingRole, activeRole);
+				cloneMs = Math.max(0, Date.now() - cloneStartedAtMs);
+				emitSyncProgress('cloned-clean-staging', {
+					activeRole,
+					stagingRole,
+					cloneMs,
+					recovered: true
+				});
+				await applyRecoveryReplayRows(replayKind, activeRole, stagingRole);
+				throwIfSyncAborted(signal);
+				await clearAllDeltas();
+				await deleteReplayKind('accepted');
+				emitSyncProgress('swapping', { activeRole, stagingRole, recovered: true });
+				publishedManifest = await publishStagingRole(manifest);
+				await deleteReplayKind(replayKind);
+				await clearRecoveryState();
+			}), signal);
+
+			publishedManifest = await markSuccessfulSync();
+			await maybeEmitInitialReady(publishedManifest.activeRole);
+			emitSyncProgress('complete', {
+				activeRole: publishedManifest.activeRole,
+				stagingRole: publishedManifest.stagingRole,
+				swapped: true,
+				cloneMs,
+				recovered: true
+			});
+			return withDualSyncResult(result, {
+				...publishedManifest,
+				swapped: true,
+				cloneMs,
+				recovered: true
+			});
+		}
+
+		async function persistActiveRecoveryRows(kind, activeSync) {
+			const pendingRows = await readAllOutboxRows(activeSync, ['pending']);
+			const failedRows = await readAllOutboxRows(activeSync, ['failed']);
+			for (let i = 0; i < pendingRows.length; i++)
+				await persistReplayRow(kind, pendingRows[i], true, []);
+			for (let i = 0; i < failedRows.length; i++)
+				await persistReplayRow(kind, failedRows[i], false, []);
 		}
 
 		async function recoverAcceptedReplayRows(activeRole, activeSync) {
@@ -27985,9 +29230,13 @@ function requireDualSyncDatabase () {
 		}
 
 		async function applyConflictReplayRows(promotionId, cleanRole, promotedRole) {
+			return applyRecoveryReplayRows(conflictReplayKind(promotionId), cleanRole, promotedRole);
+		}
+
+		async function applyRecoveryReplayRows(kind, cleanRole, promotedRole) {
 			const cleanSync = getRoleSyncClient(cleanRole);
 			const promotedSync = getRoleSyncClient(promotedRole);
-			const entries = await readReplayRows(conflictReplayKind(promotionId));
+			const entries = await readReplayRows(kind);
 			for (let i = 0; i < entries.length; i++) {
 				const entry = entries[i];
 				if (!entry.replayData) {
@@ -28206,6 +29455,8 @@ function requireDualSyncDatabase () {
 				return result;
 			}
 			catch (error) {
+				if (isSyncAbortError(error))
+					throw error;
 				emit(method + '-error', { method, error });
 				emit('error', { method, error });
 				throw error;
@@ -28216,8 +29467,14 @@ function requireDualSyncDatabase () {
 			const listeners = eventListeners.get(event);
 			if (!listeners)
 				return;
-			for (const listener of Array.from(listeners))
-				listener(payload);
+			for (const listener of Array.from(listeners)) {
+				try {
+					listener(payload);
+				}
+				catch (_error) {
+					// Notifications must never change sync control flow or skip other listeners.
+				}
+			}
 		}
 
 		function attachRoleEvent(event) {
@@ -28258,9 +29515,11 @@ function requireDualSyncDatabase () {
 			emit('initial-ready', { source: 'dual-swap', role });
 		}
 
-		async function applyPendingDeltasToRole(role, onlyDeltaId) {
+		async function applyPendingDeltasToRole(role, onlyDeltaId, syncOptions = {}) {
+			const signal = syncOptions[syncAbortSignalSymbol];
 			const deltas = await readDeltas();
 			for (let i = 0; i < deltas.length; i++) {
+				throwIfSyncAborted(signal);
 				const delta = deltas[i];
 				if (onlyDeltaId && delta.id !== onlyDeltaId)
 					continue;
@@ -28278,6 +29537,7 @@ function requireDualSyncDatabase () {
 					totalItems
 				});
 				await getRoleSyncClient(role)[applyPullJournalSymbol](delta.journal, {
+					[syncAbortSignalSymbol]: signal,
 					_readPullJournalBatch: readPullJournalBatch,
 					_itemCount: totalItems,
 					_onPullJournalBatchApplied(progress) {
@@ -28371,11 +29631,22 @@ function requireDualSyncDatabase () {
 		}
 
 		function emitSyncProgress(phase, details = {}) {
-			emit('sync-progress', {
+			const event = {
 				phase,
 				atMs: Date.now(),
 				...details
-			});
+			};
+			if (typeof syncFaultInjector === 'function')
+				syncFaultInjector(event);
+			emit('sync-progress', event);
+		}
+
+		function setSyncFaultInjector(injector) {
+			syncFaultInjector = typeof injector === 'function' ? injector : undefined;
+			return () => {
+				if (syncFaultInjector === injector)
+					syncFaultInjector = undefined;
+			};
 		}
 
 		function installSyncProgressInterceptors() {
@@ -28532,6 +29803,69 @@ function requireDualSyncDatabase () {
 					row.last_successful_sync_at_ms ?? row.LAST_SUCCESSFUL_SYNC_AT_MS
 				)
 			};
+		}
+
+		async function readRecoveryState() {
+			const db = await getCacheDb();
+			await ensureCacheSchema(db);
+			const row = firstRow(await db.query([
+				`SELECT "expected_generation", "active_role", "staging_role", "replay_kind", "started_at_ms" FROM "${recoveryTable}"`,
+				`WHERE "id" = ${sqlStringLiteral(recoveryId)}`,
+				'LIMIT 1'
+			].join(' ')));
+			if (!row)
+				return null;
+			const activeRole = row.active_role ?? row.ACTIVE_ROLE;
+			const stagingRole = row.staging_role ?? row.STAGING_ROLE;
+			if (!isRole(activeRole) || !isRole(stagingRole) || activeRole === stagingRole)
+				return null;
+			return {
+				expectedGeneration: normalizeGeneration(row.expected_generation ?? row.EXPECTED_GENERATION),
+				activeRole,
+				stagingRole,
+				replayKind: nonEmptyString(row.replay_kind ?? row.REPLAY_KIND),
+				startedAtMs: normalizeTimestamp(row.started_at_ms ?? row.STARTED_AT_MS)
+			};
+		}
+
+		async function writeRecoveryState(manifest) {
+			const db = await getCacheDb();
+			await ensureCacheSchema(db);
+			await db.query([
+				`INSERT INTO "${recoveryTable}" ("id", "expected_generation", "active_role", "staging_role", "replay_kind", "started_at_ms")`,
+				`VALUES (${sqlStringLiteral(recoveryId)}, ${manifest.generation}, ${sqlStringLiteral(manifest.activeRole)}, ${sqlStringLiteral(manifest.stagingRole)}, NULL, ${Date.now()})`,
+				'ON CONFLICT("id") DO UPDATE SET',
+				'"expected_generation" = excluded."expected_generation",',
+				'"active_role" = excluded."active_role",',
+				'"staging_role" = excluded."staging_role",',
+				'"replay_kind" = NULL,',
+				'"started_at_ms" = excluded."started_at_ms"'
+			].join(' '));
+		}
+
+		async function setRecoveryReplayKind(manifest, replayKind) {
+			const db = await getCacheDb();
+			await ensureCacheSchema(db);
+			await db.query([
+				`UPDATE "${recoveryTable}"`,
+				`SET "replay_kind" = ${sqlStringLiteral(replayKind)}`,
+				`WHERE "id" = ${sqlStringLiteral(recoveryId)}`,
+				`AND "expected_generation" = ${manifest.generation}`,
+				`AND "active_role" = ${sqlStringLiteral(manifest.activeRole)}`,
+				`AND "staging_role" = ${sqlStringLiteral(manifest.stagingRole)}`
+			].join(' '));
+		}
+
+		async function clearRecoveryState() {
+			const db = await getCacheDb();
+			await ensureCacheSchema(db);
+			await db.query(`DELETE FROM "${recoveryTable}" WHERE "id" = ${sqlStringLiteral(recoveryId)}`);
+		}
+
+		async function cleanupRecoveryState(recovery) {
+			if (recovery && recovery.replayKind)
+				await deleteReplayKind(recovery.replayKind);
+			await clearRecoveryState();
 		}
 
 		async function markSuccessfulSync() {
@@ -28785,6 +30119,13 @@ function requireDualSyncDatabase () {
 			delta.appliedRoles = roles;
 		}
 
+		async function clearAllDeltas() {
+			const db = await getCacheDb();
+			await ensureCacheSchema(db);
+			await db.query(`DELETE FROM "${deltaChunkTable}"`);
+			await db.query(`DELETE FROM "${deltaTable}"`);
+		}
+
 		async function resetCache() {
 			const db = await getCacheDb();
 			const currentManifest = await getManifest().catch(() => null);
@@ -28793,6 +30134,7 @@ function requireDualSyncDatabase () {
 			await db.query(`DROP TABLE IF EXISTS "${deltaChunkTable}"`);
 			await db.query(`DROP TABLE IF EXISTS "${deltaTable}"`);
 			await db.query(`DROP TABLE IF EXISTS "${replayTable}"`);
+			await db.query(`DROP TABLE IF EXISTS "${recoveryTable}"`);
 			await db.query(`DROP TABLE IF EXISTS "${manifestTable}"`);
 			await ensureCacheSchema(db);
 			return writeManifest({
@@ -28857,6 +30199,16 @@ function requireDualSyncDatabase () {
 						'"created_at_ms" INTEGER NOT NULL,',
 						'"applied_roles_json" TEXT NOT NULL,',
 						'PRIMARY KEY ("kind", "mutation_id")',
+						');'
+					].join(' '));
+					await db.query([
+						`CREATE TABLE IF NOT EXISTS "${recoveryTable}" (`,
+						'"id" TEXT PRIMARY KEY,',
+						'"expected_generation" INTEGER NOT NULL,',
+						'"active_role" TEXT NOT NULL,',
+						'"staging_role" TEXT NOT NULL,',
+						'"replay_kind" TEXT,',
+						'"started_at_ms" INTEGER NOT NULL',
 						');'
 					].join(' '));
 					cacheSchemaReady = true;
@@ -29002,6 +30354,41 @@ function requireDualSyncDatabase () {
 			schemaReadyGeneration++;
 			schemaReadyRoles.clear();
 			schemaReadyPromises.clear();
+		}
+	}
+
+	class StagingReloadRequiredError extends Error {
+		constructor(reason) {
+			super('Dual sync staging must be reloaded before applying an authoritative snapshot.');
+			this.name = 'StagingReloadRequiredError';
+			this.reason = reason;
+		}
+	}
+
+	function canResumePullAfterError(error) {
+		const status = Number(error && error.response && error.response.status || error && error.status);
+		if (Number.isFinite(status) && status > 0)
+			return true;
+		const name = String(error && error.name || '');
+		if (/Abort|Timeout/u.test(name))
+			return true;
+		const message = String(error && error.message || error || '');
+		return /network|fetch|timed? ?out|ECONN|socket|aborted/u.test(message);
+	}
+
+	function isPublishedRecovery(manifest, recovery) {
+		return !!manifest && !!recovery
+			&& manifest.generation > recovery.expectedGeneration
+			&& manifest.activeRole === recovery.stagingRole
+			&& manifest.stagingRole === recovery.activeRole;
+	}
+
+	function assertExpectedRecoveryManifest(manifest, recovery) {
+		if (!manifest || !recovery
+			|| manifest.generation !== recovery.expectedGeneration
+			|| manifest.activeRole !== recovery.activeRole
+			|| manifest.stagingRole !== recovery.stagingRole) {
+			throw new Error('Dual sync recovery state does not match the persisted manifest. Reset local sync state before retrying.');
 		}
 	}
 
@@ -29212,7 +30599,10 @@ function requireDualSyncDatabase () {
 		if (invalidKeys.length > 0)
 			throw new Error(`Unsupported sync option "${invalidKeys[0]}". sync only accepts { timeoutMs }.`);
 		const timeoutMs = normalizeTimeoutMs(input.timeoutMs);
-		return timeoutMs === undefined ? {} : { timeoutMs };
+		const result = timeoutMs === undefined ? {} : { timeoutMs };
+		if (input[syncAbortSignalSymbol])
+			result[syncAbortSignalSymbol] = input[syncAbortSignalSymbol];
+		return result;
 	}
 
 	function normalizeTimeoutMs(value) {
@@ -29285,8 +30675,9 @@ function requireDualSyncDatabase () {
 		return sqlStringLiteral(stringify(value));
 	}
 
-	dualSyncDatabase = newDualSyncDatabase;
-	return dualSyncDatabase;
+	dualSyncDatabase.exports = newDualSyncDatabase;
+	dualSyncDatabase.exports.dualSyncFaultInjectorSymbol = dualSyncFaultInjectorSymbol;
+	return dualSyncDatabase.exports;
 }
 
 var newDatabase_1$1;

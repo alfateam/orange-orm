@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 const rdb = require('../src/index');
+const createHttpInterceptor = require('../src/client/httpInterceptor');
 const { syncAutoStartSymbol } = require('../src/client/syncAuto');
 const fs = require('fs');
 const map = require('./db');
@@ -38,7 +39,7 @@ afterAll(async () => {
 });
 
 describe('db worker rpc', () => {
-	test('auto-starts worker sync client by default', () => {
+	test('auto-starts worker sync client after the main-thread client is ready', async () => {
 		let starts = 0;
 		let autoStarts = 0;
 		let stops = 0;
@@ -57,9 +58,139 @@ describe('db worker rpc', () => {
 		}, { postMessage: () => {} });
 
 		expect(starts).toBe(0);
+		expect(autoStarts).toBe(0);
+		await handler.handleMessage({ data: { type: 'orange-db-client-ready' } });
+		await new Promise((resolve) => setTimeout(resolve, 0));
 		expect(autoStarts).toBe(1);
-		handler.stop();
+		await handler.stop();
 		expect(stops).toBe(1);
+	});
+
+	test('applies a synchronously registered auth interceptor to the first automatic DB-worker request', async () => {
+		const workerInterceptors = createHttpInterceptor();
+		let firstRequest;
+		const bridge = createBridge({
+			syncClient: {
+				interceptors: workerInterceptors,
+				[syncAutoStartSymbol]: async () => {
+					firstRequest = await workerInterceptors.applyRequest({
+						url: '/sync',
+						headers: {}
+					});
+				},
+				stop: async () => {},
+				on() {
+					return () => {};
+				}
+			}
+		});
+		const workerClient = rdb.createDbWorkerClient(bridge.worker);
+		workerClient.syncClient.interceptors.request.use((config) => ({
+			...config,
+			headers: {
+				...config.headers,
+				Authorization: 'Bearer db-worker-token'
+			}
+		}));
+
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(firstRequest).toMatchObject({
+			headers: { Authorization: 'Bearer db-worker-token' }
+		});
+		workerClient.close();
+		await bridge.handler.stop();
+	});
+
+	test('a new DB-worker sync restarts a hanging main-thread request interceptor', async () => {
+		const workerInterceptors = createHttpInterceptor();
+		let tail = Promise.resolve();
+		const bridge = createBridge({
+			syncClient: {
+				interceptors: workerInterceptors,
+				sync() {
+					const run = tail.then(() => workerInterceptors.applyRequest({
+						url: '/sync',
+						headers: {}
+					}));
+					tail = run.catch(() => {});
+					return run;
+				},
+				stop: async () => {}
+			}
+		}, { autoStart: false });
+		const workerClient = rdb.createDbWorkerClient(bridge.worker);
+		let interceptorCalls = 0;
+		let resolveOldAttempt;
+		let markFirstAttempt;
+		let markRestartedAttempt;
+		const firstAttempt = new Promise(resolve => {
+			markFirstAttempt = resolve;
+		});
+		const restartedAttempt = new Promise(resolve => {
+			markRestartedAttempt = resolve;
+		});
+		workerClient.syncClient.interceptors.request.use((config) => {
+			interceptorCalls += 1;
+			if (interceptorCalls === 1) {
+				markFirstAttempt();
+				return new Promise(resolve => {
+					resolveOldAttempt = resolve;
+				});
+			}
+			if (interceptorCalls === 2)
+				markRestartedAttempt();
+			return {
+				...config,
+				headers: { Authorization: `Bearer attempt-${interceptorCalls}` }
+			};
+		});
+
+		const firstSync = workerClient.syncClient.sync();
+		await firstAttempt;
+		const secondSync = workerClient.syncClient.sync();
+		await restartedAttempt;
+
+		await expect(firstSync).resolves.toMatchObject({
+			headers: { Authorization: 'Bearer attempt-2' }
+		});
+		await expect(secondSync).resolves.toMatchObject({
+			headers: { Authorization: 'Bearer attempt-3' }
+		});
+		resolveOldAttempt({
+			url: '/sync',
+			headers: { Authorization: 'Bearer obsolete-attempt' }
+		});
+		await new Promise(resolve => setTimeout(resolve, 0));
+		expect(interceptorCalls).toBe(3);
+
+		workerClient.close();
+		await bridge.handler.stop();
+	});
+
+	test('replays an early initial-ready event from the DB worker', async () => {
+		const listeners = new Map();
+		const bridge = createBridge({
+			syncClient: {
+				[syncAutoStartSymbol]: async () => {
+					listeners.get('initial-ready')?.({ source: 'db-worker' });
+				},
+				stop: async () => {},
+				on(event, listener) {
+					listeners.set(event, listener);
+					return () => listeners.delete(event);
+				}
+			}
+		});
+		const workerClient = rdb.createDbWorkerClient(bridge.worker);
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		const ready = [];
+
+		workerClient.syncClient.once('initial-ready', event => ready.push(event));
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		expect(ready).toEqual([{ source: 'db-worker' }]);
+		workerClient.close();
+		await bridge.handler.stop();
 	});
 
 	test('routes ensureLocalSchema through worker sync client', async () => {

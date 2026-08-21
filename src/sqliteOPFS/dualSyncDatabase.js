@@ -7,6 +7,12 @@ const createHttpInterceptor = require('../client/httpInterceptor');
 const newSyncClient = require('../client/syncClient');
 const { createSyncAuto, syncAutoStartSymbol } = require('../client/syncAuto');
 const {
+	awaitWithSyncAbort,
+	isSyncAbortError,
+	syncAbortSignalSymbol,
+	throwIfSyncAborted
+} = require('../client/syncAbort');
+const {
 	acquireSyncRead,
 	runSyncRead,
 	runSyncSwap
@@ -40,6 +46,9 @@ const outboxReplayPageSize = 1000;
 const deltaItemsPerChunk = 1000;
 const deltaChunkReadPageSize = 32;
 const manifestCacheMaxAgeMs = 1000;
+const dualSyncFaultInjectorSymbol = typeof Symbol === 'function'
+	? Symbol.for('orange-orm.sqliteOPFS.dualSync.faultInjector')
+	: '__orangeOrmDualSyncFaultInjector';
 
 function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase) {
 	const roleConnectionStrings = {
@@ -78,6 +87,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	const schemaReadyRoles = new Set();
 	const schemaReadyPromises = new Map();
 	let schemaReadyGeneration = 0;
+	let syncFaultInjector;
 	const dualSyncLockName = `orange-orm:sqliteOPFS:dual-sync:${normalizeLockNamePart(connectionString)}`;
 	const dualWriteLockName = `orange-orm:sqliteOPFS:dual-write:${normalizeLockNamePart(connectionString)}`;
 	const dualReadLockName = `orange-orm:sqliteOPFS:dual-read:${normalizeLockNamePart(connectionString)}`;
@@ -103,6 +113,9 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		__orangeCrossTabReadLock: { enabled: true, name: dualReadLockName, timeoutMs: 300000 },
 		__orangeBeforeSyncWrite: refreshManifestBeforeWrite
 	};
+	Object.defineProperty(router, dualSyncFaultInjectorSymbol, {
+		value: setSyncFaultInjector
+	});
 	router.poolFactory = router;
 	installSyncProgressInterceptors();
 
@@ -222,8 +235,8 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		return coalesceSync(normalizeSyncOptions(options));
 	}
 
-	function syncAutomatic(config) {
-		return coalesceSync({}, {
+	function syncAutomatic(config, syncOptions) {
+		return coalesceSync(normalizeSyncOptions(syncOptions), {
 			minimumIntervalMs: normalizeAutoSyncIntervalMs(config && config.intervalMs)
 		});
 	}
@@ -234,11 +247,11 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		if (pendingSyncRequest) {
 			mergePendingSyncRequest(pendingSyncRequest, normalizedOptions, schedule);
 			emitSyncProgress('coalesced-next', { queueDepth: 1 });
-			return pendingSyncRequest.promise;
+			return awaitWithSyncAbort(pendingSyncRequest.promise, normalizedOptions[syncAbortSignalSymbol]);
 		}
 		pendingSyncRequest = createPendingSyncRequest(normalizedOptions, schedule);
 		emitSyncProgress('queued-next', { queueDepth: 1 });
-		return pendingSyncRequest.promise;
+		return awaitWithSyncAbort(pendingSyncRequest.promise, normalizedOptions[syncAbortSignalSymbol]);
 	}
 
 	function startSyncRun(normalizedOptions, schedule) {
@@ -283,28 +296,46 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		const pendingTimeoutMs = normalizeTimeoutMs(pending.normalizedOptions.timeoutMs);
 		const requestedTimeoutMs = normalizeTimeoutMs(normalizedOptions.timeoutMs);
 		const timeoutMs = Math.max(pendingTimeoutMs || 0, requestedTimeoutMs || 0);
+		const pendingSignal = pending.normalizedOptions[syncAbortSignalSymbol];
+		const requestedSignal = normalizedOptions[syncAbortSignalSymbol];
+		const signal = pendingSignal && pendingSignal === requestedSignal
+			? pendingSignal
+			: undefined;
 		pending.normalizedOptions = timeoutMs > 0 ? { timeoutMs } : {};
+		if (signal)
+			pending.normalizedOptions[syncAbortSignalSymbol] = signal;
 		if (!(schedule && schedule.minimumIntervalMs > 0))
 			pending.schedule = {};
 	}
 
 	function queueSync(normalizedOptions, schedule = {}) {
+		const signal = normalizedOptions[syncAbortSignalSymbol];
 		queuedSyncCount += 1;
 		emitSyncProgress('queued', { queueDepth: queuedSyncCount });
-		const run = syncTail.then(() => {
+		let leftQueue = false;
+		const run = awaitWithSyncAbort(syncTail, signal).then(() => {
+			leftQueue = true;
 			queuedSyncCount = Math.max(0, queuedSyncCount - 1);
 			emitSyncProgress('waiting-for-sync-lock', { queueDepth: queuedSyncCount });
-			return observe('sync', () => runWithCrossTabLock(
+			return awaitWithSyncAbort(observe('sync', () => runWithCrossTabLock(
 				dualSyncLockName,
 				toDualSyncLockConfig(poolOptions && poolOptions.sync, normalizedOptions),
-				() => syncScheduled(normalizedOptions, schedule)
-			));
+				() => {
+					throwIfSyncAborted(signal);
+					return syncScheduled(normalizedOptions, schedule);
+				}
+			)), signal);
+		}).catch((error) => {
+			if (!leftQueue)
+				queuedSyncCount = Math.max(0, queuedSyncCount - 1);
+			throw error;
 		});
 		syncTail = run.catch(() => {});
 		return run;
 	}
 
 	async function syncScheduled(options, schedule) {
+		throwIfSyncAborted(options[syncAbortSignalSymbol]);
 		const minimumIntervalMs = schedule && schedule.minimumIntervalMs;
 		const recovery = await readRecoveryState();
 		if (!recovery && minimumIntervalMs > 0) {
@@ -335,8 +366,11 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	}
 
 	async function sync(options = {}) {
+		const signal = options[syncAbortSignalSymbol];
+		throwIfSyncAborted(signal);
 		emitSyncProgress('preparing');
 		let manifest = await getManifest(true);
+		throwIfSyncAborted(signal);
 		const recovery = await readRecoveryState();
 		if (recovery) {
 			if (isPublishedRecovery(manifest, recovery)) {
@@ -356,10 +390,12 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			activeSync.ensureLocalSchema(options),
 			stagingSync.ensureLocalSchema(options)
 		]);
+		throwIfSyncAborted(signal);
 		await ensureSharedClientId(manifest);
 
 		emitSyncProgress('updating-staging', { activeRole, stagingRole });
-		await applyPendingDeltasToRole(stagingRole);
+		await applyPendingDeltasToRole(stagingRole, undefined, options);
+		throwIfSyncAborted(signal);
 		await recoverAcceptedReplayRows(activeRole, activeSync);
 
 		emitSyncProgress('pushing-active', { activeRole, stagingRole });
@@ -392,6 +428,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 
 		await applyAcceptedReplayRows(stagingRole, stagingSync);
 		await mirrorFailedOutboxMetadata(activeSync, stagingSync);
+		throwIfSyncAborted(signal);
 
 		await writeRecoveryState(manifest);
 		const pullResult = await pullIntoStaging({
@@ -403,13 +440,15 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			stagingSync
 		});
 		const { result, deltaId } = pullResult;
+		throwIfSyncAborted(signal);
 		let publishedManifest = manifest;
 		let swapped = false;
 		let cloneMs = 0;
 		let deferred;
 
 		emitSyncProgress('waiting-for-write-barrier', { activeRole, stagingRole });
-		await runSyncSwap(router, async () => {
+		await awaitWithSyncAbort(runSyncSwap(router, async () => {
+			throwIfSyncAborted(signal);
 			const currentManifest = await getManifest(true);
 			assertExpectedManifest(currentManifest, manifest);
 			const finalPendingRows = (await readAllOutboxRows(activeSync, ['pending']))
@@ -435,6 +474,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				});
 				await markDeltaCopiedByClone(deltaId, activeRole);
 				await applyConflictReplayRows(promotionId, activeRole, stagingRole, activeSync, stagingSync);
+				throwIfSyncAborted(signal);
 				emitSyncProgress('swapping', { activeRole, stagingRole });
 				publishedManifest = await publishStagingRole(manifest);
 				swapped = true;
@@ -452,13 +492,14 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				await clearRecoveryState();
 				return;
 			}
+			throwIfSyncAborted(signal);
 			if (pullResult.shouldPublish || deltaId || acceptedMutationCount > 0 || Number(result && result.applied || 0) > 0) {
 				emitSyncProgress('swapping', { activeRole, stagingRole });
 				publishedManifest = await publishStagingRole(manifest);
 				swapped = true;
 			}
 			await clearRecoveryState();
-		});
+		}), signal);
 
 		publishedManifest = await markSuccessfulSync();
 		const newActiveRole = publishedManifest.activeRole;
@@ -575,6 +616,8 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	}
 
 	async function recoverInterruptedSync(options, manifest, recovery) {
+		const signal = options[syncAbortSignalSymbol];
+		throwIfSyncAborted(signal);
 		const activeRole = manifest.activeRole;
 		const stagingRole = manifest.stagingRole;
 		const activeSync = getRoleSyncClient(activeRole);
@@ -583,6 +626,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			activeSync.ensureLocalSchema(options),
 			stagingSync.ensureLocalSchema(options)
 		]);
+		throwIfSyncAborted(signal);
 		await ensureSharedClientId(manifest);
 
 		const replayKind = recovery.replayKind || `recovery:${randomUuid()}`;
@@ -607,6 +651,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				pullStagingSummary = summary;
 			}
 		});
+		throwIfSyncAborted(signal);
 		emitSyncProgress('pull-staging-summary', {
 			activeRole,
 			stagingRole,
@@ -618,7 +663,8 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 
 		let publishedManifest;
 		let cloneMs = 0;
-		await runSyncSwap(router, async () => {
+		await awaitWithSyncAbort(runSyncSwap(router, async () => {
+			throwIfSyncAborted(signal);
 			const currentManifest = await getManifest(true);
 			assertExpectedManifest(currentManifest, manifest);
 			await persistActiveRecoveryRows(replayKind, activeSync);
@@ -632,13 +678,14 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				recovered: true
 			});
 			await applyRecoveryReplayRows(replayKind, activeRole, stagingRole);
+			throwIfSyncAborted(signal);
 			await clearAllDeltas();
 			await deleteReplayKind('accepted');
 			emitSyncProgress('swapping', { activeRole, stagingRole, recovered: true });
 			publishedManifest = await publishStagingRole(manifest);
 			await deleteReplayKind(replayKind);
 			await clearRecoveryState();
-		});
+		}), signal);
 
 		publishedManifest = await markSuccessfulSync();
 		await maybeEmitInitialReady(publishedManifest.activeRole);
@@ -954,6 +1001,8 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			return result;
 		}
 		catch (error) {
+			if (isSyncAbortError(error))
+				throw error;
 			emit(method + '-error', { method, error });
 			emit('error', { method, error });
 			throw error;
@@ -964,8 +1013,14 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		const listeners = eventListeners.get(event);
 		if (!listeners)
 			return;
-		for (const listener of Array.from(listeners))
-			listener(payload);
+		for (const listener of Array.from(listeners)) {
+			try {
+				listener(payload);
+			}
+			catch (_error) {
+				// Notifications must never change sync control flow or skip other listeners.
+			}
+		}
 	}
 
 	function attachRoleEvent(event) {
@@ -1006,9 +1061,11 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		emit('initial-ready', { source: 'dual-swap', role });
 	}
 
-	async function applyPendingDeltasToRole(role, onlyDeltaId) {
+	async function applyPendingDeltasToRole(role, onlyDeltaId, syncOptions = {}) {
+		const signal = syncOptions[syncAbortSignalSymbol];
 		const deltas = await readDeltas();
 		for (let i = 0; i < deltas.length; i++) {
+			throwIfSyncAborted(signal);
 			const delta = deltas[i];
 			if (onlyDeltaId && delta.id !== onlyDeltaId)
 				continue;
@@ -1026,6 +1083,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				totalItems
 			});
 			await getRoleSyncClient(role)[applyPullJournalSymbol](delta.journal, {
+				[syncAbortSignalSymbol]: signal,
 				_readPullJournalBatch: readPullJournalBatch,
 				_itemCount: totalItems,
 				_onPullJournalBatchApplied(progress) {
@@ -1119,11 +1177,22 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	}
 
 	function emitSyncProgress(phase, details = {}) {
-		emit('sync-progress', {
+		const event = {
 			phase,
 			atMs: Date.now(),
 			...details
-		});
+		};
+		if (typeof syncFaultInjector === 'function')
+			syncFaultInjector(event);
+		emit('sync-progress', event);
+	}
+
+	function setSyncFaultInjector(injector) {
+		syncFaultInjector = typeof injector === 'function' ? injector : undefined;
+		return () => {
+			if (syncFaultInjector === injector)
+				syncFaultInjector = undefined;
+		};
 	}
 
 	function installSyncProgressInterceptors() {
@@ -2076,7 +2145,10 @@ function normalizeSyncOptions(input) {
 	if (invalidKeys.length > 0)
 		throw new Error(`Unsupported sync option "${invalidKeys[0]}". sync only accepts { timeoutMs }.`);
 	const timeoutMs = normalizeTimeoutMs(input.timeoutMs);
-	return timeoutMs === undefined ? {} : { timeoutMs };
+	const result = timeoutMs === undefined ? {} : { timeoutMs };
+	if (input[syncAbortSignalSymbol])
+		result[syncAbortSignalSymbol] = input[syncAbortSignalSymbol];
+	return result;
 }
 
 function normalizeTimeoutMs(value) {
@@ -2150,3 +2222,4 @@ function sqlNullableJsonLiteral(value) {
 }
 
 module.exports = newDualSyncDatabase;
+module.exports.dualSyncFaultInjectorSymbol = dualSyncFaultInjectorSymbol;
