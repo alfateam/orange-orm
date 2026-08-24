@@ -52,7 +52,6 @@ describe('sqliteOPFS dual sync integration', () => {
 			title: `Data first ${index + 1}`
 		}));
 		const fixture = await createDualIntegrationFixture('data-first', rows, {
-			dual: { bootstrap: 'data-first' },
 			pull: {
 				maxKeysPerBatch: 200,
 				maxRowsPerBatch: 200
@@ -188,7 +187,6 @@ describe('sqliteOPFS dual sync integration', () => {
 			title: `Resume ${index + 1}`
 		}));
 		const fixture = await createDualIntegrationFixture('data-first-pull-resume', rows, {
-			dual: { bootstrap: 'data-first' },
 			pull: {
 				maxKeysPerBatch: 100,
 				maxRowsPerBatch: 100
@@ -235,7 +233,6 @@ describe('sqliteOPFS dual sync integration', () => {
 			title: `Replica ${index + 1}`
 		}));
 		const fixture = await createDualIntegrationFixture('data-first-replica-resume', rows, {
-			dual: { bootstrap: 'data-first' },
 			pull: {
 				maxKeysPerBatch: 200,
 				maxRowsPerBatch: 200
@@ -340,7 +337,6 @@ describe('sqliteOPFS dual sync integration', () => {
 			auto: false,
 			// Exercise child-before-parent delivery; validation is deferred until the complete snapshot exists.
 			tables: ['compositeOrderLine', 'compositeOrder'],
-			dual: { bootstrap: 'data-first' },
 			pull: {
 				maxKeysPerBatch: 200,
 				maxRowsPerBatch: 200
@@ -371,7 +367,7 @@ describe('sqliteOPFS dual sync integration', () => {
 		}
 	}, 30000);
 
-	test('validates relations after a standard bootstrap streams children before parents', async () => {
+	test('validates relations when bootstrap streams children before parents', async () => {
 		const remoteDb = relationalMap({
 			db: con => con.pglite(undefined, { size: 1 })
 		});
@@ -434,7 +430,7 @@ describe('sqliteOPFS dual sync integration', () => {
 		expect(await localDb.query('PRAGMA foreign_key_check')).toHaveLength(0);
 	}, 30000);
 
-	test('streams bootstrap batches and replays incremental deltas across roles', async () => {
+	test('streams bootstrap batches and syncs incremental deltas across roles', async () => {
 		const remoteDb = map({
 			db: con => con.pglite(undefined, { size: 1 })
 		});
@@ -517,15 +513,15 @@ describe('sqliteOPFS dual sync integration', () => {
 		expect(beforeSync).toBe(0);
 		expect(syncResult.__orangeDualSync).toMatchObject({
 			activeRole: 'b',
-			stagingRole: 'a'
+			stagingRole: 'a',
+			bootstrapMode: 'data-first',
+			replicaReady: true
 		});
 		expect(afterSync).toBe(1002);
-		expect(await roleA.project.count()).toBe(0);
+		expect(await roleA.project.count()).toBe(1002);
 		expect(await roleB.project.count()).toBe(1002);
 		const storedDeltaChunks = await deltaDb.query('SELECT "items_json" FROM "orange_sync_dual_delta_chunk" ORDER BY "chunk_index"');
-		expect(storedDeltaChunks).toHaveLength(2);
-		expect(JSON.parse(storedDeltaChunks[0].items_json)).toHaveLength(1000);
-		expect(JSON.parse(storedDeltaChunks[1].items_json)).toHaveLength(2);
+		expect(storedDeltaChunks).toHaveLength(0);
 		const bootstrapBatchProgress = progressEvents.filter(event => event.phase === 'pull-batch-complete');
 		const bootstrapStagingSummary = progressEvents.find(event => event.phase === 'pull-staging-summary');
 		expect(bootstrapBatchProgress).toHaveLength(11);
@@ -561,10 +557,6 @@ describe('sqliteOPFS dual sync integration', () => {
 			activeRole: 'a',
 			stagingRole: 'b'
 		});
-		const bootstrapReplayProgress = progressEvents
-			.filter(event => event.phase === 'applying-delta' && event.targetRole === 'a' && event.totalItems === 1002)
-			.map(event => event.processedItems);
-		expect(bootstrapReplayProgress).toEqual([0, 1000, 1002]);
 		expect(pushedRemoteProject.title).toBe('One pushed locally');
 		expect((await localDb.project.getById('p1')).title).toBe('One pushed locally');
 
@@ -665,10 +657,11 @@ describe('sqliteOPFS dual sync integration', () => {
 
 		expect(fallbackSummary).toMatchObject({
 			deferredStableBase: true,
+			bootstrapMode: 'data-first',
 			failed: false
 		});
 		expect((await localDb.project.getById('local-before-bootstrap')).title).toBe('Local before bootstrap');
-		expect((await remoteDb.project.getById('local-before-bootstrap')).title).toBe('Local before bootstrap');
+		expect(await remoteDb.project.getById('local-before-bootstrap')).toBeUndefined();
 
 		await localDb.syncClient.sync();
 		expect((await remoteDb.project.getById('local-before-bootstrap')).title).toBe('Local before bootstrap');

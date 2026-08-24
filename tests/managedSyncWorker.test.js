@@ -38,14 +38,12 @@ describe('managed sync worker', () => {
 				createWorker() {},
 				sync: {
 					url: '/sync',
-					worker: { createWorker: () => worker },
-					dual: { bootstrap: 'data-first' }
+					worker: { createWorker: () => worker }
 				}
 			},
 			syncConfig: {
 				url: '/sync',
-				worker: { createWorker: () => worker },
-				dual: { bootstrap: 'data-first' }
+				worker: { createWorker: () => worker }
 			},
 			databases: ports.map((port, index) => ({
 				connectionString: ['app.sqlite3', 'app.__orange_sync_b.sqlite3', 'app.__orange_sync_delta.sqlite3'][index],
@@ -61,8 +59,7 @@ describe('managed sync worker', () => {
 				vfs: 'opfs-sahpool',
 				singleWorker: true,
 				sync: {
-					url: '/sync',
-					dual: { bootstrap: 'data-first' }
+					url: '/sync'
 				}
 			}
 		});

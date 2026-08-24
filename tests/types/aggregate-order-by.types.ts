@@ -50,12 +50,9 @@ void orgnr;
 void navn;
 void antall;
 
-const dataFirstSync: SyncConfig<Model> = {
-	url: '/rdb',
-	dual: { bootstrap: 'data-first' }
-};
+const defaultSync: SyncConfig<Model> = { url: '/rdb' };
 
-void dataFirstSync;
+void defaultSync;
 
 // @ts-expect-error Query options must not be exposed on result rows.
 distinctRow.orderBy;

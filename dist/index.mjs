@@ -32422,8 +32422,7 @@ function requireDualSyncDatabase () {
 			]);
 			throwIfSyncAborted(signal);
 			await ensureSharedClientId(manifest);
-			if (isDataFirstBootstrapEnabled(poolOptions && poolOptions.sync)
-				&& !await roleHasInitialState(activeRole)) {
+			if (!await roleHasInitialState(activeRole)) {
 				return runDataFirstBootstrap(options, manifest);
 			}
 
@@ -34696,7 +34695,6 @@ function requireDualSyncDatabase () {
 		if (!sync || sync !== Object(sync) || Array.isArray(sync))
 			return sync;
 		const {
-			dual,
 			worker,
 			...rest
 		} = sync;
@@ -34705,12 +34703,6 @@ function requireDualSyncDatabase () {
 
 	function isManagedSyncWorkerEnabled(sync) {
 		return !!sync && sync === Object(sync) && !Array.isArray(sync) && !!sync.worker;
-	}
-
-	function isDataFirstBootstrapEnabled(sync) {
-		return !!sync && sync === Object(sync) && !Array.isArray(sync)
-			&& sync.dual && sync.dual === Object(sync.dual)
-			&& sync.dual.bootstrap === 'data-first';
 	}
 
 	function appendRoleSuffix(connectionString, suffix) {

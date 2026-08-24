@@ -1075,9 +1075,6 @@ export interface SyncConfig<M extends Record<string, any> = any> extends Partial
     requestTimeoutMs?: number;
     createWorker?: () => Worker | MessagePort;
   };
-  dual?: {
-    bootstrap?: 'data-first';
-  };
   pull?: string | SyncPullOverrideConfig<M>;
   push?: string | SyncPushOverrideConfig;
   auto?: boolean | {
