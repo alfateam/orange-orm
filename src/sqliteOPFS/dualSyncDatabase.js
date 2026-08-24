@@ -2646,7 +2646,7 @@ function manifestChannelName(connectionString) {
 function toDataPoolOptions(poolOptions = {}) {
 	const options = {
 		...poolOptions,
-		sync: stripDualSyncOption(poolOptions.sync)
+		sync: stripRouterSyncOptions(poolOptions.sync)
 	};
 	if (isManagedSyncWorkerEnabled(poolOptions.sync))
 		options.singleWorker = true;
@@ -2706,11 +2706,10 @@ function nonEmptyString(value) {
 	return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
-function stripDualSyncOption(sync) {
+function stripRouterSyncOptions(sync) {
 	if (!sync || sync !== Object(sync) || Array.isArray(sync))
 		return sync;
 	const {
-		dualDataDb,
 		dual,
 		worker,
 		...rest

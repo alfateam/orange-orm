@@ -18,23 +18,10 @@ describe('sqliteOPFS dual sync database', () => {
 		await db.end();
 	});
 
-	test('ignores the legacy dualDataDb false option and keeps dual routing', async () => {
-		const db = newDatabase('app.sqlite3', {
-			sync: { url: '/rdb', dualDataDb: false },
-			createWorker() {
-				return newIdleWorker();
-			}
-		});
-
-		expect(db.__orangeSyncIdentity).toBe('sqliteOPFS:app.sqlite3:dual');
-
-		await db.end();
-	});
-
 	test('routes regular queries to the default active role', async () => {
 		const fixture = newFixture();
 		const db = newDualSyncDatabase('app.sqlite3', {
-			sync: { url: '/rdb', dualDataDb: true }
+			sync: { url: '/rdb' }
 		}, fixture.createSingleDatabase);
 
 		const rows = await db.query('SELECT 1');
@@ -53,7 +40,7 @@ describe('sqliteOPFS dual sync database', () => {
 			updatedAtMs: 123
 		});
 		const db = newDualSyncDatabase('app.sqlite3', {
-			sync: { url: '/rdb', dualDataDb: true }
+			sync: { url: '/rdb' }
 		}, fixture.createSingleDatabase);
 
 		const rows = await db.query('SELECT 2');
@@ -79,7 +66,7 @@ describe('sqliteOPFS dual sync database', () => {
 				clientId: 'fixture-client'
 			});
 			const db = newDualSyncDatabase('app.sqlite3', {
-				sync: { url: '/rdb', dualDataDb: true }
+				sync: { url: '/rdb' }
 			}, fixture.createSingleDatabase);
 			await db.query('SELECT before swap');
 			const swapRelease = newDeferred();
@@ -136,7 +123,7 @@ describe('sqliteOPFS dual sync database', () => {
 				clientId: 'fixture-client'
 			});
 			const db = newDualSyncDatabase('app.sqlite3', {
-				sync: { url: '/rdb', dualDataDb: true }
+				sync: { url: '/rdb' }
 			}, fixture.createSingleDatabase);
 			const transaction = db.createTransaction({ readonly: true });
 			await transaction(async () => {});
@@ -164,7 +151,7 @@ describe('sqliteOPFS dual sync database', () => {
 	test('refreshes the persisted manifest before repeated regular queries', async () => {
 		const fixture = newFixture();
 		const db = newDualSyncDatabase('app.sqlite3', {
-			sync: { url: '/rdb', dualDataDb: true }
+			sync: { url: '/rdb' }
 		}, fixture.createSingleDatabase);
 
 		await db.query('SELECT first');
@@ -178,7 +165,7 @@ describe('sqliteOPFS dual sync database', () => {
 	test('uses the cross-tab-safe opfs-wl VFS for every dual database by default', async () => {
 		const fixture = newFixture();
 		const db = newDualSyncDatabase('app.sqlite3', {
-			sync: { url: '/rdb', dualDataDb: true }
+			sync: { url: '/rdb' }
 		}, fixture.createSingleDatabase);
 
 		await db.query('SELECT 1');
@@ -190,7 +177,7 @@ describe('sqliteOPFS dual sync database', () => {
 	test('updates the cached manifest from an external sync event', async () => {
 		const fixture = newFixture();
 		const db = newDualSyncDatabase('app.sqlite3', {
-			sync: { url: '/rdb', dualDataDb: true }
+			sync: { url: '/rdb' }
 		}, fixture.createSingleDatabase);
 		const syncClient = newFakeSyncClient();
 
@@ -216,7 +203,7 @@ describe('sqliteOPFS dual sync database', () => {
 	test('routes early GUI reads from manifest data in an external initial-ready event', async () => {
 		const fixture = newFixture();
 		const db = newDualSyncDatabase('app.sqlite3', {
-			sync: { url: '/rdb', dualDataDb: true }
+			sync: { url: '/rdb' }
 		}, fixture.createSingleDatabase);
 		const syncClient = newFakeSyncClient();
 
@@ -245,7 +232,7 @@ describe('sqliteOPFS dual sync database', () => {
 			updatedAtMs: Date.now() + 60000
 		});
 		const db = newDualSyncDatabase('app.sqlite3', {
-			sync: { url: '/rdb', dualDataDb: true }
+			sync: { url: '/rdb' }
 		}, fixture.createSingleDatabase);
 		const syncClient = newFakeSyncClient({
 			async resetLocal() {
@@ -280,7 +267,7 @@ describe('sqliteOPFS dual sync database', () => {
 		fixture.schemaReadyByConnection.set('app.sqlite3', false);
 		fixture.schemaReadyByConnection.set('app.__orange_sync_b.sqlite3', true);
 		const db = newDualSyncDatabase('app.sqlite3', {
-			sync: { url: '/rdb', dualDataDb: true }
+			sync: { url: '/rdb' }
 		}, fixture.createSingleDatabase);
 		const syncClient = newFakeSyncClient({
 			async resetLocal() {
@@ -318,7 +305,7 @@ describe('sqliteOPFS dual sync database', () => {
 		const fixture = newFixture();
 		fixture.schemaReadyByConnection.set('app.sqlite3', false);
 		const db = newDualSyncDatabase('app.sqlite3', {
-			sync: { url: '/rdb', dualDataDb: true }
+			sync: { url: '/rdb' }
 		}, fixture.createSingleDatabase);
 		const syncClient = newFakeSyncClient();
 		syncClient[ensureLocalSchemaReadySymbol] = async function() {
@@ -339,7 +326,7 @@ describe('sqliteOPFS dual sync database', () => {
 	test('attaches an external sync client through a lazy mapped database provider', async () => {
 		const fixture = newFixture();
 		const db = newDualSyncDatabase('app.sqlite3', {
-			sync: { url: '/rdb', dualDataDb: true }
+			sync: { url: '/rdb' }
 		}, fixture.createSingleDatabase);
 		const syncClient = newFakeSyncClient();
 		const mapped = rdb.map(({ table }) => ({
@@ -380,7 +367,7 @@ describe('sqliteOPFS dual sync database', () => {
 		const db = newDualSyncDatabase('app.sqlite3', {
 			worker,
 			closeDbOnClose: false,
-			sync: { url: '/rdb', dualDataDb: true }
+			sync: { url: '/rdb' }
 		}, fixture.createSingleDatabase);
 
 		await db.query('SELECT 1');
@@ -400,7 +387,7 @@ describe('sqliteOPFS dual sync database', () => {
 		const db = newDualSyncDatabase('app.sqlite3', {
 			createWorker,
 			closeDbOnClose: false,
-			sync: { url: '/rdb', dualDataDb: true }
+			sync: { url: '/rdb' }
 		}, fixture.createSingleDatabase);
 
 		await db.query('SELECT 1');
@@ -425,7 +412,7 @@ describe('sqliteOPFS dual sync database', () => {
 		const db = newDualSyncDatabase('app.sqlite3', {
 			vfs: 'opfs-sahpool',
 			opfsSahPool,
-			sync: { url: '/rdb', dualDataDb: true }
+			sync: { url: '/rdb' }
 		}, fixture.createSingleDatabase);
 
 		await db.query('SELECT 1');
