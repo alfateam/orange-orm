@@ -3,7 +3,7 @@
 import rdb from '../dist/index.mjs';
 import sqliteTestPath from './sqliteTestPath.mjs';
 import { describe, it, beforeAll, afterAll } from 'jsr:@std/testing/bdd';
-import { assertObjectMatch } from 'jsr:@std/assert';
+import { assertEquals as assertDeepEquals, assertObjectMatch } from 'jsr:@std/assert';
 import { fromFileUrl } from 'jsr:@std/path';
 
 import map from './db.mjs';
@@ -227,4 +227,19 @@ describe('sqlite function in transaction', () => {
 			assertEquals(rows, expected);
 		});
 	}
+});
+
+describe('ad-hoc relations', () => {
+	it('resolves root scope through the Deno SQLite adapter', async () => {
+		const { db } = getDb('sqlite');
+		const rows = await db.order.getMany({
+			orderBy: 'id',
+			latestLine: db.orderLine.one({
+				where: (line, { root }) => line.orderId.eq(root.id),
+				orderBy: 'id desc'
+			})
+		});
+
+		assertDeepEquals(rows.map(row => row.latestLine?.id), [2, 3]);
+	});
 });

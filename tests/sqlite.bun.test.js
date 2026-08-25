@@ -231,3 +231,18 @@ describe('sqlite function in transaction', () => {
 		});
 	}
 });
+
+describe('ad-hoc relations', () => {
+	test('resolves root scope through the Bun SQLite adapter', async () => {
+		const { db } = getDb('sqlite');
+		const rows = await db.order.getMany({
+			orderBy: 'id',
+			latestLine: db.orderLine.one({
+				where: (line, { root }) => line.orderId.eq(root.id),
+				orderBy: 'id desc'
+			})
+		});
+
+		expect(rows.map(row => row.latestLine?.id)).toEqual([2, 3]);
+	});
+});

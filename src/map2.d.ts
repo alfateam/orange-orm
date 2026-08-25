@@ -144,6 +144,71 @@ export type ColumnRefs<M extends Record<string, TableDefinition<M>>, K extends k
 export type RootTableRefs<M extends Record<string, TableDefinition<M>>, Target extends keyof M> =
   ColumnRefs<M, Target> & RelationRefs<M, Target>;
 
+// The target table is known when table.many()/table.one() is called, while the
+// placement table is only known by the surrounding fetch strategy. Scope exposes
+// every mapped column name for autocomplete while the server validates it against
+// the actual root/parent table at runtime.
+export type AdHocScopeTableRefs<M extends Record<string, TableDefinition<M>>> =
+  {
+    [ColumnName in {
+      [K in keyof M]: keyof M[K]['columns']
+    }[keyof M]]: ColumnFilterType<any, any>
+  };
+
+export type AdHocScope<M extends Record<string, TableDefinition<M>>> = {
+  root: AdHocScopeTableRefs<M>;
+  parent: AdHocScopeTableRefs<M>;
+};
+
+export type AdHocManyDescriptor<
+  M extends Record<string, TableDefinition<M>>,
+  K extends keyof M,
+  Strategy extends Record<string, any>
+> = {
+  readonly __rdbAdHocRelation: 'many';
+  readonly table: string;
+  readonly strategy: Strategy;
+  readonly __target?: K;
+  readonly __map?: M;
+};
+
+export type AdHocOneDescriptor<
+  M extends Record<string, TableDefinition<M>>,
+  K extends keyof M,
+  Strategy extends Record<string, any>
+> = {
+  readonly __rdbAdHocRelation: 'one';
+  readonly table: string;
+  readonly strategy: Strategy;
+  readonly __target?: K;
+  readonly __map?: M;
+};
+
+type AnyAdHocDescriptor<M extends Record<string, TableDefinition<M>>> =
+  | AdHocManyDescriptor<M, keyof M, Record<string, any>>
+  | AdHocOneDescriptor<M, keyof M, Record<string, any>>;
+
+type ValidateAdHocPropertyNames<
+  M extends Record<string, TableDefinition<M>>,
+  K extends keyof M,
+  Strategy extends Record<string, any>
+> = {
+  [P in keyof Strategy]:
+    Strategy[P] extends AnyAdHocDescriptor<M>
+      ? P extends keyof M[K]['columns'] | keyof NonNullable<M[K]['relations']> | ReservedFetchStrategyProps
+        ? never
+        : Strategy[P]
+      : P extends keyof NonNullable<M[K]['relations']>
+        ? M[K]['relations'] extends infer Relations
+          ? Relations extends Record<P, RelationDefinition<M>>
+            ? Strategy[P] extends Record<string, any>
+              ? ValidateAdHocPropertyNames<M, Relations[P]['target'], Strategy[P]>
+              : Strategy[P]
+            : Strategy[P]
+          : Strategy[P]
+        : Strategy[P];
+};
+
 export type RelationTableRefs<M extends Record<string, TableDefinition<M>>, Target extends keyof M> =
   ColumnRefs<M, Target> & RelationRefs<M, Target> & {
     exists(): Filter;
@@ -368,7 +433,8 @@ export type FetchStrategy<M extends Record<string, TableDefinition<M>>, K extend
     (ColumnSelection<M, K> & RelationSelection<M, K>) |
     (ColumnSelection<M, K> & CustomSelectors<M, K>) |
     (RelationSelection<M, K> & CustomSelectors<M, K>) |
-    (ColumnSelection<M, K> & RelationSelection<M, K> & CustomSelectors<M, K>));
+    (ColumnSelection<M, K> & RelationSelection<M, K> & CustomSelectors<M, K>)) &
+  Record<string, unknown>;
 
 export type AggregateStrategy<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
   BaseAggregateStrategy<M, K>
@@ -382,6 +448,15 @@ type WhereFunc<M extends Record<string, TableDefinition<M>>, K extends keyof M> 
 
 type WhereClause<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
   WhereFilter<M, K> | WhereFunc<M, K> | (() => WhereFilter<M, K>);
+
+export type AdHocFetchStrategy<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
+  Omit<FetchStrategy<M, K>, 'where' | 'forUpdate' | 'skipLocked'> & {
+    where?: WhereFilter<M, K>
+      | ((row: RootTableRefs<M, K>, scope: AdHocScope<M>) => WhereFilter<M, K>)
+      | (() => WhereFilter<M, K>);
+    forUpdate?: never;
+    skipLocked?: never;
+  };
 
 type BaseAggregateStrategy<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
   limit?: number;
@@ -525,6 +600,21 @@ type CustomSelectorProperties<M extends Record<string, TableDefinition<M>>, K ex
         : never;
 };
 
+type AdHocSelectorProperties<
+  M extends Record<string, TableDefinition<M>>,
+  FS extends Record<string, any>
+> = {
+  [P in keyof FS as FS[P] extends AdHocManyDescriptor<M, keyof M, Record<string, any>> ? P : never]:
+    FS[P] extends AdHocManyDescriptor<M, infer Target extends keyof M, infer Strategy extends Record<string, any>>
+      ? Array<DeepExpand<Selection<M, Target, Strategy>>>
+      : never;
+} & {
+  [P in keyof FS as FS[P] extends AdHocOneDescriptor<M, keyof M, Record<string, any>> ? P : never]:
+    FS[P] extends AdHocOneDescriptor<M, infer Target extends keyof M, infer Strategy extends Record<string, any>>
+      ? DeepExpand<Selection<M, Target, Strategy>> | null
+      : never;
+};
+
 export type Selection<
   M extends Record<string, TableDefinition<M>>,
   K extends keyof M,
@@ -559,7 +649,7 @@ export type Selection<
       : never;
     }
     : {}
-  ) & CustomSelectorProperties<M, K, FS>;
+  ) & CustomSelectorProperties<M, K, FS> & AdHocSelectorProperties<M, FS>;
 
 export type PrimaryKeyArgs<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
   M[K]['primaryKey'] extends readonly [infer A extends keyof M[K]['columns']]
@@ -740,8 +830,18 @@ type AggregateCustomSelectorProperties<M extends Record<string, TableDefinition<
 };
 
 export type TableClient<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
+  many(): AdHocManyDescriptor<M, K, {}>;
+  many<const strategy extends AdHocFetchStrategy<M, K>>(
+    strategy: strategy & ValidateAdHocPropertyNames<M, K, strategy>
+  ): AdHocManyDescriptor<M, K, strategy>;
+
+  one(): AdHocOneDescriptor<M, K, {}>;
+  one<const strategy extends AdHocFetchStrategy<M, K>>(
+    strategy: strategy & ValidateAdHocPropertyNames<M, K, strategy>
+  ): AdHocOneDescriptor<M, K, strategy>;
+
   // Array methods - return arrays with array-level active record methods, but individual items are plain
-  getMany<strategy extends FetchStrategy<M, K>>(strategy?: strategy): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
+  getMany<strategy extends FetchStrategy<M, K>>(strategy?: strategy & ValidateAdHocPropertyNames<M, K, strategy>): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
 
   // Aggregate methods - return plain objects (no active record methods)
   aggregate<const strategy extends Record<string, unknown>>(
@@ -753,7 +853,7 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
 
   // Single item methods - return individual objects with individual active record methods
   getOne<strategy extends FetchStrategy<M, K>>(
-    strategy?: strategy
+    strategy?: strategy & ValidateAdHocPropertyNames<M, K, strategy>
   ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K> | undefined>;
 
   getById<strategy extends FetchStrategy<M, K>>(

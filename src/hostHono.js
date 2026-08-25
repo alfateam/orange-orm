@@ -16,6 +16,8 @@ function hostHono(hostLocal, client, options = {}) {
 			...readonly,
 			...tableOptions,
 			table: client.tables[tableName],
+			tables: client.tables,
+			tableConfigs: options,
 			isHttp: true,
 			client,
 			hooks

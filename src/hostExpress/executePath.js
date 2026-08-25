@@ -2,6 +2,8 @@ const createPatch = require('../client/createPatch');
 const emptyFilter = require('../emptyFilter');
 const negotiateRawSqlFilter = require('../table/column/negotiateRawSqlFilter');
 const parseAggregateOrderBy = require('../table/groupBy/parseOrderBy');
+const { isAdHocRelation } = require('../adHocRelation');
+const newAdHocPlan = require('../getManyDto/newAdHocPlan');
 let getMeta = require('./getMeta');
 let isSafe = Symbol();
 
@@ -75,7 +77,8 @@ function _executePath(context, ...rest) {
 
 	return executePath(...rest);
 
-	async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client }) {
+	async function executePath({ table, tables, tableConfigs, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client }) {
+		tables = tables || client?.tables || {};
 		let allowedOps = { ..._allowedOps, insert: !readonly, ...extractRelations(getMeta(table)) };
 		let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, aggregate, distinct, count, delete: _delete, cascadeDelete, update, replace };
 
@@ -85,7 +88,7 @@ function _executePath(context, ...rest) {
 		else
 			return res;
 
-		function parseFilter(json, table) {
+		function parseFilter(json, table, scope) {
 			if (isFilter(json)) {
 				let subFilters = [];
 
@@ -96,14 +99,14 @@ function _executePath(context, ...rest) {
 						validateArgs(arg0);
 					const f = arg0 === undefined
 						? anyAllNone(context)
-						: anyAllNone(context, x => parseFilter(arg0, x));
+						: anyAllNone(context, x => parseFilter(arg0, x, scope));
 					if(!('isSafe' in f))
 						f.isSafe = isSafe;
 					return f;
 				}
 				else {
 					for (let i = 0; i < json.args.length; i++) {
-						subFilters.push(parseFilter(json.args[i], nextTable(json.path, table)));
+						subFilters.push(parseFilter(json.args[i], nextTable(json.path, table), scope));
 					}
 				}
 				return executePath(json.path, subFilters);
@@ -111,14 +114,31 @@ function _executePath(context, ...rest) {
 			else if (Array.isArray(json)) {
 				const result = [];
 				for (let i = 0; i < json.length; i++) {
-					result.push(parseFilter(json[i], table));
+					result.push(parseFilter(json[i], table, scope));
 				}
 				return result;
+			}
+			else if (isScopeRef(json)) {
+				return resolveScopeRef(json.__columnRef, scope);
 			}
 			else if (isColumnRef(json)) {
 				return resolveColumnRef(table, json.__columnRef);
 			}
 			return json;
+
+			function resolveScopeRef(path, scope) {
+				const match = /^\$(root|parent)\.([^.]+)$/.exec(path);
+				const selectedScope = match && scope?.[match[1]];
+				const columnName = match && match[2];
+				const column = selectedScope?.table?.[columnName];
+				if (!selectedScope || !column || typeof column._toFilterArg !== 'function') {
+					const e = new Error(`Scope column reference '${path}' is invalid`);
+					// @ts-ignore
+					e.status = 400;
+					throw e;
+				}
+				return selectedScope.row[columnName];
+			}
 
 			function tryGetAnyAllNone(path, table) {
 				const parts = path.split('.');
@@ -185,16 +205,17 @@ function _executePath(context, ...rest) {
 		}
 
 		async function invokeBaseFilter() {
+			let res;
 			if (typeof baseFilter === 'function') {
-				const res = await baseFilter.apply(null, [bindDb(client), request, response]);
-				if (!res)
-					return;
-				const JSONFilter = JSON.parse(JSON.stringify(res));
-				//@ts-ignore
-				return executePath({ table, JSONFilter, request, response });
+				res = await baseFilter.apply(null, [bindDb(client), request, response]);
 			}
 			else
+				res = baseFilter;
+			if (!res)
 				return;
+			const JSONFilter = JSON.parse(JSON.stringify(res));
+			//@ts-ignore
+			return executePath({ table, JSONFilter, request, response });
 		}
 
 		function getCustomFilterPaths(customFilters) {
@@ -282,7 +303,7 @@ function _executePath(context, ...rest) {
 		}
 
 		async function count(filter, strategy) {
-			validateStrategy(table, strategy);
+			validateStrategy(table, strategy, tables);
 			filter = negotiateFilter(filter);
 			const _baseFilter = await invokeBaseFilter();
 			if (_baseFilter)
@@ -292,24 +313,45 @@ function _executePath(context, ...rest) {
 		}
 
 		async function getManyDto(filter, strategy) {
-			validateStrategy(table, strategy);
+			validateStrategy(table, strategy, tables);
 			filter = negotiateFilter(filter);
 			const _baseFilter = await invokeBaseFilter();
 			if (_baseFilter)
 				filter = filter.and(context, _baseFilter);
-			let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
-			await negotiateWhereAndAggregate(strategy);
-			return table.getManyDto.apply(null, args);
+
+			const adHocPlan = newAdHocPlan({
+				context,
+				rootTable: table,
+				sourceStrategy: strategy,
+				tables,
+				parseFilter,
+				negotiateStrategy: negotiateWhereAndAggregate,
+				resolveBaseFilter: invokeAdHocBaseFilter
+			});
+			await negotiateWhereAndAggregate(adHocPlan.strategy, table);
+			const rows = await table.getManyDto(context, filter, adHocPlan.strategy);
+			return adHocPlan.materialize(rows);
+		}
+
+		async function invokeAdHocBaseFilter(tableName, targetTable) {
+			const configured = tableConfigs?.[tableName]?.baseFilter;
+			const res = typeof configured === 'function'
+				? await configured.apply(null, [bindDb(client), request, response])
+				: configured;
+			if (!res)
+				return;
+			const json = JSON.parse(JSON.stringify(res));
+			return parseFilter(json, targetTable);
 		}
 
 		async function replace(subject, strategy = { insertAndForget: true }) {
-			validateStrategy(table, strategy);
+			validateStrategy(table, strategy, tables);
 			const refinedStrategy = withLockingStrategy(objectToStrategy(subject, {}, table), strategy);
 			const JSONFilter2 = {
 				path: 'getManyDto',
 				args: [subject, refinedStrategy]
 			};
-			const originals = await executePath({ table, JSONFilter: JSONFilter2, baseFilter, customFilters, request, response, readonly, disableBulkDeletes, isHttp, client });
+			const originals = await executePath({ table, tables, tableConfigs, JSONFilter: JSONFilter2, baseFilter, customFilters, request, response, readonly, disableBulkDeletes, isHttp, client });
 			const meta = getMeta(table);
 			const patch = createPatch(originals, Array.isArray(subject) ? subject : [subject], meta);
 			const { changed } = await table.patch(context, patch, { strategy });
@@ -320,13 +362,13 @@ function _executePath(context, ...rest) {
 		}
 
 		async function update(subject, whereStrategy, strategy = { insertAndForget: true }) {
-			validateStrategy(table, strategy);
+			validateStrategy(table, strategy, tables);
 			const refinedWhereStrategy = withLockingStrategy(objectToStrategy(subject, whereStrategy, table), strategy);
 			const JSONFilter2 = {
 				path: 'getManyDto',
 				args: [null, refinedWhereStrategy]
 			};
-			const rows = await executePath({ table, JSONFilter: JSONFilter2, baseFilter, customFilters, request, response, readonly, disableBulkDeletes, isHttp, client });
+			const rows = await executePath({ table, tables, tableConfigs, JSONFilter: JSONFilter2, baseFilter, customFilters, request, response, readonly, disableBulkDeletes, isHttp, client });
 			const originals = new Array(rows.length);
 			for (let i = 0; i < rows.length; i++) {
 				const row = rows[i];
@@ -423,22 +465,24 @@ function _executePath(context, ...rest) {
 
 
 
-		async function negotiateWhereAndAggregate(strategy) {
+		async function negotiateWhereAndAggregate(strategy, filterTable = table, scope) {
 			if (typeof strategy !== 'object')
 				return;
 
 			for (let name in strategy) {
 				const target = strategy[name];
+				if (isAdHocRelation(target))
+					continue;
 				if (isFilter(target))
-					strategy[name] = await parseFilter(strategy[name], table);
+					strategy[name] = await parseFilter(strategy[name], filterTable, scope);
 				else
-					await negotiateWhereAndAggregate(strategy[name]);
+					await negotiateWhereAndAggregate(strategy[name], filterTable, scope);
 			}
 
 		}
 
 		async function getMany(filter, strategy) {
-			validateStrategy(table, strategy);
+			validateStrategy(table, strategy, tables);
 			filter = negotiateFilter(filter);
 			const _baseFilter = await invokeBaseFilter();
 			if (_baseFilter)
@@ -450,7 +494,7 @@ function _executePath(context, ...rest) {
 
 	}
 
-	function validateStrategy(table, strategy) {
+	function validateStrategy(table, strategy, tables) {
 		if (!strategy || !table)
 			return;
 
@@ -458,7 +502,34 @@ function _executePath(context, ...rest) {
 			validateOffset(strategy);
 			validateLimit(strategy);
 			validateOrderBy(table, strategy);
-			validateStrategy(table[p], strategy[p]);
+			if (isAdHocRelation(strategy[p])) {
+				const isMappedName = table._columns?.some(column => column.alias === p) || table._relations?.[p];
+				const reservedNames = new Set(['where', 'orderBy', 'limit', 'offset', 'forUpdate', 'skipLocked']);
+				const isReservedName = reservedNames.has(p);
+				if (isMappedName || isReservedName) {
+					const e = new Error(`Ad-hoc relation property '${p}' conflicts with a mapped or reserved property`);
+					// @ts-ignore
+					e.status = 400;
+					throw e;
+				}
+				const descriptor = strategy[p];
+				const target = tables?.[descriptor.table];
+				if (!target) {
+					const e = new Error(`Ad-hoc relation target '${descriptor.table}' is not mapped or exposed`);
+					// @ts-ignore
+					e.status = 400;
+					throw e;
+				}
+				if (descriptor.strategy?.forUpdate || descriptor.strategy?.skipLocked) {
+					const e = new Error('Ad-hoc relations are read-only and cannot use row locking');
+					// @ts-ignore
+					e.status = 400;
+					throw e;
+				}
+				validateStrategy(target, descriptor.strategy, tables);
+			}
+			else
+				validateStrategy(table[p], strategy[p], tables);
 		}
 	}
 
@@ -548,6 +619,10 @@ function _executePath(context, ...rest) {
 
 	function isColumnRef(json) {
 		return json instanceof Object && typeof json.__columnRef === 'string';
+	}
+
+	function isScopeRef(json) {
+		return isColumnRef(json) && /^\$(root|parent)\./.test(json.__columnRef);
 	}
 
 	function resolveColumnRef(table, path) {

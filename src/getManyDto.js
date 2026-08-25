@@ -372,3 +372,4 @@ function getFromMap(map, primaryColumns, values) {
 }
 
 module.exports = getManyDto;
+module.exports.decode = decode;

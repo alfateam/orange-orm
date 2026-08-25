@@ -22,6 +22,7 @@ function getTSDefinition(tableConfigs, {isNamespace = false, isHttp = false} = {
 	if (isNamespace)
 		src += startNamespace(tables, isHttp);
 	src += defs;
+	src += getAdHocScopeTs(tables);
 	src += getRdbClientTs(tables, isHttp);
 	if (isNamespace)
 		src += '}';
@@ -40,13 +41,17 @@ function getTSDefinition(tableConfigs, {isNamespace = false, isHttp = false} = {
 		const _tableRelations = tableRelations(table);
 		return `
 export interface ${Name}Table {
+	many(fetchingStrategy?: ${Name}AdHocStrategy): AdHocMany<${Name}>;
+	one(fetchingStrategy?: ${Name}AdHocStrategy): AdHocOne<${Name}>;
 	count(filter?: RawFilter): Promise<number>;
+	getMany<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<${Name}AdHocArray<Strategy>>;
 	getAll(): Promise<${Name}Array>;
 	getAll(fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
 	getMany(filter?: RawFilter): Promise<${Name}Array>;
 	getMany(filter: RawFilter, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
 	getMany(${name}s: Array<${Name}>): Promise<${Name}Array>;
 	getMany(${name}s: Array<${Name}>, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+	getOne<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<${Name}AdHocRow<Strategy>>;
 	getOne(filter?: RawFilter): Promise<${Name}Row>;
 	getOne(filter?: RawFilter, fetchingStrategy?: ${Name}Strategy): Promise<${Name}Row>;
 	getOne(${name}: ${Name}): Promise<${Name}Row>;
@@ -210,7 +215,12 @@ ${Concurrency(table, Name, true)}
 		}
 
 		let row = '';
+		let adHocResultTypes = `
+export type ${name}AdHocRow<Strategy extends ${name}Strategy> = ${name}Row & AdHocProperties<Strategy>;
+export type ${name}AdHocArray<Strategy extends ${name}Strategy> = ${name}Array & Array<${name}AdHocRow<Strategy>>;
+`;
 		if (!isRoot) {
+			adHocResultTypes = '';
 			row = `export interface ${name}RelatedTable {
 	${columns(table)}
 	${tableRelations(table)}
@@ -241,6 +251,7 @@ export interface ${name}TableBase {
 
 
 export interface ${name}Strategy {
+	[property: string]: unknown;
 	${strategyColumns(table)}
 	${strategyRelations}
 	limit?: number;
@@ -250,6 +261,14 @@ export interface ${name}Strategy {
 	forUpdate?: boolean;
 	skipLocked?: boolean;
 }
+
+export type ${name}AdHocStrategy = Omit<${name}Strategy, 'where' | 'forUpdate' | 'skipLocked'> & {
+	where?: RawFilter | ((table: ${name}TableBase, scope: { root: AdHocScopeTable; parent: AdHocScopeTable }) => RawFilter);
+	forUpdate?: never;
+	skipLocked?: never;
+};
+
+${adHocResultTypes}
 
 ${otherConcurrency}
 
@@ -273,6 +292,19 @@ ${row}`;
 			return name;
 		}
 	}
+}
+
+function getAdHocScopeTs(tables) {
+	const columnNames = new Set();
+	for (const table of Object.values(tables))
+		for (const column of table._columns)
+			columnNames.add(column.alias);
+	const properties = [...columnNames].map(name => `\t${name}: any;`).join('\n');
+	return `
+export interface AdHocScopeTable {
+${properties}
+}
+`;
 }
 
 function regularColumns(table) {
@@ -390,6 +422,23 @@ type HttpResponse<T = any> = {
 	headers: Record<string, string>;
 	config: HttpRequestConfig;
 };
+interface AdHocMany<T> {
+	readonly __rdbAdHocRelation: 'many';
+	readonly table: string;
+	readonly strategy: Record<string, unknown>;
+	readonly __result?: T[];
+}
+interface AdHocOne<T> {
+	readonly __rdbAdHocRelation: 'one';
+	readonly table: string;
+	readonly strategy: Record<string, unknown>;
+	readonly __result?: T | null;
+}
+type AdHocProperties<Strategy> = {
+	[Property in keyof Strategy as Strategy[Property] extends AdHocMany<any> | AdHocOne<any> ? Property : never]:
+		Strategy[Property] extends AdHocMany<infer Row> ? Row[] :
+		Strategy[Property] extends AdHocOne<infer Row> ? Row | null : never;
+};
 `;
 
 	return `
@@ -415,6 +464,23 @@ type HttpResponse<T = any> = {
 	statusText: string;
 	headers: Record<string, string>;
 	config: HttpRequestConfig;
+};
+interface AdHocMany<T> {
+	readonly __rdbAdHocRelation: 'many';
+	readonly table: string;
+	readonly strategy: Record<string, unknown>;
+	readonly __result?: T[];
+}
+interface AdHocOne<T> {
+	readonly __rdbAdHocRelation: 'one';
+	readonly table: string;
+	readonly strategy: Record<string, unknown>;
+	readonly __result?: T | null;
+}
+type AdHocProperties<Strategy> = {
+	[Property in keyof Strategy as Strategy[Property] extends AdHocMany<any> | AdHocOne<any> ? Property : never]:
+		Strategy[Property] extends AdHocMany<infer Row> ? Row[] :
+		Strategy[Property] extends AdHocOne<infer Row> ? Row | null : never;
 };
 export default schema as RdbClient;`;
 }

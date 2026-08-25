@@ -42,6 +42,10 @@ beforeAll(async () => {
 		{ orderDate: date1, customer: george },
 		{ orderDate: date2, customer: john }
 	]);
+	await db.orderLine.insert([
+		{ orderId: 1, product: 'First', amount: 10 },
+		{ orderId: 2, product: 'Second', amount: 20 }
+	]);
 
 	hostHono();
 });
@@ -71,6 +75,23 @@ describe('hono adapter', () => {
 		row.orderDate = dateToISOString(new Date(row.orderDate));
 
 		expect(row.orderDate).toEqual(dateToISOString(date));
+	});
+
+	test('round-trips ad-hoc scope relations', async () => {
+		const db = getHttpDb();
+		db.interceptors.request.use((config) => {
+			config.headers.Authorization = 'Bearer 2';
+			return config;
+		});
+
+		const row = await db.order.getOne({
+			where: order => order.id.eq(2),
+			matchingLines: db.orderLine.many({
+				where: (line, { root }) => line.orderId.eq(root.id)
+			})
+		});
+
+		expect(row.matchingLines.map(line => line.product)).toEqual(['Second']);
 	});
 });
 

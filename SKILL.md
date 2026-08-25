@@ -899,6 +899,35 @@ const orders = await db.order.getMany({
 });
 ```
 
+### Ad-hoc relations with root/parent scope
+
+Use `table.many()` or `table.one()` inside `getMany`/`getOne` when the result should include rows from another mapped table without declaring a relation. `root` is the top-level result row and `parent` is the row that owns the ad-hoc property.
+
+```ts
+const customers = await db.customer.getMany({
+  orders: {
+    matchingLines: db.orderLine.many({
+      where: (line, { root, parent }) =>
+        line.orderId.eq(parent.id).and(line.amount.lt(root.balance)),
+      orderBy: 'id',
+      limit: 10
+    }),
+    firstLine: db.orderLine.one({
+      where: (line, { parent }) => line.orderId.eq(parent.id),
+      orderBy: 'id'
+    })
+  }
+});
+```
+
+- `many()` yields an array; `one()` yields a row or `null`.
+- The ad-hoc property name must not collide with a mapped or reserved property.
+- Supports column selection, mapped/nested ad-hoc relations, `where`, `orderBy`, `limit`, and `offset` per parent.
+- Scope filters are owner-tagged and batched, including composite/non-key equality and additional root/parent comparisons. Hidden scope fields and the internal owner tag are removed from the returned DTO.
+- Ad-hoc projections are read-only, are ignored by `saveChanges()`, and cannot use `forUpdate`/`skipLocked`.
+- Hidden attachment columns are handled automatically; callers do not need to select primary keys.
+- Works locally and through Express/Hono HTTP adapters. Target `baseFilter` rules still apply.
+
 ---
 
 ## Aggregate Functions

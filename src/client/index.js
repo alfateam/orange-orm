@@ -10,6 +10,7 @@ const map = require('./clientMap');
 const clone = require('rfdc/default');
 const createHttpInterceptor = require('./httpInterceptor');
 const flags = require('../flags');
+const { isAdHocRelation, newAdHocRelation } = require('../adHocRelation');
 
 function rdbClient(options = {}) {
 	flags.useLazyDefaults = false;
@@ -208,6 +209,8 @@ function rdbClient(options = {}) {
 	function table(url, tableName, tableOptions) {
 		tableOptions = tableOptions || {};
 		tableOptions = { db: baseUrl, ...tableOptions, transaction };
+		Object.defineProperty(tableOptions, 'tables', { value: options.tables, enumerable: false });
+		Object.defineProperty(tableOptions, 'tableConfigs', { value: options, enumerable: false });
 		let meta;
 		let c = {
 			count,
@@ -227,6 +230,8 @@ function rdbClient(options = {}) {
 			deleteCascade,
 			patch,
 			expand,
+			many: adHoc.bind(null, 'many'),
+			one: adHoc.bind(null, 'one'),
 		};
 
 
@@ -244,6 +249,35 @@ function rdbClient(options = {}) {
 
 		function expand() {
 			return c;
+		}
+
+		function adHoc(kind, strategy = {}) {
+			return newAdHocRelation(kind, tableName, serializeAdHocStrategy(strategy));
+		}
+
+		function serializeAdHocStrategy(_strategy, path = '') {
+			if (!_strategy || typeof _strategy !== 'object' || Array.isArray(_strategy))
+				return _strategy;
+			if (isAdHocRelation(_strategy))
+				return _strategy;
+
+			const strategy = { ..._strategy };
+			for (let name in strategy) {
+				if (isAdHocRelation(strategy[name]))
+					continue;
+				if (name === 'where' && typeof strategy[name] === 'function') {
+					const selector = strategy[name];
+					strategy[name] = column(path + 'where')((target) => selector(target, {
+						root: tableProxy('$root.'),
+						parent: tableProxy('$parent.')
+					}));
+				}
+				else if (typeof strategy[name] === 'function')
+					strategy[name] = aggregate(path, strategy[name]);
+				else
+					strategy[name] = serializeAdHocStrategy(strategy[name], path + name + '.');
+			}
+			return strategy;
 		}
 
 		async function getAll() {
@@ -400,6 +434,8 @@ function rdbClient(options = {}) {
 
 		function negotiateWhereSingle(_strategy, path = '') {
 			if (typeof _strategy !== 'object' || _strategy === null)
+				return _strategy;
+			if (isAdHocRelation(_strategy))
 				return _strategy;
 
 			if (Array.isArray(_strategy)) {
@@ -703,7 +739,7 @@ function rdbClient(options = {}) {
 			const patch = createPatch(json, array, meta);
 			if (patch.length === 0)
 				return;
-			let body = stringify({ patch, options: { strategy, ...tableOptions, ...concurrencyOptions, deduceStrategy } });
+			let body = stringify({ patch, options: { strategy: stripAdHocStrategy(strategy), ...tableOptions, ...concurrencyOptions, deduceStrategy } });
 			let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 			let p = adapter.patch(body);
 			if (strategy?.insertAndForget) {
@@ -714,15 +750,19 @@ function rdbClient(options = {}) {
 			let updatedPositions = extractChangedRowsPositions(array, patch, meta);
 			let insertedPositions = getInsertedRowsPosition(array);
 			let { changed, strategy: newStrategy } = await p;
-			copyIntoArray(changed, array, [...insertedPositions, ...updatedPositions]);
-			rootMap.set(array, { json: cloneFromDb(array), strategy: toStoredFetchStrategy(newStrategy), originalArray: [...array] });
+			copyIntoArray(changed, array, [...insertedPositions, ...updatedPositions], strategy);
+			rootMap.set(array, {
+				json: cloneFromDb(array),
+				strategy: toStoredFetchStrategy(restoreAdHocStrategy(newStrategy, strategy)),
+				originalArray: [...array]
+			});
 		}
 
 		async function patch(patch, concurrencyOptions, strategy) {
 			let deduceStrategy = false;
 			if (patch.length === 0)
 				return;
-			let body = stringify({ patch, options: { strategy, ...tableOptions, ...concurrencyOptions, deduceStrategy } });
+			let body = stringify({ patch, options: { strategy: stripAdHocStrategy(strategy), ...tableOptions, ...concurrencyOptions, deduceStrategy } });
 			let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 			await adapter.patch(body);
 			return;
@@ -755,17 +795,41 @@ function rdbClient(options = {}) {
 			return positions;
 		}
 
-		function copyInto(from, to) {
+		function copyInto(from, to, strategy) {
 			for (let i = 0; i < from.length; i++) {
+				preserveAdHocValues(to[i], from[i], strategy);
 				for (let p in from[i]) {
 					to[i][p] = from[i][p];
 				}
 			}
 		}
 
-		function copyIntoArray(from, to, positions) {
+		function copyIntoArray(from, to, positions, strategy) {
 			for (let i = 0; i < from.length; i++) {
+				preserveAdHocValues(to[positions[i]], from[i], strategy);
 				to[positions[i]] = from[i];
+			}
+		}
+
+		function preserveAdHocValues(previous, next, strategy) {
+			if (!previous || !next || !strategy || typeof strategy !== 'object')
+				return;
+			for (let name in strategy) {
+				if (isAdHocRelation(strategy[name])) {
+					if (name in previous)
+						next[name] = previous[name];
+					continue;
+				}
+				if (!strategy[name] || typeof strategy[name] !== 'object')
+					continue;
+				const previousChild = previous[name];
+				const nextChild = next[name];
+				if (Array.isArray(previousChild) && Array.isArray(nextChild)) {
+					for (let i = 0; i < Math.min(previousChild.length, nextChild.length); i++)
+						preserveAdHocValues(previousChild[i], nextChild[i], strategy[name]);
+				}
+				else
+					preserveAdHocValues(previousChild, nextChild, strategy[name]);
 			}
 		}
 
@@ -794,6 +858,11 @@ function rdbClient(options = {}) {
 		function toStoredFetchStrategy(strategy) {
 			if (strategy === undefined || strategy === null || typeof strategy !== 'object')
 				return strategy;
+			if (isAdHocRelation(strategy))
+				return {
+					...strategy,
+					strategy: cloneAdHocStrategy(strategy.strategy)
+				};
 			if (Array.isArray(strategy))
 				return strategy.map(toStoredFetchStrategy);
 			const cleanStrategy = { ...strategy };
@@ -805,6 +874,86 @@ function rdbClient(options = {}) {
 					cleanStrategy[name] = toStoredFetchStrategy(cleanStrategy[name]);
 			}
 			return cleanStrategy;
+		}
+
+		function cloneAdHocStrategy(strategy) {
+			if (strategy === undefined || strategy === null || typeof strategy !== 'object')
+				return strategy;
+			const clean = clone(strategy);
+			stripLocking(clean);
+			return clean;
+
+			function stripLocking(value) {
+				if (!value || typeof value !== 'object')
+					return;
+				if (!Array.isArray(value)) {
+					if (!isPlainObject(value))
+						return;
+					delete value.forUpdate;
+					delete value.skipLocked;
+				}
+				for (let name in value)
+					stripLocking(value[name]);
+			}
+		}
+
+		function stripAdHocStrategy(strategy) {
+			if (!strategy || typeof strategy !== 'object')
+				return strategy;
+			if (Array.isArray(strategy))
+				return strategy.map(stripAdHocStrategy);
+			if (!isPlainObject(strategy))
+				return strategy;
+			const clean = {};
+			for (let name in strategy) {
+				if (isAdHocRelation(strategy[name]))
+					continue;
+				clean[name] = stripAdHocStrategy(strategy[name]);
+			}
+			return clean;
+		}
+
+		function restoreAdHocStrategy(serverStrategy, originalStrategy) {
+			if (!originalStrategy || typeof originalStrategy !== 'object')
+				return serverStrategy;
+			if (isAdHocRelation(originalStrategy))
+				return originalStrategy;
+			if (!serverStrategy || typeof serverStrategy !== 'object')
+				return originalStrategy;
+			if (Array.isArray(originalStrategy) && !Array.isArray(serverStrategy))
+				return originalStrategy;
+			if (Array.isArray(originalStrategy))
+				return originalStrategy.map((value, index) => containsAdHoc(value)
+					? restoreAdHocStrategy(serverStrategy[index], value)
+					: serverStrategy[index]);
+			if (!isPlainObject(originalStrategy))
+				return serverStrategy;
+			const restored = { ...serverStrategy };
+			for (let name in originalStrategy) {
+				if (isAdHocRelation(originalStrategy[name]))
+					restored[name] = originalStrategy[name];
+				else if (containsAdHoc(originalStrategy[name]))
+					restored[name] = restoreAdHocStrategy(restored[name], originalStrategy[name]);
+			}
+			return restored;
+		}
+
+		function containsAdHoc(value) {
+			if (!value || typeof value !== 'object')
+				return false;
+			if (isAdHocRelation(value))
+				return true;
+			if (!Array.isArray(value) && !isPlainObject(value))
+				return false;
+			for (let name in value)
+				if (containsAdHoc(value[name]))
+					return true;
+			return false;
+		}
+
+		function isPlainObject(value) {
+			const prototype = Object.getPrototypeOf(value);
+			return prototype === Object.prototype || prototype === null;
 		}
 
 		function clearChangesArray(array) {
@@ -926,12 +1075,15 @@ function rdbClient(options = {}) {
 			if (patch.length === 0)
 				return;
 
-			let body = stringify({ patch, options: { ...tableOptions, ...concurrencyOptions, strategy, deduceStrategy } });
+			let body = stringify({ patch, options: { ...tableOptions, ...concurrencyOptions, strategy: stripAdHocStrategy(strategy), deduceStrategy } });
 
 			let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 			let { changed, strategy: newStrategy } = await adapter.patch(body);
-			copyInto(changed, [row]);
-			rootMap.set(row, { json: cloneFromDb(row), strategy: toStoredFetchStrategy(newStrategy) });
+			copyInto(changed, [row], strategy);
+			rootMap.set(row, {
+				json: cloneFromDb(row),
+				strategy: toStoredFetchStrategy(restoreAdHocStrategy(newStrategy, strategy))
+			});
 		}
 
 		async function refreshRow(row, strategy) {
@@ -983,10 +1135,10 @@ function rdbClient(options = {}) {
 	}
 }
 
-function tableProxy() {
+function tableProxy(prefix = '') {
 	let handler = {
 		get(_target, property,) {
-			return column(property);
+			return column(prefix + String(property));
 		}
 
 	};
