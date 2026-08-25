@@ -154,6 +154,7 @@ describe.each(providers)('ad-hoc relations on $name', provider => {
 		let rows;
 		try {
 			rows = await db.order.getMany({
+				where: order => order.id.in(fixture.orders.map(row => row.id)),
 				orderBy: 'id',
 				latestLines: db.orderLine.many({
 					id: true,
@@ -337,6 +338,10 @@ async function insertFixture(db) {
 		orderDate: new Date('2024-01-02T00:00:00Z'),
 		customerId: customers[1].id
 	}));
+	const sharedOrder = await db.order.insert({
+		orderDate: new Date('2024-01-03T00:00:00Z'),
+		customerId: sharedCustomers[0].id
+	});
 
 	const lines = [];
 	lines.push(await db.orderLine.insert({
@@ -361,10 +366,12 @@ async function insertFixture(db) {
 	}));
 	const sharedLines = [];
 	sharedLines.push(await db.orderLine.insert({
+		orderId: sharedOrder.id,
 		product: 'Shared',
 		amount: 25
 	}));
 	sharedLines.push(await db.orderLine.insert({
+		orderId: sharedOrder.id,
 		product: 'Shared',
 		amount: 75
 	}));

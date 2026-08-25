@@ -13832,16 +13832,19 @@ function requireValidateDeleteAllowed () {
 		return {...parent,  ...(defaults[property] || {})};
 	}
 
-	function hasReadonlyTrue(options) {
+	function hasReadonlyTrue(options, visited = new WeakSet()) {
 		if (!options || options !== Object(options))
 			return false;
+		if (visited.has(options))
+			return false;
+		visited.add(options);
 		if (options.readonly === true)
 			return true;
 		for (let p in options) {
 			const value = options[p];
 			if (!value || value !== Object(value))
 				continue;
-			if (hasReadonlyTrue(value))
+			if (hasReadonlyTrue(value, visited))
 				return true;
 		}
 		return false;
@@ -14342,7 +14345,7 @@ function requirePatchTable () {
 		}
 
 		function cleanOptions(options) {
-			const { table, transaction, db, client, ..._options } = options;
+			const { table, tables, tableConfigs, transaction, db, client, ..._options } = options;
 			return _options;
 		}
 	}

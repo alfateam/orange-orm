@@ -466,7 +466,7 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 	}
 
 	function cleanOptions(options) {
-		const { table, transaction, db, client, ..._options } = options;
+		const { table, tables, tableConfigs, transaction, db, client, ..._options } = options;
 		return _options;
 	}
 }
