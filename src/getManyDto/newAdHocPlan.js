@@ -186,6 +186,8 @@ module.exports = function newAdHocPlan({
 		const result = pairs.map(() => []);
 		const refs = collectOwnedScopeRefs(descriptor.strategy.where);
 		const { scope, scopeColumns } = createVirtualScope(refs, ownerTable);
+		const scopeGroups = createScopeGroups(pairs, scopeColumns);
+		const rowsByGroup = scopeGroups.map(() => []);
 		const targetBaseFilter = await resolveBaseFilter(descriptor.table, targetTable);
 		const queryStrategy = JSON.parse(JSON.stringify(descriptor.strategy || {}));
 		const jsonWhere = queryStrategy.where;
@@ -208,11 +210,11 @@ module.exports = function newAdHocPlan({
 		const limit = descriptor.__rdbAdHocRelation === 'one' ? 1 : descriptor.strategy?.limit;
 		const databasePaginates = getSessionSingleton(context, 'engine') !== 'sap'
 			&& (start > 0 || limit !== undefined);
-		for (let offset = 0; offset < pairs.length; offset += chunkSize) {
-			const scopeRows = pairs.slice(offset, offset + chunkSize).map((pair, index) => ({
-				ownerId: offset + index,
-				root: pair.root,
-				parent: pair.row
+		for (let offset = 0; offset < scopeGroups.length; offset += chunkSize) {
+			const scopeRows = scopeGroups.slice(offset, offset + chunkSize).map(group => ({
+				ownerId: group.groupId,
+				root: group.root,
+				parent: group.parent
 			}));
 			const rows = await getManyDtoScoped({
 				context,
@@ -227,14 +229,63 @@ module.exports = function newAdHocPlan({
 			});
 			for (const { ownerId, row } of rows)
 				if (row)
-					result[ownerId].push(row);
+					rowsByGroup[ownerId].push(row);
 		}
 
-		for (let i = 0; i < pairs.length; i++) {
-			const end = limit === undefined ? undefined : start + limit;
-			result[i] = clone(databasePaginates ? result[i] : result[i].slice(start, end));
+		const end = limit === undefined ? undefined : start + limit;
+		for (const group of scopeGroups) {
+			const rows = databasePaginates
+				? rowsByGroup[group.groupId]
+				: rowsByGroup[group.groupId].slice(start, end);
+			for (const pairIndex of group.pairIndexes)
+				result[pairIndex] = clone(rows);
 		}
 		return result;
+	}
+
+	function createScopeGroups(pairs, scopeColumns) {
+		const groups = [];
+		const groupsByKey = new Map();
+		for (let pairIndex = 0; pairIndex < pairs.length; pairIndex++) {
+			const pair = pairs[pairIndex];
+			const scopeRow = { root: pair.root, parent: pair.row };
+			const key = createScopeKey(scopeColumns, scopeRow);
+			let group = key === undefined ? undefined : groupsByKey.get(key);
+			if (!group) {
+				group = {
+					groupId: groups.length,
+					root: pair.root,
+					parent: pair.row,
+					pairIndexes: []
+				};
+				groups.push(group);
+				if (key !== undefined)
+					groupsByKey.set(key, group);
+			}
+			group.pairIndexes.push(pairIndex);
+		}
+		return groups;
+	}
+
+	function createScopeKey(scopeColumns, scopeRow) {
+		try {
+			const values = new Array(scopeColumns.length);
+			for (let index = 0; index < scopeColumns.length; index++) {
+				const scopeColumn = scopeColumns[index];
+				let value = scopeColumn.value(scopeRow);
+				if (value !== null && value !== undefined
+					&& typeof scopeColumn.column.encode?.direct === 'function')
+					value = scopeColumn.column.encode.direct(context, value);
+				const canonical = canonicalizeScopeValue(value);
+				if (canonical === undefined)
+					return;
+				values[index] = [index, canonical];
+			}
+			return JSON.stringify(values);
+		}
+		catch (_error) {
+			return;
+		}
 	}
 
 	function createVirtualScope(refs, ownerTable) {
@@ -331,6 +382,124 @@ module.exports = function newAdHocPlan({
 		}
 	}
 };
+
+function canonicalizeScopeValue(value, seen = new Set()) {
+	if (value === undefined)
+		return ['undefined'];
+	if (value === null)
+		return ['null'];
+
+	const type = typeof value;
+	if (type === 'string')
+		return ['string', value];
+	if (type === 'boolean')
+		return ['boolean', value];
+	if (type === 'bigint')
+		return ['bigint', value.toString()];
+	if (type === 'number') {
+		if (Number.isNaN(value))
+			return ['number', 'NaN'];
+		if (value === Infinity)
+			return ['number', 'Infinity'];
+		if (value === -Infinity)
+			return ['number', '-Infinity'];
+		if (Object.is(value, -0))
+			return ['number', '-0'];
+		return ['number', String(value)];
+	}
+	if (type !== 'object')
+		return;
+
+	const bytes = getBinaryBytes(value);
+	if (bytes)
+		return ['binary', binaryToBase64(bytes)];
+	if (value instanceof Date) {
+		const timestamp = Date.prototype.getTime.call(value);
+		return Number.isNaN(timestamp)
+			? undefined
+			: ['date', Date.prototype.toISOString.call(value)];
+	}
+	if (seen.has(value))
+		return;
+
+	seen.add(value);
+	try {
+		if (Array.isArray(value)) {
+			const ownKeys = Reflect.ownKeys(value);
+			for (const key of ownKeys)
+				if (key !== 'length' && !isArrayIndex(key, value.length))
+					return;
+
+			const items = new Array(value.length);
+			for (let index = 0; index < value.length; index++) {
+				const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+				if (!descriptor) {
+					items[index] = ['hole'];
+					continue;
+				}
+				if (!Object.prototype.hasOwnProperty.call(descriptor, 'value'))
+					return;
+				const item = canonicalizeScopeValue(descriptor.value, seen);
+				if (item === undefined)
+					return;
+				items[index] = item;
+			}
+			return ['array', items];
+		}
+
+		const prototype = Object.getPrototypeOf(value);
+		if (prototype !== Object.prototype && prototype !== null)
+			return;
+		const ownKeys = Reflect.ownKeys(value);
+		if (ownKeys.some(key => typeof key !== 'string'))
+			return;
+		const keys = ownKeys.sort();
+		const entries = new Array(keys.length);
+		for (let index = 0; index < keys.length; index++) {
+			const key = keys[index];
+			const descriptor = Object.getOwnPropertyDescriptor(value, key);
+			if (!descriptor?.enumerable
+				|| !Object.prototype.hasOwnProperty.call(descriptor, 'value'))
+				return;
+			const item = canonicalizeScopeValue(descriptor.value, seen);
+			if (item === undefined)
+				return;
+			entries[index] = [key, item];
+		}
+		return ['object', entries];
+	}
+	finally {
+		seen.delete(value);
+	}
+}
+
+function getBinaryBytes(value) {
+	if (typeof Buffer !== 'undefined' && Buffer.isBuffer(value))
+		return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+	if (typeof Uint8Array !== 'undefined' && value instanceof Uint8Array)
+		return value;
+	if (typeof ArrayBuffer !== 'undefined' && value instanceof ArrayBuffer)
+		return new Uint8Array(value);
+}
+
+function binaryToBase64(bytes) {
+	if (typeof Buffer !== 'undefined')
+		return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString('base64');
+	if (typeof btoa !== 'undefined') {
+		let binary = '';
+		for (const byte of bytes)
+			binary += String.fromCharCode(byte);
+		return btoa(binary);
+	}
+	throw new Error('No base64 encoder is available');
+}
+
+function isArrayIndex(key, length) {
+	if (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/.test(key))
+		return false;
+	const index = Number(key);
+	return Number.isSafeInteger(index) && index < length;
+}
 
 function throwBadRequest(message) {
 	const error = new Error(message);

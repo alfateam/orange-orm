@@ -1,6 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import sqliteTestPath from './sqliteTestPath.mjs';
-import rdb from '../src/index';
 const express = require('express');
 const { json } = require('body-parser');
 const orange = require('../src/index');
@@ -235,32 +234,15 @@ describe('ad-hoc relations', () => {
 		expect(rows[0].matchingLines.map(line => line.id)).toEqual([101]);
 	});
 
-	test('chunks owner scope rows without losing attachment identity', async () => {
-		const orders = [];
-		const lines = [];
-		for (let i = 0; i < 101; i++) {
-			orders.push({
-				id: 1000 + i,
-				orderDate: new Date('2024-03-01T00:00:00Z'),
-				customerId: 1
-			});
-			lines.push({
-				id: 2000 + i,
-				orderId: 1000 + i,
-				product: `P${i}`,
-				amount: i
-			});
-		}
-		await db.order.insert(orders);
-		await db.orderLine.insert(lines);
-
+	test('chunks 205 unique scope tuples without losing attachment identity', async () => {
+		const fixture = await getScopeBatchFixture();
 		const queries = [];
 		const onQuery = query => queries.push(query.sql);
 		orange.on('query', onQuery);
 		let rows;
 		try {
 			rows = await db.order.getMany({
-				where: order => order.id.ge(1000),
+				where: order => order.id.in(fixture.orderIds),
 				orderBy: 'id',
 				matchingLines: db.orderLine.many({
 					where: (line, { root }) => line.orderId.eq(root.id),
@@ -272,9 +254,259 @@ describe('ad-hoc relations', () => {
 			orange.off('query', onQuery);
 		}
 
-		expect(rows).toHaveLength(101);
+		expect(rows).toHaveLength(205);
 		expect(rows.every(row => row.matchingLines.length === 1)).toBe(true);
 		expect(rows.map(row => row.matchingLines[0].orderId)).toEqual(rows.map(row => row.id));
-		expect(queries.filter(sql => /from\s+"?orderline"?/i.test(sql))).toHaveLength(2);
+		expect(queries.filter(isOrderLineSelect)).toHaveLength(3);
+	});
+
+	test('deduplicates 205 identical scopes and deep-clones nested results per owner', async () => {
+		const fixture = await getScopeBatchFixture();
+		const queries = [];
+		const onQuery = query => queries.push(query.sql);
+		orange.on('query', onQuery);
+		let rows;
+		try {
+			rows = await db.order.getMany({
+				where: order => order.id.in(fixture.orderIds),
+				orderBy: 'id',
+				matchingLines: db.orderLine.many({
+					where: (line, { root }) => line.amount.eq(root.customerId),
+					orderBy: 'id',
+					packagesForLine: db.package.many({
+						where: (pkg, { parent }) => pkg.lineId.eq(parent.id),
+						orderBy: 'id'
+					})
+				})
+			});
+		}
+		finally {
+			orange.off('query', onQuery);
+		}
+
+		expect(queries.filter(isOrderLineSelect)).toHaveLength(1);
+		expect(rows).toHaveLength(205);
+		expect(rows.every(row => row.matchingLines.map(line => line.id).join(',') === '101,2099')).toBe(true);
+		expect(rows[0].matchingLines).not.toBe(rows[1].matchingLines);
+		expect(rows[0].matchingLines[0]).not.toBe(rows[1].matchingLines[0]);
+		expect(rows[0].matchingLines[0].packagesForLine).not.toBe(rows[1].matchingLines[0].packagesForLine);
+		expect(rows[0].matchingLines[0].packagesForLine[0]).not.toBe(rows[1].matchingLines[0].packagesForLine[0]);
+
+		rows[0].matchingLines.pop();
+		rows[0].matchingLines[0].packagesForLine[0].sscc = 'changed';
+		expect(rows[1].matchingLines).toHaveLength(2);
+		expect(rows[1].matchingLines[0].packagesForLine[0].sscc).toBe('A-1');
+	});
+
+	test('paginates many and one once per identical scope before cloning', async () => {
+		const fixture = await getScopeBatchFixture();
+		const queries = [];
+		const onQuery = query => queries.push(query.sql);
+		orange.on('query', onQuery);
+		let rows;
+		try {
+			rows = await db.order.getMany({
+				where: order => order.id.in(fixture.orderIds),
+				orderBy: 'id',
+				pagedLines: db.orderLine.many({
+					where: (line, { root }) => line.amount.ge(root.customerId),
+					orderBy: 'id',
+					offset: 1,
+					limit: 1
+				}),
+				firstLine: db.orderLine.one({
+					where: (line, { root }) => line.amount.ge(root.customerId),
+					orderBy: 'id'
+				})
+			});
+		}
+		finally {
+			orange.off('query', onQuery);
+		}
+
+		expect(queries.filter(isOrderLineSelect)).toHaveLength(2);
+		expect(rows.every(row => row.pagedLines.length === 1 && row.pagedLines[0].id === 102)).toBe(true);
+		expect(rows.every(row => row.firstLine.id === 101)).toBe(true);
+		expect(rows[0].pagedLines).not.toBe(rows[1].pagedLines);
+		expect(rows[0].pagedLines[0]).not.toBe(rows[1].pagedLines[0]);
+		expect(rows[0].firstLine).not.toBe(rows[1].firstLine);
+	});
+
+	test('deduplicates normalized dates for a non-equality scope filter', async () => {
+		const fixture = await getScopeBatchFixture();
+		const queries = [];
+		const onQuery = query => queries.push(query.sql);
+		orange.on('query', onQuery);
+		let rows;
+		try {
+			rows = await db.order.getMany({
+				where: order => order.id.in(fixture.orderIds),
+				orderBy: 'id',
+				earlierDates: db.datetest.many({
+					where: (dateRow, { root }) => dateRow.datetime.lt(root.orderDate),
+					orderBy: 'id'
+				})
+			});
+		}
+		finally {
+			orange.off('query', onQuery);
+		}
+
+		const targetQueries = queries.filter(isDateTestSelect);
+		expect(targetQueries).toHaveLength(1);
+		expect(scopeRowCount(targetQueries[0])).toBe(1);
+		expect(rows.every(row => row.earlierDates.length === 1 && row.earlierDates[0].id === 1)).toBe(true);
+	});
+
+	test('separates partially matching root and parent tuples', async () => {
+		const fixture = await getCompositeScopeFixture();
+		const queries = [];
+		const onQuery = query => queries.push(query.sql);
+		orange.on('query', onQuery);
+		let rows;
+		try {
+			rows = await db.customer.getMany({
+				where: customer => customer.id.in(fixture.customerIds),
+				orderBy: 'id',
+				orders: {
+					orderBy: 'id',
+					dateMatches: db.datetest.many({
+						where: (dateRow, { root, parent }) => dateRow.id.lt(root.balance)
+							.and(dateRow.datetime.lt(parent.orderDate)),
+						orderBy: 'id'
+					})
+				}
+			});
+		}
+		finally {
+			orange.off('query', onQuery);
+		}
+
+		const targetQueries = queries.filter(isDateTestSelect);
+		const attached = rows.flatMap(row => row.orders.map(order => order.dateMatches.map(dateRow => dateRow.id)));
+		expect(attached).toEqual([[1], [1], [1], [1]]);
+		expect(targetQueries).toHaveLength(1);
+		expect(scopeRowCount(targetQueries[0])).toBe(3);
+	});
+
+	test('keeps no-scope and per-parent fallback query counts unchanged', async () => {
+		const fixture = await getScopeBatchFixture();
+		const ownerIds = fixture.orderIds.slice(0, 2);
+		const noScopeQueries = [];
+		const onNoScopeQuery = query => noScopeQueries.push(query.sql);
+		orange.on('query', onNoScopeQuery);
+		let noScopeRows;
+		try {
+			noScopeRows = await db.order.getMany({
+				where: order => order.id.in(ownerIds),
+				orderBy: 'id',
+				fixedPackages: db.package.many({
+					where: pkg => pkg.id.eq(1001)
+				})
+			});
+		}
+		finally {
+			orange.off('query', onNoScopeQuery);
+		}
+
+		expect(noScopeQueries.filter(isPackageSelect)).toHaveLength(1);
+		expect(noScopeRows.map(row => row.fixedPackages.map(pkg => pkg.id))).toEqual([[1001], [1001]]);
+		expect(noScopeRows[0].fixedPackages).not.toBe(noScopeRows[1].fixedPackages);
+		expect(noScopeRows[0].fixedPackages[0]).not.toBe(noScopeRows[1].fixedPackages[0]);
+
+		const fallbackQueries = [];
+		const onFallbackQuery = query => fallbackQueries.push(query.sql);
+		orange.on('query', onFallbackQuery);
+		let fallbackRows;
+		try {
+			fallbackRows = await db.order.getMany({
+				where: order => order.id.in(ownerIds),
+				orderBy: 'id',
+				matchingLines: db.orderLine.many({
+					where: (line, { root }) => line.amount.eq(root.customerId),
+					order: {
+						where: (order, { root }) => order.customerId.eq(root.customerId)
+					}
+				})
+			});
+		}
+		finally {
+			orange.off('query', onFallbackQuery);
+		}
+
+		expect(fallbackQueries.filter(isOrderLineSelect)).toHaveLength(2);
+		expect(fallbackRows.map(row => row.matchingLines.map(line => line.id))).toEqual([
+			[101, 2099],
+			[101, 2099]
+		]);
 	});
 });
+
+let scopeBatchFixturePromise;
+
+function getScopeBatchFixture() {
+	if (!scopeBatchFixturePromise)
+		scopeBatchFixturePromise = insertScopeBatchFixture();
+	return scopeBatchFixturePromise;
+}
+
+async function insertScopeBatchFixture() {
+	await db.customer.insert({ id: 100, name: 'Batch', balance: 100, isActive: true });
+	const orders = [];
+	const lines = [];
+	for (let i = 0; i < 205; i++) {
+		orders.push({
+			id: 1000 + i,
+			orderDate: new Date('2024-03-01T00:00:00Z'),
+			customerId: 100
+		});
+		lines.push({
+			id: 2000 + i,
+			orderId: 1000 + i,
+			product: `P${i}`,
+			amount: i + 1
+		});
+	}
+	await db.order.insert(orders);
+	await db.orderLine.insert(lines);
+	return { orderIds: orders.map(order => order.id) };
+}
+
+let compositeScopeFixturePromise;
+
+function getCompositeScopeFixture() {
+	if (!compositeScopeFixturePromise)
+		compositeScopeFixturePromise = insertCompositeScopeFixture();
+	return compositeScopeFixturePromise;
+}
+
+async function insertCompositeScopeFixture() {
+	const customers = [
+		{ id: 300, name: 'Tuple A', balance: 100, isActive: true },
+		{ id: 301, name: 'Tuple B', balance: 200, isActive: true }
+	];
+	await db.customer.insert(customers);
+	await db.order.insert([
+		{ id: 3000, orderDate: new Date('2024-04-01T00:00:00Z'), customerId: 300 },
+		{ id: 3001, orderDate: new Date('2024-04-01T00:00:00Z'), customerId: 300 },
+		{ id: 3002, orderDate: new Date('2024-04-02T00:00:00Z'), customerId: 300 },
+		{ id: 3003, orderDate: new Date('2024-04-01T00:00:00Z'), customerId: 301 }
+	]);
+	return { customerIds: customers.map(customer => customer.id) };
+}
+
+function isOrderLineSelect(sql) {
+	return /\bfrom\s+"?orderline"?/i.test(sql);
+}
+
+function isDateTestSelect(sql) {
+	return /\bfrom\s+"?datetest"?/i.test(sql);
+}
+
+function isPackageSelect(sql) {
+	return /\bfrom\s+"?package"?/i.test(sql);
+}
+
+function scopeRowCount(sql) {
+	return (sql.match(/\bunion\s+all\b/gi) || []).length + 1;
+}

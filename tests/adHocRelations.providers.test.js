@@ -227,7 +227,7 @@ describe.each(providers)('ad-hoc relations on $name', provider => {
 		expect(queries.filter(isOrderLineSelect)).toHaveLength(1);
 	});
 
-	test('uses ordinary equality fields and keeps duplicate scope keys separated', async () => {
+	test('deduplicates complete tuples and separates partially matching scope values', async () => {
 		const queries = [];
 		const onQuery = query => queries.push(query.sql);
 		orange.on('query', onQuery);
@@ -252,10 +252,17 @@ describe.each(providers)('ad-hoc relations on $name', provider => {
 
 		expect(rows.map(row => row.matchingLines.map(line => line.id))).toEqual([
 			[fixture.sharedLines[0].id],
+			[fixture.sharedLines[0].id],
 			[fixture.sharedLines[0].id, fixture.sharedLines[1].id]
 		]);
 		expect(rows[0]).not.toHaveProperty('id');
-		expect(queries.filter(isOrderLineSelect)).toHaveLength(1);
+		const targetQueries = queries.filter(isOrderLineSelect);
+		expect(targetQueries).toHaveLength(1);
+		expect(scopeRowCount(targetQueries[0])).toBe(2);
+		const matchingBalanceRows = rows.filter(row => Number(row.balance) === 50);
+		expect(matchingBalanceRows).toHaveLength(2);
+		expect(matchingBalanceRows[0].matchingLines).not.toBe(matchingBalanceRows[1].matchingLines);
+		expect(matchingBalanceRows[0].matchingLines[0]).not.toBe(matchingBalanceRows[1].matchingLines[0]);
 	});
 
 	test('batches non-equality scope filters with typed date values', async () => {
@@ -328,6 +335,11 @@ async function insertFixture(db) {
 		balance: 100,
 		isActive: true
 	}));
+	sharedCustomers.push(await db.customer.insert({
+		name: 'Shared',
+		balance: 50,
+		isActive: true
+	}));
 
 	const orders = [];
 	orders.push(await db.order.insert({
@@ -398,6 +410,10 @@ function isOrderLineSelect(sql) {
 function isDateTestSelect(sql) {
 	const normalized = sql.replace(/["`[\]]/g, '').toLowerCase();
 	return /\bfrom\s+datetest\b/.test(normalized);
+}
+
+function scopeRowCount(sql) {
+	return (sql.match(/\bunion\s+all\b/gi) || []).length + 1;
 }
 
 function newD1Database() {

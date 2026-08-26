@@ -1,6 +1,7 @@
 ## Changelog
 __Next__
 Add read-only ad-hoc `many()` and `one()` query relations with `root`/`parent` scoped filters, owner-tagged cross-provider batching, composite and non-key correlations, per-owner ordering/pagination, nesting, and Express/Hono transport support.
+Deduplicate identical ad-hoc scope tuples before batching.
 __5.4.2__  
 Support for limit and orderBy in `aggregate` and `distinct`  
 __5.4.1__  
