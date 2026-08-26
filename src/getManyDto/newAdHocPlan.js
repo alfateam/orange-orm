@@ -274,7 +274,9 @@ module.exports = function newAdHocPlan({
 			mode = { hasIncludes: targetTable._columns.some(col => targetStrategy[col.alias] === true) };
 			selectionModes.set(targetStrategy, mode);
 		}
-		const wasVisible = targetStrategy[name] !== false && (!mode.hasIncludes || targetStrategy[name] === true);
+		const isPrimaryColumn = targetTable._primaryColumns.includes(column);
+		const wasVisible = targetStrategy[name] !== false
+			&& (isPrimaryColumn || !mode.hasIncludes || targetStrategy[name] === true);
 		if (!wasVisible) {
 			let hidden = hiddenColumns.get(targetStrategy);
 			if (!hidden) {

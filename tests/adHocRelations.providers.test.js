@@ -223,7 +223,7 @@ describe.each(providers)('ad-hoc relations on $name', provider => {
 			[fixture.lines[2].id]
 		]);
 		expect(rows[0]).not.toHaveProperty('balance');
-		expect(rows[0].orders[0]).not.toHaveProperty('id');
+		expect(rows[0].orders[0]).toHaveProperty('id', fixture.orders[0].id);
 		expect(queries.filter(isOrderLineSelect)).toHaveLength(1);
 	});
 

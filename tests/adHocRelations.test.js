@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import sqliteTestPath from './sqliteTestPath.mjs';
+import rdb from '../src/index';
 const express = require('express');
 const { json } = require('body-parser');
 const orange = require('../src/index');
@@ -103,9 +104,10 @@ describe('ad-hoc relations', () => {
 			}
 		});
 
+		console.dir(rows, { depth: Infinity});
 		expect(rows.map(row => row.orders[0].affordableLines.map(line => line.id))).toEqual([[101], [201]]);
 		expect(rows[0]).not.toHaveProperty('balance');
-		expect(rows[0].orders[0]).not.toHaveProperty('id');
+		expect(rows[0].orders[0]).toHaveProperty('id', 10);
 	});
 
 	test('applies limit and offset independently per parent', async () => {
