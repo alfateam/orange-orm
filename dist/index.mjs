@@ -1726,8 +1726,6 @@ function requireGetSessionSingleton () {
 
 var getManyDtoScoped = {exports: {}};
 
-var getManyDto = {exports: {}};
-
 var newShallowColumnSql;
 var hasRequiredNewShallowColumnSql;
 
@@ -2950,6 +2948,8 @@ function requireExecuteQueries () {
 	return executeQueries_1;
 }
 
+var getManyDto = {exports: {}};
+
 var hasRequiredGetManyDto$1;
 
 function requireGetManyDto$1 () {
@@ -2961,6 +2961,7 @@ function requireGetManyDto$1 () {
 	const strategyToSpan = requireStrategyToSpan();
 	const executeQueries = requireExecuteQueries();
 	const getSessionSingleton = requireGetSessionSingleton();
+	const getManyDtoScoped = requireGetManyDtoScoped();
 
 	async function getManyDto$1(context, table, filter, strategy, spanFromParent, updateParent) {
 		filter = negotiateRawSqlFilter(context, filter, table);
@@ -3101,6 +3102,7 @@ function requireGetManyDto$1 () {
 		}
 		span._rowsMap = rowsMap;
 		span._ids = fkIds;
+		span._rows = outRows;
 
 		keys.splice(0, columnsLength + aggregateKeys.length);
 		if (span.legs.toArray().length === 0)
@@ -3160,6 +3162,11 @@ function requireGetManyDto$1 () {
 			const name = leg.name;
 			const table = span.table;
 			const relation = table._relations[name];
+			const relationStrategy = strategy[name];
+			if (hasPagination(leg.span)) {
+				promises.push(fetchPagedRelation(leg, relation, relationStrategy));
+				return;
+			}
 			const parametersPerRow = relation.joinRelation.columns.length;
 			const maxRows = maxParameters
 				? Math.max(1, Math.floor((maxParameters - 1) / parametersPerRow))
@@ -3210,6 +3217,100 @@ function requireGetManyDto$1 () {
 				});
 			}
 		};
+
+		async function fetchPagedRelation(leg, relation, relationStrategy) {
+			const columns = relation.joinRelation.columns;
+			const childTable = relation.childTable;
+			// Build a fresh span through getManyDtoScoped so strategyToSpan keeps
+			// omitted primary keys and relation foreign keys in the internal projection.
+			// The public Selection type still follows the caller's original strategy.
+			const executionStrategy = withoutPagination(relationStrategy);
+			const filter = strategyFilter(childTable, relationStrategy);
+			const scopeColumns = columns.map((column, index) => ({
+				column,
+				alias: `__rdb_m${index}`,
+				value: scopeRow => scopeRow.key[index]
+			}));
+			let scopeFilter = emptyFilter;
+			for (let i = 0; i < columns.length; i++) {
+				const scopeRef = getManyDtoScoped.newScopeColumnRef(context, scopeColumns[i].alias);
+				const columnFilter = columns[i].eq(context, scopeRef);
+				scopeFilter = scopeFilter === emptyFilter
+					? columnFilter
+					: scopeFilter.and(context, columnFilter);
+			}
+
+			const scopeRows = [];
+			for (let ownerId = 0; ownerId < span._rows.length; ownerId++) {
+				if (!span._rows[ownerId])
+					continue;
+				const id = span._ids[ownerId];
+				scopeRows.push({
+					ownerId,
+					key: columns.length === 1 ? [id] : id
+				});
+			}
+			if (scopeRows.length === 0)
+				return;
+
+			const fixedParameters = filter?.parameters?.length || 0;
+			const maxRows = maxParameters
+				? Math.max(1, Math.floor((maxParameters - fixedParameters) / columns.length))
+				: 100;
+			const chunkSize = Math.min(100, maxRows);
+			const rowsByOwner = new Map();
+			for (const scopeRowsChunk of chunk(scopeRows, chunkSize)) {
+				const rows = await getManyDtoScoped({
+					context,
+					table: childTable,
+					filter,
+					scopeFilter,
+					strategy: executionStrategy,
+					scopeColumns,
+					scopeRows: scopeRowsChunk,
+					offset: leg.span.offset || 0,
+					limit: leg.span.limit
+				});
+				for (const { ownerId, row } of rows) {
+					if (!row)
+						continue;
+					if (!rowsByOwner.has(ownerId))
+						rowsByOwner.set(ownerId, []);
+					rowsByOwner.get(ownerId).push(row);
+				}
+			}
+
+			const paginateInMemory = getSessionSingleton(context, 'engine') === 'sap';
+			const start = leg.span.offset || 0;
+			const end = leg.span.limit === undefined ? undefined : start + leg.span.limit;
+			for (const scopeRow of scopeRows) {
+				const parentRow = span._rows[scopeRow.ownerId];
+				let rows = rowsByOwner.get(scopeRow.ownerId) || [];
+				if (paginateInMemory)
+					rows = rows.slice(start, end);
+				parentRow[leg.name].push(...rows);
+			}
+		}
+
+		function strategyFilter(table, relationStrategy) {
+			if (!relationStrategy?.where)
+				return emptyFilter;
+			const where = typeof relationStrategy.where === 'function'
+				? relationStrategy.where(context, table)
+				: relationStrategy.where;
+			return emptyFilter.and(context, where);
+		}
+
+		function withoutPagination(relationStrategy) {
+			const result = { ...relationStrategy };
+			delete result.limit;
+			delete result.offset;
+			return result;
+		}
+
+		function hasPagination(relationSpan) {
+			return relationSpan.limit !== undefined || (relationSpan.offset || 0) > 0;
+		}
 
 		function createExtractKey(leg) {
 			if (leg.columns.length === 1) {
@@ -3338,7 +3439,6 @@ var hasRequiredGetManyDtoScoped;
 function requireGetManyDtoScoped () {
 	if (hasRequiredGetManyDtoScoped) return getManyDtoScoped.exports;
 	hasRequiredGetManyDtoScoped = 1;
-	const getManyDto = requireGetManyDto$1();
 	const newQuery = requireNewQuery$2();
 	const strategyToSpan = requireStrategyToSpan();
 	const executeQueries = requireExecuteQueries();
@@ -3399,7 +3499,10 @@ function requireGetManyDtoScoped () {
 			if (useWindowPagination)
 				delete rawRows[i][rowNumberKey];
 		}
-		const rows = await getManyDto.decode(context, strategy, span, rawRows);
+		// Resolve lazily because the mapped-relation loader in getManyDto also uses
+		// this helper. Requiring it at module initialization would leave the decoder
+		// pointing at a partial circular export.
+		const rows = await requireGetManyDto$1().decode(context, strategy, span, rawRows);
 		return rows.map((row, index) => ({ ownerId: ownerIds[index], row }));
 	};
 
@@ -3751,7 +3854,9 @@ function requireNewAdHocPlan () {
 				mode = { hasIncludes: targetTable._columns.some(col => targetStrategy[col.alias] === true) };
 				selectionModes.set(targetStrategy, mode);
 			}
-			const wasVisible = targetStrategy[name] !== false && (!mode.hasIncludes || targetStrategy[name] === true);
+			const isPrimaryColumn = targetTable._primaryColumns.includes(column);
+			const wasVisible = targetStrategy[name] !== false
+				&& (isPrimaryColumn || !mode.hasIncludes || targetStrategy[name] === true);
 			if (!wasVisible) {
 				let hidden = hiddenColumns.get(targetStrategy);
 				if (!hidden) {

@@ -7,6 +7,9 @@ type Model = {
 			maxAmount: { ' type': 'numeric', ' notNull': true };
 		};
 		primaryKey: readonly ['id'];
+		relations: {
+			lines: { type: 'hasMany', target: 'orderLine' };
+		};
 	};
 	orderLine: {
 		columns: {
@@ -54,3 +57,20 @@ orderLine.many({ forUpdate: true });
 
 // @ts-expect-error Ad-hoc aliases cannot replace mapped properties.
 order.getMany({ id: orderLine.many() });
+
+const mappedRowsPromise = order.getMany({
+	lines: {
+		amount: true,
+		orderId: false,
+		orderBy: 'id',
+		limit: 1
+	}
+});
+
+type MappedRow = Awaited<typeof mappedRowsPromise>[number];
+declare const mappedRow: MappedRow;
+const mappedAmount: number = mappedRow.lines[0].amount;
+void mappedAmount;
+
+// @ts-expect-error Internally selected tracking keys stay out of the result type.
+mappedRow.lines[0].id;
