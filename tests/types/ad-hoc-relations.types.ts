@@ -30,6 +30,15 @@ type Model = {
 			amount: { ' type': 'numeric', ' notNull': true };
 		};
 		primaryKey: readonly ['id'];
+		relations: {};
+	};
+	package: {
+		columns: {
+			id: { ' type': 'numeric', ' notNull': true };
+			lineId: { ' type': 'numeric', ' notNull': true };
+		};
+		primaryKey: readonly ['id'];
+		relations: {};
 	};
 };
 
@@ -38,14 +47,18 @@ declare const order: TableClient<Model, 'order'>;
 declare const orderLine: TableClient<Model, 'orderLine'>;
 
 const rowsPromise = order.getMany({
-	matchingLines: orderLine.many({
-		where: (line, { root, parent }) => line.orderId.eq(root.id)
-			.and(line.amount.le(parent.maxAmount)),
+	matchingLines: (currentOrder, { db, root }) => db.orderLine.many({
+		where: line => line.orderId.eq(root.id)
+			.and(line.amount.le(currentOrder.maxAmount)),
 		orderBy: 'id',
-		limit: 2
+		limit: 2,
+		packages: (currentLine, { db }) => db.package.many({
+			where: pkg => pkg.lineId.eq(currentLine.id)
+				.and(currentLine.orderId.eq(currentOrder.id))
+		})
 	}),
-	firstLine: orderLine.one({
-		where: (line, { root }) => line.orderId.eq(root.id),
+	firstLine: (_, { db, root }) => db.orderLine.one({
+		where: line => line.orderId.eq(root.id),
 		orderBy: 'id'
 	})
 });
@@ -54,20 +67,21 @@ type Row = Awaited<typeof rowsPromise>[number];
 declare const row: Row;
 
 const manyId: number = row.matchingLines[0].id;
+const nestedPackageId: number = row.matchingLines[0].packages[0].id;
 const oneId: number | undefined = row.firstLine?.id;
 
 const scopedRowsPromise = customer.getMany({
 	orders: {
-		matchingLines: orderLine.many({
-			where: (line, { root, parent }) => line.orderId.eq(parent.id)
+		matchingLines: (currentOrder, { db, root }) => db.orderLine.many({
+			where: line => line.orderId.eq(currentOrder.id)
 				.and(line.amount.le(root.balance))
 				.and(root.orders.any(relatedOrder => relatedOrder.id.gt(0)))
-				.and(parent.customer.balance.gt(0)),
+				.and(currentOrder.customer.balance.gt(0)),
 			id: true,
 			orderId: false
 		}),
-		firstLine: orderLine.one({
-			where: (line, { parent }) => line.orderId.eq(parent.id),
+		firstLine: (currentOrder, { db }) => db.orderLine.one({
+			where: line => line.orderId.eq(currentOrder.id),
 			id: true
 		})
 	}
@@ -79,44 +93,54 @@ const scopedManyId: number = scopedRow.orders[0].matchingLines[0].id;
 const scopedOneId: number | undefined = scopedRow.orders[0].firstLine?.id;
 
 void manyId;
+void nestedPackageId;
 void oneId;
 void scopedManyId;
 void scopedOneId;
 
-// @ts-expect-error Target columns remain contextually typed.
-orderLine.many({ where: line => line.missing.eq(1) });
-
-// @ts-expect-error Scope columns must exist on a mapped table.
-orderLine.many({ where: (line, { root }) => line.orderId.eq(root.missing) });
+order.getMany({
+	invalidTargetColumn: (_, { db }) => db.orderLine.many({
+		// @ts-expect-error Target columns remain contextually typed.
+		where: line => line.missing.eq(1)
+	}),
+	invalidScopeColumn: (_, { db, root }) => db.orderLine.many({
+		// @ts-expect-error Scope columns must exist on the root table.
+		where: line => line.orderId.eq(root.missing)
+	})
+});
 
 customer.getMany({
 	orders: {
-		invalidRoot: orderLine.many({
+		invalidRoot: (_, { db, root }) => db.orderLine.many({
 			// @ts-expect-error Root is the customer table at this placement.
-			where: (line, { root }) => line.amount.eq(root.maxAmount)
+			where: line => line.amount.eq(root.maxAmount)
 		}),
-		invalidParent: orderLine.many({
-			// @ts-expect-error Parent is the nested order table at this placement.
-			where: (line, { parent }) => line.amount.eq(parent.balance)
+		invalidCurrent: (currentOrder, { db }) => db.orderLine.many({
+			// @ts-expect-error Current is the nested order table at this placement.
+			where: line => line.amount.eq(currentOrder.balance)
 		})
 	}
 });
 
 order.getMany({
-	invalidTarget: orderLine.many({
+	invalidTarget: (_, { db }) => db.orderLine.many({
 		// @ts-expect-error Target callbacks use orderLine columns.
 		where: line => line.missing.eq(1)
 	})
 });
 
-// @ts-expect-error Strategy factories are not part of the ad-hoc API.
-orderLine.many(() => ({}));
+// @ts-expect-error Ad-hoc builders are only exposed inside strategy functions.
+orderLine.many({});
 
-// @ts-expect-error Ad-hoc descriptors are read-only and cannot request locks.
-orderLine.many({ forUpdate: true });
+order.getMany({
+	locked: (_, { db }) => db.orderLine.many({
+		// @ts-expect-error Ad-hoc descriptors are read-only and cannot request locks.
+		forUpdate: true
+	})
+});
 
 // @ts-expect-error Ad-hoc aliases cannot replace mapped properties.
-order.getMany({ id: orderLine.many() });
+order.getMany({ id: (_, { db }) => db.orderLine.many() });
 
 const mappedRowsPromise = order.getMany({
 	lines: {

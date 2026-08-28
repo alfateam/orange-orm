@@ -41,8 +41,6 @@ function getTSDefinition(tableConfigs, {isNamespace = false, isHttp = false} = {
 		const _tableRelations = tableRelations(table);
 		return `
 export interface ${Name}Table {
-	many(fetchingStrategy?: ${Name}AdHocStrategy): AdHocMany<${Name}>;
-	one(fetchingStrategy?: ${Name}AdHocStrategy): AdHocOne<${Name}>;
 	count(filter?: RawFilter): Promise<number>;
 	getMany<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<${Name}AdHocArray<Strategy>>;
 	getAll(): Promise<${Name}Array>;
@@ -197,7 +195,7 @@ ${Concurrency(table, Name, true)}
 
 			otherConcurrency += `${Concurrency(relation.childTable, tableTypeName)}`;
 			concurrencyRelations += `${relationName}?: ${tableTypeName}Concurrency;${separator}`;
-			strategyRelations += `${relationName}?: ${tableTypeName}Strategy | boolean;${separator}`;
+			strategyRelations += `${relationName}?: ${tableTypeName}Strategy<Root> | boolean;${separator}`;
 			regularRelations += `${relationName}?: ${tableTypeName} | null;${separator}`;
 		};
 		visitor.visitOne = visitor.visitJoin;
@@ -205,7 +203,7 @@ ${Concurrency(table, Name, true)}
 			const tableTypeName = getTableName(relation, relationName);
 			otherConcurrency += `${Concurrency(relation.childTable, tableTypeName)}`;
 			concurrencyRelations += `${relationName}?: ${tableTypeName}Concurrency;${separator}`;
-			strategyRelations += `${relationName}?: ${tableTypeName}Strategy | boolean;${separator}`;
+			strategyRelations += `${relationName}?: ${tableTypeName}Strategy<Root> | boolean;${separator}`;
 			regularRelations += `${relationName}?: ${tableTypeName}[] | null;${separator}`;
 		};
 
@@ -250,8 +248,14 @@ export interface ${name}TableBase {
 }
 
 
-export interface ${name}Strategy {
-	[property: string]: unknown;
+export interface ${name}AdHocTable<Root, Current> {
+	many(fetchingStrategy?: ${name}AdHocStrategy<Root, Current>): AdHocMany<${name}>;
+	one(fetchingStrategy?: ${name}AdHocStrategy<Root, Current>): AdHocOne<${name}>;
+}
+
+export interface ${name}Strategy<Root = ${name}TableBase> {
+	[property: string]: boolean | number | string | object | undefined
+		| ((table: ${name}TableBase, context: AdHocFactoryContext<Root, ${name}TableBase>) => unknown);
 	${strategyColumns(table)}
 	${strategyRelations}
 	limit?: number;
@@ -262,8 +266,8 @@ export interface ${name}Strategy {
 	skipLocked?: boolean;
 }
 
-export type ${name}AdHocStrategy = Omit<${name}Strategy, 'where' | 'forUpdate' | 'skipLocked'> & {
-	where?: RawFilter | ((table: ${name}TableBase, scope: { root: AdHocScopeTable; parent: AdHocScopeTable }) => RawFilter);
+export type ${name}AdHocStrategy<Root, Current> = Omit<${name}Strategy<Root>, 'where' | 'forUpdate' | 'skipLocked'> & {
+	where?: RawFilter | ((table: ${name}TableBase) => RawFilter);
 	forUpdate?: never;
 	skipLocked?: never;
 };
@@ -295,14 +299,16 @@ ${row}`;
 }
 
 function getAdHocScopeTs(tables) {
-	const columnNames = new Set();
-	for (const table of Object.values(tables))
-		for (const column of table._columns)
-			columnNames.add(column.alias);
-	const properties = [...columnNames].map(name => `\t${name}: any;`).join('\n');
+	const dbProperties = Object.keys(tables)
+		.map(name => `\t${name}: ${pascalCase(name)}AdHocTable<Root, Current>;`)
+		.join('\n');
 	return `
-export interface AdHocScopeTable {
-${properties}
+export interface AdHocDb<Root, Current> {
+${dbProperties}
+}
+export interface AdHocFactoryContext<Root, Current> {
+	db: AdHocDb<Root, Current>;
+	root: Root;
 }
 `;
 }
@@ -435,9 +441,9 @@ interface AdHocOne<T> {
 	readonly __result?: T | null;
 }
 type AdHocProperties<Strategy> = {
-	[Property in keyof Strategy as Strategy[Property] extends AdHocMany<any> | AdHocOne<any> ? Property : never]:
-		Strategy[Property] extends AdHocMany<infer Row> ? Row[] :
-		Strategy[Property] extends AdHocOne<infer Row> ? Row | null : never;
+	[Property in keyof Strategy as Strategy[Property] extends (...args: any[]) => AdHocMany<any> | AdHocOne<any> ? Property : never]:
+		Strategy[Property] extends (...args: any[]) => AdHocMany<infer Row> ? Row[] :
+		Strategy[Property] extends (...args: any[]) => AdHocOne<infer Row> ? Row | null : never;
 };
 `;
 
@@ -478,9 +484,9 @@ interface AdHocOne<T> {
 	readonly __result?: T | null;
 }
 type AdHocProperties<Strategy> = {
-	[Property in keyof Strategy as Strategy[Property] extends AdHocMany<any> | AdHocOne<any> ? Property : never]:
-		Strategy[Property] extends AdHocMany<infer Row> ? Row[] :
-		Strategy[Property] extends AdHocOne<infer Row> ? Row | null : never;
+	[Property in keyof Strategy as Strategy[Property] extends (...args: any[]) => AdHocMany<any> | AdHocOne<any> ? Property : never]:
+		Strategy[Property] extends (...args: any[]) => AdHocMany<infer Row> ? Row[] :
+		Strategy[Property] extends (...args: any[]) => AdHocOne<infer Row> ? Row | null : never;
 };
 export default schema as RdbClient;`;
 }

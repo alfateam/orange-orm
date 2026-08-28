@@ -86,8 +86,8 @@ describe('hono adapter', () => {
 
 		const row = await db.order.getOne({
 			where: order => order.id.eq(2),
-			matchingLines: db.orderLine.many({
-				where: (line, { root }) => line.orderId.eq(root.id)
+			matchingLines: (_, { db, root }) => db.orderLine.many({
+				where: line => line.orderId.eq(root.id)
 			})
 		});
 

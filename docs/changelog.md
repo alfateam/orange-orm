@@ -1,6 +1,6 @@
 ## Changelog
 __Next__
-Add read-only ad-hoc `many()` and `one()` query relations with `root`/`parent` scoped filters, owner-tagged cross-provider batching, composite and non-key correlations, per-owner ordering/pagination, nesting, and Express/Hono transport support.
+Add read-only ad-hoc `many()` and `one()` query relations returned from fetch-strategy callbacks with a lexical current-row parameter and a context exposing `db` and `root`, including captured outer scopes, owner-tagged cross-provider batching, composite and non-key correlations, per-owner ordering/pagination, nesting, save refresh, and Express/Hono transport support.
 Deduplicate identical ad-hoc scope tuples before batching.
 Fix mapped `hasMany` fetching strategies so nested `limit` and `offset` paginate independently per parent while retaining internal keys for change tracking.
 __5.4.2__  

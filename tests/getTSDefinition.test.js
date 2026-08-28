@@ -17,9 +17,12 @@ describe('generated TypeScript definition', () => {
 			.map(diagnostic => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'));
 
 		expect(errors).toEqual([]);
-		expect(source).toContain('many(fetchingStrategy?: OrderLineAdHocStrategy)');
+		expect(source).toContain('many(fetchingStrategy?: OrderLineAdHocStrategy<Root, Current>)');
 		expect(source).toContain('Promise<OrderLineAdHocArray<Strategy>>');
-		expect(source).toContain('root: AdHocScopeTable; parent: AdHocScopeTable');
+		expect(source).toContain('context: AdHocFactoryContext<Root, OrderLineTableBase>');
+		expect(source).toContain('where?: RawFilter | ((table: OrderLineTableBase) => RawFilter);');
+		expect(source).toContain('root: Root;');
+		expect(source).not.toContain('parent:');
 	});
 });
 

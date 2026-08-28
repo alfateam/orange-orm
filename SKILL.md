@@ -903,32 +903,34 @@ const orders = await db.order.getMany({
 });
 ```
 
-### Ad-hoc relations with root/parent scope
+### Ad-hoc relations with lexical current/root scope
 
-Use `table.many()` or `table.one()` inside `getMany`/`getOne` when the result should include rows from another mapped table without declaring a relation. `root` is the top-level result row and `parent` is the row that owns the ad-hoc property.
+Return `db.table.many()` or `db.table.one()` from a fetch-strategy callback when the result should include rows from another mapped table without declaring a relation. The callback's first parameter is the current row that owns the property. Its context supplies `db` and the top-level `root` row.
 
 ```ts
 const customers = await db.customer.getMany({
   orders: {
-    matchingLines: db.orderLine.many({
-      where: (line, { root, parent }) =>
-        line.orderId.eq(parent.id).and(line.amount.lt(root.balance)),
+    matchingLines: (order, { db, root }) => db.orderLine.many({
+      where: line =>
+        line.orderId.eq(order.id).and(line.amount.lt(root.balance)),
       orderBy: 'id',
       limit: 10
     }),
-    firstLine: db.orderLine.one({
-      where: (line, { parent }) => line.orderId.eq(parent.id),
+    firstLine: (order, { db }) => db.orderLine.one({
+      where: line => line.orderId.eq(order.id),
       orderBy: 'id'
     })
   }
 });
 ```
 
+The callback form is required. TypeScript derives the exact current-row and `root` types from where the property is placed, while the inner `where` callback keeps the ordinary filter syntax and relation access. Nested ad-hoc callbacks may capture current-row variables from outer callbacks.
+
 - `many()` yields an array; `one()` yields a row or `null`.
 - The ad-hoc property name must not collide with a mapped or reserved property.
 - Supports column selection, mapped/nested ad-hoc relations, `where`, `orderBy`, `limit`, and `offset` per parent.
-- Scope filters are owner-tagged and batched, including composite/non-key equality and additional root/parent comparisons. Hidden scope fields and the internal owner tag are removed from the returned DTO.
-- Ad-hoc projections are read-only, are ignored by `saveChanges()`, and cannot use `forUpdate`/`skipLocked`.
+- Scope filters are owner-tagged and batched, including composite/non-key equality and comparisons against any captured lexical scope. Hidden scope fields and the internal owner tag are removed from the returned DTO.
+- Ad-hoc projections are read-only and cannot use `forUpdate`/`skipLocked`. `saveChanges()` re-runs them for affected rows so their values stay current.
 - Hidden attachment columns are handled automatically; callers do not need to select primary keys.
 - Works locally and through Express/Hono HTTP adapters. Target `baseFilter` rules still apply.
 

@@ -1,13 +1,8 @@
 const emptyFilter = require('../emptyFilter');
-const { isAdHocRelation } = require('../adHocRelation');
+const { isAdHocRelation, ownerScopeMarker } = require('../adHocRelation');
 const clone = require('rfdc/default');
 const getSessionSingleton = require('../table/getSessionSingleton');
 const getManyDtoScoped = require('./getManyDtoScoped');
-
-const scopeTableAliases = {
-	root: '__rdb_root',
-	parent: '__rdb_parent'
-};
 
 module.exports = function newAdHocPlan({
 	context,
@@ -21,7 +16,11 @@ module.exports = function newAdHocPlan({
 	const strategy = JSON.parse(JSON.stringify(sourceStrategy || {}));
 	const hiddenColumns = new Map();
 	const selectionModes = new Map();
-	prepare(rootTable, strategy, strategy);
+	const scopeDefinitions = new Map([
+		['root', { table: rootTable, strategy }]
+	]);
+	registerScopes(rootTable, strategy);
+	prepare(rootTable, strategy);
 
 	return {
 		strategy: stripAdHocRelations(rootTable, strategy),
@@ -29,12 +28,36 @@ module.exports = function newAdHocPlan({
 	};
 
 	async function materialize(rows) {
-		await populateAdHocRelations(rows.map(row => ({ row, root: row })), rootTable, strategy);
+		await populateAdHocRelations(
+			rows.map(row => ({ row, root: row, scopes: Object.create(null) })),
+			rootTable,
+			strategy
+		);
 		stripHiddenColumns(rows, rootTable, strategy);
 		return rows;
 	}
 
-	function prepare(currentTable, currentStrategy, rootStrategy) {
+	function registerScopes(currentTable, currentStrategy) {
+		if (!currentStrategy || typeof currentStrategy !== 'object')
+			return;
+		for (let name in currentStrategy) {
+			const value = currentStrategy[name];
+			if (isAdHocRelation(value)) {
+				const scopeName = value[ownerScopeMarker];
+				if (typeof scopeName !== 'string' || !/^s[1-9][0-9]*$/.test(scopeName))
+					throwBadRequest('Ad-hoc relation is missing its lexical owner scope');
+				const existing = scopeDefinitions.get(scopeName);
+				if (existing && (existing.table !== currentTable || existing.strategy !== currentStrategy))
+					throwBadRequest(`Ad-hoc lexical scope '${scopeName}' is ambiguous`);
+				scopeDefinitions.set(scopeName, { table: currentTable, strategy: currentStrategy });
+				registerScopes(resolveAdHocTable(value.table), value.strategy || {});
+			}
+			else if (currentTable._relations[name] && value && typeof value === 'object')
+				registerScopes(currentTable._relations[name].childTable, value);
+		}
+	}
+
+	function prepare(currentTable, currentStrategy) {
 		if (!currentStrategy || typeof currentStrategy !== 'object')
 			return;
 		for (let name in currentStrategy) {
@@ -42,19 +65,20 @@ module.exports = function newAdHocPlan({
 			if (isAdHocRelation(value)) {
 				const targetTable = resolveAdHocTable(value.table);
 				const refs = collectOwnedScopeRefs(value.strategy);
-				addScopeTableKeys(refs, currentTable);
-				for (const column of refs.root)
-					includeColumn(rootTable, rootStrategy, column);
-				for (const column of refs.parent)
-					includeColumn(currentTable, currentStrategy, column);
-				prepare(targetTable, value.strategy || {}, rootStrategy);
+				addScopeTableKeys(refs);
+				for (const [scopeName, columns] of refs.columns) {
+					const definition = getScopeDefinition(scopeName);
+					for (const column of columns)
+						includeColumn(definition.table, definition.strategy, column);
+				}
+				prepare(targetTable, value.strategy || {});
 			}
 			else if (currentTable._relations[name] && value && typeof value === 'object')
-				prepare(currentTable._relations[name].childTable, value, rootStrategy);
+				prepare(currentTable._relations[name].childTable, value);
 		}
 	}
 
-	function collectOwnedScopeRefs(value, result = { root: new Set(), parent: new Set(), tables: new Set() }) {
+	function collectOwnedScopeRefs(value, result = { columns: new Map(), tables: new Set() }) {
 		if (!value || typeof value !== 'object' || isAdHocRelation(value))
 			return result;
 		if (Array.isArray(value)) {
@@ -63,18 +87,18 @@ module.exports = function newAdHocPlan({
 			return result;
 		}
 		if (typeof value.__columnRef === 'string') {
-			const match = /^\$(root|parent)\.(.+)$/.exec(value.__columnRef);
-			if (match) {
-				if (match[2].includes('.'))
-					result.tables.add(match[1]);
+			const scopePath = parseScopePath(value.__columnRef);
+			if (scopePath) {
+				if (scopePath.path.includes('.'))
+					result.tables.add(scopePath.scopeName);
 				else
-					result[match[1]].add(match[2]);
+					getScopeColumns(result, scopePath.scopeName).add(scopePath.path);
 			}
 		}
 		if (typeof value.path === 'string') {
-			const match = /^\$(root|parent)\./.exec(value.path);
-			if (match)
-				result.tables.add(match[1]);
+			const scopePath = parseScopePath(value.path);
+			if (scopePath)
+				result.tables.add(scopePath.scopeName);
 		}
 		for (let name in value)
 			collectOwnedScopeRefs(value[name], result);
@@ -83,15 +107,41 @@ module.exports = function newAdHocPlan({
 
 	function hasOwnedScopeRefs(value) {
 		const refs = collectOwnedScopeRefs(value);
-		return refs.root.size > 0 || refs.parent.size > 0 || refs.tables.size > 0;
+		return refs.columns.size > 0 || refs.tables.size > 0;
 	}
 
-	function addScopeTableKeys(refs, ownerTable) {
+	function addScopeTableKeys(refs) {
 		for (const scopeName of refs.tables) {
-			const table = scopeName === 'root' ? rootTable : ownerTable;
-			for (const column of table._primaryColumns)
-				refs[scopeName].add(column.alias);
+			const definition = getScopeDefinition(scopeName);
+			for (const column of definition.table._primaryColumns)
+				getScopeColumns(refs, scopeName).add(column.alias);
 		}
+	}
+
+	function getScopeColumns(refs, scopeName) {
+		let columns = refs.columns.get(scopeName);
+		if (!columns) {
+			columns = new Set();
+			refs.columns.set(scopeName, columns);
+		}
+		return columns;
+	}
+
+	function getScopeDefinition(scopeName) {
+		const definition = scopeDefinitions.get(scopeName);
+		if (!definition)
+			throwBadRequest(`Ad-hoc lexical scope '${scopeName}' is invalid`);
+		return definition;
+	}
+
+	function parseScopePath(path) {
+		const rootMatch = /^\$root\.(.+)$/.exec(path);
+		if (rootMatch)
+			return { scopeName: 'root', path: rootMatch[1] };
+		const lexicalMatch = /^\$scope\.([^.]+)\.(.+)$/.exec(path);
+		return lexicalMatch
+			? { scopeName: lexicalMatch[1], path: lexicalMatch[2] }
+			: undefined;
 	}
 
 	function resolveAdHocTable(name) {
@@ -132,10 +182,10 @@ module.exports = function newAdHocPlan({
 					if (Array.isArray(child)) {
 						for (const row of child)
 							if (row)
-								childPairs.push({ row, root: pair.root });
+								childPairs.push(inheritScopes(row, pair));
 					}
 					else if (child)
-						childPairs.push({ row: child, root: pair.root });
+						childPairs.push(inheritScopes(child, pair));
 				}
 				await populateAdHocRelations(childPairs, currentTable._relations[name].childTable, value);
 			}
@@ -143,15 +193,17 @@ module.exports = function newAdHocPlan({
 
 		async function populateDescriptor(name, descriptor) {
 			const targetTable = resolveAdHocTable(descriptor.table);
+			const ownerScopeName = descriptor[ownerScopeMarker];
+			const ownerPairs = pairs.map(pair => bindOwnerScope(pair, ownerScopeName));
 			const childPairs = [];
 			if (!hasOwnedScopeRefs(descriptor.strategy)) {
 				const rows = await fetchDescriptorRows(descriptor, targetTable);
-				for (const pair of pairs) {
+				for (const pair of ownerPairs) {
 					const attached = descriptor.__rdbAdHocRelation === 'many'
 						? clone(rows)
 						: (rows.length ? clone(rows[0]) : null);
 					pair.row[name] = attached;
-					addChildPairs(attached, pair.root);
+					addChildPairs(attached, pair);
 				}
 				await populateChildren();
 				return;
@@ -161,40 +213,56 @@ module.exports = function newAdHocPlan({
 				const attachedRows = await fetchDescriptorRowsScoped(
 					descriptor,
 					targetTable,
-					currentTable,
-					pairs
+					ownerPairs
 				);
-				for (let i = 0; i < pairs.length; i++) {
-					const pair = pairs[i];
+				for (let i = 0; i < ownerPairs.length; i++) {
+					const pair = ownerPairs[i];
 					const rows = attachedRows[i];
 					const attached = descriptor.__rdbAdHocRelation === 'many' ? rows : (rows[0] || null);
 					pair.row[name] = attached;
-					addChildPairs(attached, pair.root);
+					addChildPairs(attached, pair);
 				}
 				await populateChildren();
 				return;
 			}
 
-			for (const pair of pairs) {
-				const scope = createScope(pair, currentTable);
+			for (const pair of ownerPairs) {
+				const scope = createScope(pair);
 				const rows = await fetchDescriptorRows(descriptor, targetTable, scope);
 				pair.row[name] = descriptor.__rdbAdHocRelation === 'many'
 					? rows
 					: (rows[0] || null);
-				addChildPairs(pair.row[name], pair.root);
+				addChildPairs(pair.row[name], pair);
 			}
 			await populateChildren();
 
-			function addChildPairs(value, ownerRoot) {
+			function addChildPairs(value, ownerPair) {
 				const rows = Array.isArray(value) ? value : value ? [value] : [];
 				for (const row of rows)
-					childPairs.push({ row, root: ownerRoot });
+					childPairs.push(inheritScopes(row, ownerPair));
 			}
 
 			async function populateChildren() {
 				await populateAdHocRelations(childPairs, targetTable, descriptor.strategy || {});
 			}
 		}
+	}
+
+	function bindOwnerScope(pair, scopeName) {
+		getScopeDefinition(scopeName);
+		return {
+			row: pair.row,
+			root: pair.root,
+			scopes: { ...pair.scopes, [scopeName]: pair.row }
+		};
+	}
+
+	function inheritScopes(row, pair) {
+		return {
+			row,
+			root: pair.root,
+			scopes: { ...pair.scopes }
+		};
 	}
 
 	function canUseScopedBatch(descriptor) {
@@ -205,11 +273,11 @@ module.exports = function newAdHocPlan({
 			&& !hasOwnedScopeRefs(outsideWhere);
 	}
 
-	async function fetchDescriptorRowsScoped(descriptor, targetTable, ownerTable, pairs) {
+	async function fetchDescriptorRowsScoped(descriptor, targetTable, pairs) {
 		const result = pairs.map(() => []);
 		const refs = collectOwnedScopeRefs(descriptor.strategy.where);
-		addScopeTableKeys(refs, ownerTable);
-		const { scope, scopeColumns, scopeTables } = createVirtualScope(refs, ownerTable);
+		addScopeTableKeys(refs);
+		const { scope, scopeColumns, scopeTables } = createVirtualScope(refs);
 		const scopeGroups = createScopeGroups(pairs, scopeColumns);
 		const rowsByGroup = scopeGroups.map(() => []);
 		const targetBaseFilter = await resolveBaseFilter(descriptor.table, targetTable);
@@ -235,11 +303,8 @@ module.exports = function newAdHocPlan({
 		const databasePaginates = getSessionSingleton(context, 'engine') !== 'sap'
 			&& (start > 0 || limit !== undefined);
 		for (let offset = 0; offset < scopeGroups.length; offset += chunkSize) {
-			const scopeRows = scopeGroups.slice(offset, offset + chunkSize).map(group => ({
-				ownerId: group.groupId,
-				root: group.root,
-				parent: group.parent
-			}));
+			const scopeRows = scopeGroups.slice(offset, offset + chunkSize).map(group =>
+				({ ownerId: group.groupId, ...group.scopeRows }));
 			const rows = await getManyDtoScoped({
 				context,
 				table: targetTable,
@@ -273,14 +338,13 @@ module.exports = function newAdHocPlan({
 		const groupsByKey = new Map();
 		for (let pairIndex = 0; pairIndex < pairs.length; pairIndex++) {
 			const pair = pairs[pairIndex];
-			const scopeRow = { root: pair.root, parent: pair.row };
+			const scopeRow = createScopeRows(pair);
 			const key = createScopeKey(scopeColumns, scopeRow);
 			let group = key === undefined ? undefined : groupsByKey.get(key);
 			if (!group) {
 				group = {
 					groupId: groups.length,
-					root: pair.root,
-					parent: pair.row,
+					scopeRows: scopeRow,
 					pairIndexes: []
 				};
 				groups.push(group);
@@ -313,22 +377,17 @@ module.exports = function newAdHocPlan({
 		}
 	}
 
-	function createVirtualScope(refs, ownerTable) {
-		const scope = {
-			root: {
-				row: {},
-				table: rootTable,
-				alias: refs.tables.has('root') ? scopeTableAliases.root : undefined
-			},
-			parent: {
-				row: {},
-				table: ownerTable,
-				alias: refs.tables.has('parent') ? scopeTableAliases.parent : undefined
-			}
-		};
+	function createVirtualScope(refs) {
+		const scope = Object.create(null);
 		const scopeColumns = [];
-		for (const scopeName of ['root', 'parent'])
-			for (const name of refs[scopeName]) {
+		for (const [scopeName, columns] of refs.columns) {
+			const definition = getScopeDefinition(scopeName);
+			scope[scopeName] = {
+				row: {},
+				table: definition.table,
+				alias: refs.tables.has(scopeName) ? `__rdb_scope_${scopeName}` : undefined
+			};
+			for (const name of columns) {
 				const alias = `c${scopeColumns.length}`;
 				const column = scope[scopeName].table[name];
 				scope[scopeName].row[name] = getManyDtoScoped.newScopeColumnRef(context, alias);
@@ -340,6 +399,7 @@ module.exports = function newAdHocPlan({
 					value: row => row[scopeName][name]
 				});
 			}
+		}
 		const scopeTables = [...refs.tables].map(scopeName => ({
 			scopeName,
 			table: scope[scopeName].table,
@@ -348,10 +408,19 @@ module.exports = function newAdHocPlan({
 		return { scope, scopeColumns, scopeTables };
 	}
 
-	function createScope(pair, ownerTable) {
+	function createScope(pair) {
+		const scope = {
+			root: { row: pair.root, table: rootTable }
+		};
+		for (const [scopeName, row] of Object.entries(pair.scopes))
+			scope[scopeName] = { row, table: getScopeDefinition(scopeName).table };
+		return scope;
+	}
+
+	function createScopeRows(pair) {
 		return {
-			root: { row: pair.root, table: rootTable },
-			parent: { row: pair.row, table: ownerTable }
+			root: pair.root,
+			...pair.scopes
 		};
 	}
 

@@ -156,17 +156,17 @@ describe.each(providers)('ad-hoc relations on $name', provider => {
 			rows = await db.order.getMany({
 				where: order => order.id.in(fixture.orders.map(row => row.id)),
 				orderBy: 'id',
-				latestLines: db.orderLine.many({
+				latestLines: (_, { db, root }) => db.orderLine.many({
 					id: true,
 					orderId: false,
-					where: (line, { root }) => line.orderId.eq(root.id),
+					where: line => line.orderId.eq(root.id),
 					orderBy: 'id desc',
 					limit: 1
 				}),
-				firstLine: db.orderLine.one({
+				firstLine: (_, { db, root }) => db.orderLine.one({
 					id: true,
 					orderId: false,
-					where: (line, { root }) => line.orderId.eq(root.id),
+					where: line => line.orderId.eq(root.id),
 					orderBy: 'id'
 				})
 			});
@@ -224,7 +224,7 @@ describe.each(providers)('ad-hoc relations on $name', provider => {
 			expect(targetQueries[0]).toMatch(/row_number\s*\(\s*\)\s*over\s*\(\s*partition by/i);
 	});
 
-	test('resolves root and parent scope in nested strategies', async () => {
+	test('resolves root and current scope in nested strategies', async () => {
 		const queries = [];
 		const onQuery = query => queries.push(query.sql);
 		orange.on('query', onQuery);
@@ -237,9 +237,9 @@ describe.each(providers)('ad-hoc relations on $name', provider => {
 				orders: {
 					orderDate: true,
 					orderBy: 'id',
-					affordableLines: db.orderLine.many({
+					affordableLines: (order, { db, root }) => db.orderLine.many({
 						id: true,
-						where: (line, { root, parent }) => line.orderId.eq(parent.id)
+						where: line => line.orderId.eq(order.id)
 							.and(line.amount.lt(root.balance)),
 						orderBy: 'id'
 					})
@@ -271,8 +271,8 @@ describe.each(providers)('ad-hoc relations on $name', provider => {
 				name: true,
 				balance: true,
 				orderBy: 'balance',
-				matchingLines: db.orderLine.many({
-					where: (line, { root }) => line.product.eq(root.name)
+				matchingLines: (_, { db, root }) => db.orderLine.many({
+					where: line => line.product.eq(root.name)
 						.and(line.amount.lt(root.balance)),
 					orderBy: 'amount'
 				})
@@ -306,8 +306,8 @@ describe.each(providers)('ad-hoc relations on $name', provider => {
 			rows = await db.order.getMany({
 				where: order => order.id.in(fixture.orders.map(row => row.id)),
 				orderBy: 'id',
-				earlierDates: db.datetest.many({
-					where: (dateRow, { root }) => dateRow.datetime.lt(root.orderDate),
+				earlierDates: (_, { db, root }) => db.datetest.many({
+					where: dateRow => dateRow.datetime.lt(root.orderDate),
 					orderBy: 'id'
 				})
 			});
@@ -323,12 +323,12 @@ describe.each(providers)('ad-hoc relations on $name', provider => {
 	test('batches and attaches composite correlations', async () => {
 		const rows = await db.compositeOrder.getMany({
 			orderBy: ['companyId', 'orderNo'],
-			matchingLines: db.compositeOrderLine.many({
+			matchingLines: (_, { db, root }) => db.compositeOrderLine.many({
 				companyId: false,
 				orderNo: false,
 				lineNo: true,
 				product: true,
-				where: (line, { root }) => line.companyId.eq(root.companyId)
+				where: line => line.companyId.eq(root.companyId)
 					.and(line.orderNo.eq(root.orderNo)),
 				orderBy: 'lineNo'
 			})

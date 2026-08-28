@@ -1,4 +1,5 @@
 const marker = '__rdbAdHocRelation';
+const ownerScopeMarker = '__rdbAdHocOwnerScope';
 
 function isAdHocRelation(value) {
 	return !!value && typeof value === 'object'
@@ -16,6 +17,7 @@ function newAdHocRelation(kind, table, strategy) {
 
 module.exports = {
 	marker,
+	ownerScopeMarker,
 	isAdHocRelation,
 	newAdHocRelation
 };

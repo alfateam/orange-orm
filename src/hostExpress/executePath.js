@@ -170,14 +170,19 @@ function _executePath(context, ...rest) {
 			}
 
 			function parseScopePath(path) {
-				const match = /^\$(root|parent)\.(.+)$/.exec(path);
-				return match ? { scopeName: match[1], path: match[2] } : undefined;
+				const rootMatch = /^\$root\.(.+)$/.exec(path);
+				if (rootMatch)
+					return { scopeName: 'root', path: rootMatch[1] };
+				const lexicalMatch = /^\$scope\.([^.]+)\.(.+)$/.exec(path);
+				return lexicalMatch
+					? { scopeName: lexicalMatch[1], path: lexicalMatch[2] }
+					: undefined;
 			}
 
 			function getScope(scopeName, scope) {
 				const selectedScope = scope?.[scopeName];
 				if (!selectedScope?.table) {
-					const e = new Error(`Scope table reference '$${scopeName}' is invalid`);
+					const e = new Error(`Scope table reference '${scopeName}' is invalid`);
 					// @ts-ignore
 					e.status = 400;
 					throw e;
@@ -693,7 +698,8 @@ function _executePath(context, ...rest) {
 	}
 
 	function isScopeRef(json) {
-		return isColumnRef(json) && /^\$(root|parent)\./.test(json.__columnRef);
+		return isColumnRef(json) && (/^\$root\./.test(json.__columnRef)
+			|| /^\$scope\.[^.]+\./.test(json.__columnRef));
 	}
 
 	function resolveColumnRef(table, path) {
