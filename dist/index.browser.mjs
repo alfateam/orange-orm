@@ -3358,6 +3358,7 @@ function requireGetManyDtoScoped () {
 		scopeFilter,
 		strategy,
 		scopeColumns,
+		scopeTables = [],
 		scopeRows,
 		offset,
 		limit
@@ -3371,15 +3372,16 @@ function requireGetManyDtoScoped () {
 		const scopeSource = newScopeSource(context, scopeColumns, scopeRows);
 		const scopeJoin = scopeSource
 			.prepend(' INNER JOIN ')
-			.append(' ON ')
-			.append(scopeFilter);
+			.append(' ON 1=1')
+			.append(newScopeTableJoins(context, scopeTables, scopeColumns));
+		const scopedFilter = filter.and(context, scopeFilter);
 		const ownerSelect = `${quote(scopeAlias)}.${quote(ownerColumnAlias)} as ${quote(resultOwnerAlias)},`;
 		const useWindowPagination = shouldUseWindowPagination(getSessionSingleton(context, 'engine'), offset, limit);
 		const orderBy = extractOrderBy(context, table, alias, span.orderBy);
 		const rowNumberSelect = useWindowPagination
 			? `ROW_NUMBER() OVER (PARTITION BY ${quote(scopeAlias)}.${quote(ownerColumnAlias)}${orderBy}) as ${quote(rowNumberAlias)},`
 			: '';
-		let query = newQuery(context, table, filter, span, alias, {
+		let query = newQuery(context, table, scopedFilter, span, alias, {
 			extraSelect: ownerSelect + rowNumberSelect,
 			fromSuffix: scopeJoin,
 			...(useWindowPagination ? { orderBy: '' } : {})
@@ -3410,6 +3412,27 @@ function requireGetManyDtoScoped () {
 			}
 		};
 	};
+
+	function newScopeTableJoins(context, scopeTables, scopeColumns) {
+		const quote = getSessionSingleton(context, 'quote');
+		let result = newParameterized('');
+		for (const { scopeName, table, alias } of scopeTables) {
+			result = result.append(` INNER JOIN ${quote(table._dbName)} ${quote(alias)} ON `);
+			for (let index = 0; index < table._primaryColumns.length; index++) {
+				if (index > 0)
+					result = result.append(' AND ');
+				const column = table._primaryColumns[index];
+				const scopeColumn = scopeColumns.find(candidate =>
+					candidate.scopeName === scopeName && candidate.name === column.alias);
+				if (!scopeColumn)
+					throw new Error(`Missing ${scopeName} scope key '${column.alias}'`);
+				result = result.append(
+					`${quote(alias)}.${quote(column._dbName)}=${quote(scopeAlias)}.${quote(scopeColumn.alias)}`
+				);
+			}
+		}
+		return result;
+	}
 
 	function newScopeSource(context, scopeColumns, scopeRows) {
 		const quote = getSessionSingleton(context, 'quote');
@@ -3480,6 +3503,11 @@ function requireNewAdHocPlan () {
 	const getSessionSingleton = requireGetSessionSingleton();
 	const getManyDtoScoped = requireGetManyDtoScoped();
 
+	const scopeTableAliases = {
+		root: '__rdb_root',
+		parent: '__rdb_parent'
+	};
+
 	newAdHocPlan = function newAdHocPlan({
 		context,
 		rootTable,
@@ -3513,6 +3541,7 @@ function requireNewAdHocPlan () {
 				if (isAdHocRelation(value)) {
 					const targetTable = resolveAdHocTable(value.table);
 					const refs = collectOwnedScopeRefs(value.strategy);
+					addScopeTableKeys(refs, currentTable);
 					for (const column of refs.root)
 						includeColumn(rootTable, rootStrategy, column);
 					for (const column of refs.parent)
@@ -3524,7 +3553,7 @@ function requireNewAdHocPlan () {
 			}
 		}
 
-		function collectOwnedScopeRefs(value, result = { root: new Set(), parent: new Set() }) {
+		function collectOwnedScopeRefs(value, result = { root: new Set(), parent: new Set(), tables: new Set() }) {
 			if (!value || typeof value !== 'object' || isAdHocRelation(value))
 				return result;
 			if (Array.isArray(value)) {
@@ -3533,9 +3562,18 @@ function requireNewAdHocPlan () {
 				return result;
 			}
 			if (typeof value.__columnRef === 'string') {
-				const match = /^\$(root|parent)\.([^.]+)$/.exec(value.__columnRef);
+				const match = /^\$(root|parent)\.(.+)$/.exec(value.__columnRef);
+				if (match) {
+					if (match[2].includes('.'))
+						result.tables.add(match[1]);
+					else
+						result[match[1]].add(match[2]);
+				}
+			}
+			if (typeof value.path === 'string') {
+				const match = /^\$(root|parent)\./.exec(value.path);
 				if (match)
-					result[match[1]].add(match[2]);
+					result.tables.add(match[1]);
 			}
 			for (let name in value)
 				collectOwnedScopeRefs(value[name], result);
@@ -3544,7 +3582,15 @@ function requireNewAdHocPlan () {
 
 		function hasOwnedScopeRefs(value) {
 			const refs = collectOwnedScopeRefs(value);
-			return refs.root.size > 0 || refs.parent.size > 0;
+			return refs.root.size > 0 || refs.parent.size > 0 || refs.tables.size > 0;
+		}
+
+		function addScopeTableKeys(refs, ownerTable) {
+			for (const scopeName of refs.tables) {
+				const table = scopeName === 'root' ? rootTable : ownerTable;
+				for (const column of table._primaryColumns)
+					refs[scopeName].add(column.alias);
+			}
 		}
 
 		function resolveAdHocTable(name) {
@@ -3661,7 +3707,8 @@ function requireNewAdHocPlan () {
 		async function fetchDescriptorRowsScoped(descriptor, targetTable, ownerTable, pairs) {
 			const result = pairs.map(() => []);
 			const refs = collectOwnedScopeRefs(descriptor.strategy.where);
-			const { scope, scopeColumns } = createVirtualScope(refs, ownerTable);
+			addScopeTableKeys(refs, ownerTable);
+			const { scope, scopeColumns, scopeTables } = createVirtualScope(refs, ownerTable);
 			const scopeGroups = createScopeGroups(pairs, scopeColumns);
 			const rowsByGroup = scopeGroups.map(() => []);
 			const targetBaseFilter = await resolveBaseFilter(descriptor.table, targetTable);
@@ -3699,6 +3746,7 @@ function requireNewAdHocPlan () {
 					scopeFilter,
 					strategy: executionStrategy,
 					scopeColumns,
+					scopeTables,
 					scopeRows,
 					offset: start,
 					limit
@@ -3766,8 +3814,16 @@ function requireNewAdHocPlan () {
 
 		function createVirtualScope(refs, ownerTable) {
 			const scope = {
-				root: { row: {}, table: rootTable },
-				parent: { row: {}, table: ownerTable }
+				root: {
+					row: {},
+					table: rootTable,
+					alias: refs.tables.has('root') ? scopeTableAliases.root : undefined
+				},
+				parent: {
+					row: {},
+					table: ownerTable,
+					alias: refs.tables.has('parent') ? scopeTableAliases.parent : undefined
+				}
 			};
 			const scopeColumns = [];
 			for (const scopeName of ['root', 'parent'])
@@ -3777,11 +3833,18 @@ function requireNewAdHocPlan () {
 					scope[scopeName].row[name] = getManyDtoScoped.newScopeColumnRef(context, alias);
 					scopeColumns.push({
 						alias,
+						scopeName,
+						name,
 						column,
 						value: row => row[scopeName][name]
 					});
 				}
-			return { scope, scopeColumns };
+			const scopeTables = [...refs.tables].map(scopeName => ({
+				scopeName,
+				table: scope[scopeName].table,
+				alias: scope[scopeName].alias
+			}));
+			return { scope, scopeColumns, scopeTables };
 		}
 
 		function createScope(pair, ownerTable) {
@@ -4070,10 +4133,12 @@ function requireExecutePath () {
 
 		return executePath(...rest);
 
-		async function executePath({ table, tables, tableConfigs, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client }) {
+		async function executePath({ table, tables, tableConfigs, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client, prepareAdHoc, sourceStrategy }) {
 			tables = tables || client?.tables || {};
 			let allowedOps = { ..._allowedOps, insert: !readonly, ...extractRelations(getMeta(table)) };
 			let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, aggregate, distinct, count, delete: _delete, cascadeDelete, update, replace };
+			if (prepareAdHoc)
+				return prepareAdHocPlan(sourceStrategy);
 
 			let res = await parseFilter(JSONFilter, table);
 			if (res === undefined)
@@ -4083,6 +4148,15 @@ function requireExecutePath () {
 
 			function parseFilter(json, table, scope) {
 				if (isFilter(json)) {
+					const scopePath = parseScopePath(json.path);
+					if (scopePath) {
+						const selectedScope = getScope(scopePath.scopeName, scope);
+						return withScopeAlias(selectedScope, () => parseFilter(
+							{ ...json, path: scopePath.path },
+							selectedScope.table,
+							scope
+						));
+					}
 					let subFilters = [];
 
 					let anyAllNone = tryGetAnyAllNone(json.path, table);
@@ -4120,17 +4194,72 @@ function requireExecutePath () {
 				return json;
 
 				function resolveScopeRef(path, scope) {
-					const match = /^\$(root|parent)\.([^.]+)$/.exec(path);
-					const selectedScope = match && scope?.[match[1]];
-					const columnName = match && match[2];
-					const column = selectedScope?.table?.[columnName];
-					if (!selectedScope || !column || typeof column._toFilterArg !== 'function') {
+					const scopePath = parseScopePath(path);
+					const selectedScope = scopePath && getScope(scopePath.scopeName, scope);
+					if (!selectedScope) {
 						const e = new Error(`Scope column reference '${path}' is invalid`);
 						// @ts-ignore
 						e.status = 400;
 						throw e;
 					}
-					return selectedScope.row[columnName];
+					if (!scopePath.path.includes('.')) {
+						const column = selectedScope.table?.[scopePath.path];
+						if (!column || typeof column._toFilterArg !== 'function')
+							throwInvalidScopeRef(path);
+						return selectedScope.row[scopePath.path];
+					}
+					const column = withScopeAlias(selectedScope, () =>
+						resolveColumnRef(selectedScope.table, scopePath.path));
+					const filterArg = withScopeAlias(selectedScope, () => column._toFilterArg(context));
+					return {
+						_toFilterArg() {
+							return filterArg;
+						}
+					};
+
+					function throwInvalidScopeRef(invalidPath) {
+						const e = new Error(`Scope column reference '${invalidPath}' is invalid`);
+						// @ts-ignore
+						e.status = 400;
+						throw e;
+					}
+				}
+
+				function parseScopePath(path) {
+					const match = /^\$(root|parent)\.(.+)$/.exec(path);
+					return match ? { scopeName: match[1], path: match[2] } : undefined;
+				}
+
+				function getScope(scopeName, scope) {
+					const selectedScope = scope?.[scopeName];
+					if (!selectedScope?.table) {
+						const e = new Error(`Scope table reference '$${scopeName}' is invalid`);
+						// @ts-ignore
+						e.status = 400;
+						throw e;
+					}
+					return selectedScope;
+				}
+
+				function withScopeAlias(selectedScope, fn) {
+					if (!selectedScope.alias) {
+						const e = new Error('Scope table reference is unavailable outside a scoped query');
+						// @ts-ignore
+						e.status = 400;
+						throw e;
+					}
+					const table = selectedScope.table;
+					const previousAlias = table._rootAlias;
+					table._rootAlias = selectedScope.alias;
+					try {
+						return fn();
+					}
+					finally {
+						if (previousAlias === undefined)
+							delete table._rootAlias;
+						else
+							table._rootAlias = previousAlias;
+					}
 				}
 
 				function tryGetAnyAllNone(path, table) {
@@ -4306,12 +4435,18 @@ function requireExecutePath () {
 			}
 
 			async function getManyDto(filter, strategy) {
-				validateStrategy(table, strategy, tables);
 				filter = negotiateFilter(filter);
 				const _baseFilter = await invokeBaseFilter();
 				if (_baseFilter)
 					filter = filter.and(context, _baseFilter);
 
+				const adHocPlan = await prepareAdHocPlan(strategy);
+				const rows = await table.getManyDto(context, filter, adHocPlan.strategy);
+				return adHocPlan.materialize(rows);
+			}
+
+			async function prepareAdHocPlan(strategy) {
+				validateStrategy(table, strategy, tables);
 				const adHocPlan = newAdHocPlan({
 					context,
 					rootTable: table,
@@ -4322,8 +4457,7 @@ function requireExecutePath () {
 					resolveBaseFilter: invokeAdHocBaseFilter
 				});
 				await negotiateWhereAndAggregate(adHocPlan.strategy, table);
-				const rows = await table.getManyDto(context, filter, adHocPlan.strategy);
-				return adHocPlan.materialize(rows);
+				return adHocPlan;
 			}
 
 			async function invokeAdHocBaseFilter(tableName, targetTable) {
@@ -4875,7 +5009,15 @@ function requireHostLocal () {
 			async function fn(context) {
 				setSessionSingleton(context, 'ignoreSerializable', true);
 				let patch = body.patch;
-				result = await table.patch(context, patch, { ..._options, ...body.options, isHttp });
+				const options = { ..._options, ...body.options, isHttp };
+				const adHocPlan = await executePath(context, {
+					...options,
+					request: _req,
+					response: _res,
+					prepareAdHoc: true,
+					sourceStrategy: options.strategy
+				});
+				result = await table.patch(context, patch, { ...options, adHocPlan });
 			}
 		}
 
@@ -6255,7 +6397,7 @@ function requireClient () {
 				const patch = createPatch(json, array, meta);
 				if (patch.length === 0)
 					return;
-				let body = stringify({ patch, options: { strategy: stripAdHocStrategy(strategy), ...tableOptions, ...concurrencyOptions, deduceStrategy } });
+				let body = stringify({ patch, options: { strategy, ...tableOptions, ...concurrencyOptions, deduceStrategy } });
 				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				let p = adapter.patch(body);
 				if (strategy?.insertAndForget) {
@@ -6266,10 +6408,10 @@ function requireClient () {
 				let updatedPositions = extractChangedRowsPositions(array, patch, meta);
 				let insertedPositions = getInsertedRowsPosition(array);
 				let { changed, strategy: newStrategy } = await p;
-				copyIntoArray(changed, array, [...insertedPositions, ...updatedPositions], strategy);
+				copyIntoArray(changed, array, [...insertedPositions, ...updatedPositions]);
 				rootMap.set(array, {
 					json: cloneFromDb(array),
-					strategy: toStoredFetchStrategy(restoreAdHocStrategy(newStrategy, strategy)),
+					strategy: toStoredFetchStrategy(newStrategy),
 					originalArray: [...array]
 				});
 			}
@@ -6311,41 +6453,17 @@ function requireClient () {
 				return positions;
 			}
 
-			function copyInto(from, to, strategy) {
+			function copyInto(from, to) {
 				for (let i = 0; i < from.length; i++) {
-					preserveAdHocValues(to[i], from[i], strategy);
 					for (let p in from[i]) {
 						to[i][p] = from[i][p];
 					}
 				}
 			}
 
-			function copyIntoArray(from, to, positions, strategy) {
+			function copyIntoArray(from, to, positions) {
 				for (let i = 0; i < from.length; i++) {
-					preserveAdHocValues(to[positions[i]], from[i], strategy);
 					to[positions[i]] = from[i];
-				}
-			}
-
-			function preserveAdHocValues(previous, next, strategy) {
-				if (!previous || !next || !strategy || typeof strategy !== 'object')
-					return;
-				for (let name in strategy) {
-					if (isAdHocRelation(strategy[name])) {
-						if (name in previous)
-							next[name] = previous[name];
-						continue;
-					}
-					if (!strategy[name] || typeof strategy[name] !== 'object')
-						continue;
-					const previousChild = previous[name];
-					const nextChild = next[name];
-					if (Array.isArray(previousChild) && Array.isArray(nextChild)) {
-						for (let i = 0; i < Math.min(previousChild.length, nextChild.length); i++)
-							preserveAdHocValues(previousChild[i], nextChild[i], strategy[name]);
-					}
-					else
-						preserveAdHocValues(previousChild, nextChild, strategy[name]);
 				}
 			}
 
@@ -6427,44 +6545,6 @@ function requireClient () {
 					clean[name] = stripAdHocStrategy(strategy[name]);
 				}
 				return clean;
-			}
-
-			function restoreAdHocStrategy(serverStrategy, originalStrategy) {
-				if (!originalStrategy || typeof originalStrategy !== 'object')
-					return serverStrategy;
-				if (isAdHocRelation(originalStrategy))
-					return originalStrategy;
-				if (!serverStrategy || typeof serverStrategy !== 'object')
-					return originalStrategy;
-				if (Array.isArray(originalStrategy) && !Array.isArray(serverStrategy))
-					return originalStrategy;
-				if (Array.isArray(originalStrategy))
-					return originalStrategy.map((value, index) => containsAdHoc(value)
-						? restoreAdHocStrategy(serverStrategy[index], value)
-						: serverStrategy[index]);
-				if (!isPlainObject(originalStrategy))
-					return serverStrategy;
-				const restored = { ...serverStrategy };
-				for (let name in originalStrategy) {
-					if (isAdHocRelation(originalStrategy[name]))
-						restored[name] = originalStrategy[name];
-					else if (containsAdHoc(originalStrategy[name]))
-						restored[name] = restoreAdHocStrategy(restored[name], originalStrategy[name]);
-				}
-				return restored;
-			}
-
-			function containsAdHoc(value) {
-				if (!value || typeof value !== 'object')
-					return false;
-				if (isAdHocRelation(value))
-					return true;
-				if (!Array.isArray(value) && !isPlainObject(value))
-					return false;
-				for (let name in value)
-					if (containsAdHoc(value[name]))
-						return true;
-				return false;
 			}
 
 			function isPlainObject(value) {
@@ -6591,14 +6671,14 @@ function requireClient () {
 				if (patch.length === 0)
 					return;
 
-				let body = stringify({ patch, options: { ...tableOptions, ...concurrencyOptions, strategy: stripAdHocStrategy(strategy), deduceStrategy } });
+				let body = stringify({ patch, options: { ...tableOptions, ...concurrencyOptions, strategy, deduceStrategy } });
 
 				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				let { changed, strategy: newStrategy } = await adapter.patch(body);
-				copyInto(changed, [row], strategy);
+				copyInto(changed, [row]);
 				rootMap.set(row, {
 					json: cloneFromDb(row),
-					strategy: toStoredFetchStrategy(restoreAdHocStrategy(newStrategy, strategy))
+					strategy: toStoredFetchStrategy(newStrategy)
 				});
 			}
 
@@ -14066,10 +14146,11 @@ function requirePatchTable () {
 		return result;
 	}
 
-	async function patchTableCore(context, table, patches, { strategy = undefined, deduceStrategy = false, ...options } = {}, dryrun) {
+	async function patchTableCore(context, table, patches, { strategy = undefined, deduceStrategy = false, adHocPlan, ...options } = {}, dryrun) {
 		const engine = getSessionSingleton(context, 'engine');
 		options = cleanOptions(options);
-		strategy = JSON.parse(JSON.stringify(strategy || {}));
+		const responseStrategy = JSON.parse(JSON.stringify(strategy || {}));
+		strategy = adHocPlan?.strategy || responseStrategy;
 		await lockTouchedRows();
 		let changed = new Set();
 		for (let i = 0; i < patches.length; i++) {
@@ -14092,13 +14173,13 @@ function requirePatchTable () {
 			return {
 				changed: [], strategy: stripLockingStrategy(strategy)
 			};
-		return { changed: await toDtos(changed), strategy: stripLockingStrategy(strategy) };
+		return { changed: await toDtos(changed), strategy: stripLockingStrategy(responseStrategy) };
 
 
 		async function toDtos(set) {
 			set = [...set];
-			const result = await table.getManyDto(context, set, stripLockingStrategy(strategy));
-			return result;
+			const rows = await table.getManyDto(context, set, stripLockingStrategy(strategy));
+			return adHocPlan ? adHocPlan.materialize(rows) : rows;
 		}
 
 		function stripLockingStrategy(strategy) {

@@ -4,6 +4,11 @@ const clone = require('rfdc/default');
 const getSessionSingleton = require('../table/getSessionSingleton');
 const getManyDtoScoped = require('./getManyDtoScoped');
 
+const scopeTableAliases = {
+	root: '__rdb_root',
+	parent: '__rdb_parent'
+};
+
 module.exports = function newAdHocPlan({
 	context,
 	rootTable,
@@ -37,6 +42,7 @@ module.exports = function newAdHocPlan({
 			if (isAdHocRelation(value)) {
 				const targetTable = resolveAdHocTable(value.table);
 				const refs = collectOwnedScopeRefs(value.strategy);
+				addScopeTableKeys(refs, currentTable);
 				for (const column of refs.root)
 					includeColumn(rootTable, rootStrategy, column);
 				for (const column of refs.parent)
@@ -48,7 +54,7 @@ module.exports = function newAdHocPlan({
 		}
 	}
 
-	function collectOwnedScopeRefs(value, result = { root: new Set(), parent: new Set() }) {
+	function collectOwnedScopeRefs(value, result = { root: new Set(), parent: new Set(), tables: new Set() }) {
 		if (!value || typeof value !== 'object' || isAdHocRelation(value))
 			return result;
 		if (Array.isArray(value)) {
@@ -57,9 +63,18 @@ module.exports = function newAdHocPlan({
 			return result;
 		}
 		if (typeof value.__columnRef === 'string') {
-			const match = /^\$(root|parent)\.([^.]+)$/.exec(value.__columnRef);
+			const match = /^\$(root|parent)\.(.+)$/.exec(value.__columnRef);
+			if (match) {
+				if (match[2].includes('.'))
+					result.tables.add(match[1]);
+				else
+					result[match[1]].add(match[2]);
+			}
+		}
+		if (typeof value.path === 'string') {
+			const match = /^\$(root|parent)\./.exec(value.path);
 			if (match)
-				result[match[1]].add(match[2]);
+				result.tables.add(match[1]);
 		}
 		for (let name in value)
 			collectOwnedScopeRefs(value[name], result);
@@ -68,7 +83,15 @@ module.exports = function newAdHocPlan({
 
 	function hasOwnedScopeRefs(value) {
 		const refs = collectOwnedScopeRefs(value);
-		return refs.root.size > 0 || refs.parent.size > 0;
+		return refs.root.size > 0 || refs.parent.size > 0 || refs.tables.size > 0;
+	}
+
+	function addScopeTableKeys(refs, ownerTable) {
+		for (const scopeName of refs.tables) {
+			const table = scopeName === 'root' ? rootTable : ownerTable;
+			for (const column of table._primaryColumns)
+				refs[scopeName].add(column.alias);
+		}
 	}
 
 	function resolveAdHocTable(name) {
@@ -185,7 +208,8 @@ module.exports = function newAdHocPlan({
 	async function fetchDescriptorRowsScoped(descriptor, targetTable, ownerTable, pairs) {
 		const result = pairs.map(() => []);
 		const refs = collectOwnedScopeRefs(descriptor.strategy.where);
-		const { scope, scopeColumns } = createVirtualScope(refs, ownerTable);
+		addScopeTableKeys(refs, ownerTable);
+		const { scope, scopeColumns, scopeTables } = createVirtualScope(refs, ownerTable);
 		const scopeGroups = createScopeGroups(pairs, scopeColumns);
 		const rowsByGroup = scopeGroups.map(() => []);
 		const targetBaseFilter = await resolveBaseFilter(descriptor.table, targetTable);
@@ -223,6 +247,7 @@ module.exports = function newAdHocPlan({
 				scopeFilter,
 				strategy: executionStrategy,
 				scopeColumns,
+				scopeTables,
 				scopeRows,
 				offset: start,
 				limit
@@ -290,8 +315,16 @@ module.exports = function newAdHocPlan({
 
 	function createVirtualScope(refs, ownerTable) {
 		const scope = {
-			root: { row: {}, table: rootTable },
-			parent: { row: {}, table: ownerTable }
+			root: {
+				row: {},
+				table: rootTable,
+				alias: refs.tables.has('root') ? scopeTableAliases.root : undefined
+			},
+			parent: {
+				row: {},
+				table: ownerTable,
+				alias: refs.tables.has('parent') ? scopeTableAliases.parent : undefined
+			}
 		};
 		const scopeColumns = [];
 		for (const scopeName of ['root', 'parent'])
@@ -301,11 +334,18 @@ module.exports = function newAdHocPlan({
 				scope[scopeName].row[name] = getManyDtoScoped.newScopeColumnRef(context, alias);
 				scopeColumns.push({
 					alias,
+					scopeName,
+					name,
 					column,
 					value: row => row[scopeName][name]
 				});
 			}
-		return { scope, scopeColumns };
+		const scopeTables = [...refs.tables].map(scopeName => ({
+			scopeName,
+			table: scope[scopeName].table,
+			alias: scope[scopeName].alias
+		}));
+		return { scope, scopeColumns, scopeTables };
 	}
 
 	function createScope(pair, ownerTable) {

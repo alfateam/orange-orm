@@ -52,7 +52,15 @@ function hostLocal() {
 		async function fn(context) {
 			setSessionSingleton(context, 'ignoreSerializable', true);
 			let patch = body.patch;
-			result = await table.patch(context, patch, { ..._options, ...body.options, isHttp });
+			const options = { ..._options, ...body.options, isHttp };
+			const adHocPlan = await executePath(context, {
+				...options,
+				request: _req,
+				response: _res,
+				prepareAdHoc: true,
+				sourceStrategy: options.strategy
+			});
+			result = await table.patch(context, patch, { ...options, adHocPlan });
 		}
 	}
 

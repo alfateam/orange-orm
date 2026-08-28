@@ -16,10 +16,11 @@ async function patchTable() {
 	return result;
 }
 
-async function patchTableCore(context, table, patches, { strategy = undefined, deduceStrategy = false, ...options } = {}, dryrun) {
+async function patchTableCore(context, table, patches, { strategy = undefined, deduceStrategy = false, adHocPlan, ...options } = {}, dryrun) {
 	const engine = getSessionSingleton(context, 'engine');
 	options = cleanOptions(options);
-	strategy = JSON.parse(JSON.stringify(strategy || {}));
+	const responseStrategy = JSON.parse(JSON.stringify(strategy || {}));
+	strategy = adHocPlan?.strategy || responseStrategy;
 	await lockTouchedRows();
 	let changed = new Set();
 	for (let i = 0; i < patches.length; i++) {
@@ -42,13 +43,13 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 		return {
 			changed: [], strategy: stripLockingStrategy(strategy)
 		};
-	return { changed: await toDtos(changed), strategy: stripLockingStrategy(strategy) };
+	return { changed: await toDtos(changed), strategy: stripLockingStrategy(responseStrategy) };
 
 
 	async function toDtos(set) {
 		set = [...set];
-		const result = await table.getManyDto(context, set, stripLockingStrategy(strategy));
-		return result;
+		const rows = await table.getManyDto(context, set, stripLockingStrategy(strategy));
+		return adHocPlan ? adHocPlan.materialize(rows) : rows;
 	}
 
 	function stripLockingStrategy(strategy) {

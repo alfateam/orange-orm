@@ -19,6 +19,7 @@ module.exports = async function getManyDtoScoped({
 	scopeFilter,
 	strategy,
 	scopeColumns,
+	scopeTables = [],
 	scopeRows,
 	offset,
 	limit
@@ -32,15 +33,16 @@ module.exports = async function getManyDtoScoped({
 	const scopeSource = newScopeSource(context, scopeColumns, scopeRows);
 	const scopeJoin = scopeSource
 		.prepend(' INNER JOIN ')
-		.append(' ON ')
-		.append(scopeFilter);
+		.append(' ON 1=1')
+		.append(newScopeTableJoins(context, scopeTables, scopeColumns));
+	const scopedFilter = filter.and(context, scopeFilter);
 	const ownerSelect = `${quote(scopeAlias)}.${quote(ownerColumnAlias)} as ${quote(resultOwnerAlias)},`;
 	const useWindowPagination = shouldUseWindowPagination(getSessionSingleton(context, 'engine'), offset, limit);
 	const orderBy = extractOrderBy(context, table, alias, span.orderBy);
 	const rowNumberSelect = useWindowPagination
 		? `ROW_NUMBER() OVER (PARTITION BY ${quote(scopeAlias)}.${quote(ownerColumnAlias)}${orderBy}) as ${quote(rowNumberAlias)},`
 		: '';
-	let query = newQuery(context, table, filter, span, alias, {
+	let query = newQuery(context, table, scopedFilter, span, alias, {
 		extraSelect: ownerSelect + rowNumberSelect,
 		fromSuffix: scopeJoin,
 		...(useWindowPagination ? { orderBy: '' } : {})
@@ -71,6 +73,27 @@ module.exports.newScopeColumnRef = function newScopeColumnRef(context, alias) {
 		}
 	};
 };
+
+function newScopeTableJoins(context, scopeTables, scopeColumns) {
+	const quote = getSessionSingleton(context, 'quote');
+	let result = newParameterized('');
+	for (const { scopeName, table, alias } of scopeTables) {
+		result = result.append(` INNER JOIN ${quote(table._dbName)} ${quote(alias)} ON `);
+		for (let index = 0; index < table._primaryColumns.length; index++) {
+			if (index > 0)
+				result = result.append(' AND ');
+			const column = table._primaryColumns[index];
+			const scopeColumn = scopeColumns.find(candidate =>
+				candidate.scopeName === scopeName && candidate.name === column.alias);
+			if (!scopeColumn)
+				throw new Error(`Missing ${scopeName} scope key '${column.alias}'`);
+			result = result.append(
+				`${quote(alias)}.${quote(column._dbName)}=${quote(scopeAlias)}.${quote(scopeColumn.alias)}`
+			);
+		}
+	}
+	return result;
+}
 
 function newScopeSource(context, scopeColumns, scopeRows) {
 	const quote = getSessionSingleton(context, 'quote');

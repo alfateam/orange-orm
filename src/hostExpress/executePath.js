@@ -77,10 +77,12 @@ function _executePath(context, ...rest) {
 
 	return executePath(...rest);
 
-	async function executePath({ table, tables, tableConfigs, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client }) {
+	async function executePath({ table, tables, tableConfigs, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client, prepareAdHoc, sourceStrategy }) {
 		tables = tables || client?.tables || {};
 		let allowedOps = { ..._allowedOps, insert: !readonly, ...extractRelations(getMeta(table)) };
 		let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, aggregate, distinct, count, delete: _delete, cascadeDelete, update, replace };
+		if (prepareAdHoc)
+			return prepareAdHocPlan(sourceStrategy);
 
 		let res = await parseFilter(JSONFilter, table);
 		if (res === undefined)
@@ -90,6 +92,15 @@ function _executePath(context, ...rest) {
 
 		function parseFilter(json, table, scope) {
 			if (isFilter(json)) {
+				const scopePath = parseScopePath(json.path);
+				if (scopePath) {
+					const selectedScope = getScope(scopePath.scopeName, scope);
+					return withScopeAlias(selectedScope, () => parseFilter(
+						{ ...json, path: scopePath.path },
+						selectedScope.table,
+						scope
+					));
+				}
 				let subFilters = [];
 
 				let anyAllNone = tryGetAnyAllNone(json.path, table);
@@ -127,17 +138,72 @@ function _executePath(context, ...rest) {
 			return json;
 
 			function resolveScopeRef(path, scope) {
-				const match = /^\$(root|parent)\.([^.]+)$/.exec(path);
-				const selectedScope = match && scope?.[match[1]];
-				const columnName = match && match[2];
-				const column = selectedScope?.table?.[columnName];
-				if (!selectedScope || !column || typeof column._toFilterArg !== 'function') {
+				const scopePath = parseScopePath(path);
+				const selectedScope = scopePath && getScope(scopePath.scopeName, scope);
+				if (!selectedScope) {
 					const e = new Error(`Scope column reference '${path}' is invalid`);
 					// @ts-ignore
 					e.status = 400;
 					throw e;
 				}
-				return selectedScope.row[columnName];
+				if (!scopePath.path.includes('.')) {
+					const column = selectedScope.table?.[scopePath.path];
+					if (!column || typeof column._toFilterArg !== 'function')
+						throwInvalidScopeRef(path);
+					return selectedScope.row[scopePath.path];
+				}
+				const column = withScopeAlias(selectedScope, () =>
+					resolveColumnRef(selectedScope.table, scopePath.path));
+				const filterArg = withScopeAlias(selectedScope, () => column._toFilterArg(context));
+				return {
+					_toFilterArg() {
+						return filterArg;
+					}
+				};
+
+				function throwInvalidScopeRef(invalidPath) {
+					const e = new Error(`Scope column reference '${invalidPath}' is invalid`);
+					// @ts-ignore
+					e.status = 400;
+					throw e;
+				}
+			}
+
+			function parseScopePath(path) {
+				const match = /^\$(root|parent)\.(.+)$/.exec(path);
+				return match ? { scopeName: match[1], path: match[2] } : undefined;
+			}
+
+			function getScope(scopeName, scope) {
+				const selectedScope = scope?.[scopeName];
+				if (!selectedScope?.table) {
+					const e = new Error(`Scope table reference '$${scopeName}' is invalid`);
+					// @ts-ignore
+					e.status = 400;
+					throw e;
+				}
+				return selectedScope;
+			}
+
+			function withScopeAlias(selectedScope, fn) {
+				if (!selectedScope.alias) {
+					const e = new Error('Scope table reference is unavailable outside a scoped query');
+					// @ts-ignore
+					e.status = 400;
+					throw e;
+				}
+				const table = selectedScope.table;
+				const previousAlias = table._rootAlias;
+				table._rootAlias = selectedScope.alias;
+				try {
+					return fn();
+				}
+				finally {
+					if (previousAlias === undefined)
+						delete table._rootAlias;
+					else
+						table._rootAlias = previousAlias;
+				}
 			}
 
 			function tryGetAnyAllNone(path, table) {
@@ -313,12 +379,18 @@ function _executePath(context, ...rest) {
 		}
 
 		async function getManyDto(filter, strategy) {
-			validateStrategy(table, strategy, tables);
 			filter = negotiateFilter(filter);
 			const _baseFilter = await invokeBaseFilter();
 			if (_baseFilter)
 				filter = filter.and(context, _baseFilter);
 
+			const adHocPlan = await prepareAdHocPlan(strategy);
+			const rows = await table.getManyDto(context, filter, adHocPlan.strategy);
+			return adHocPlan.materialize(rows);
+		}
+
+		async function prepareAdHocPlan(strategy) {
+			validateStrategy(table, strategy, tables);
 			const adHocPlan = newAdHocPlan({
 				context,
 				rootTable: table,
@@ -329,8 +401,7 @@ function _executePath(context, ...rest) {
 				resolveBaseFilter: invokeAdHocBaseFilter
 			});
 			await negotiateWhereAndAggregate(adHocPlan.strategy, table);
-			const rows = await table.getManyDto(context, filter, adHocPlan.strategy);
-			return adHocPlan.materialize(rows);
+			return adHocPlan;
 		}
 
 		async function invokeAdHocBaseFilter(tableName, targetTable) {

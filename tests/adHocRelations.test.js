@@ -109,6 +109,35 @@ describe('ad-hoc relations', () => {
 		expect(rows[0].orders[0]).toHaveProperty('id', 10);
 	});
 
+	test('uses ordinary relation filters on root and parent scope in one batch', async () => {
+		const queries = [];
+		const onQuery = query => queries.push(query.sql);
+		orange.on('query', onQuery);
+		let rows;
+		try {
+			rows = await db.customer.getMany({
+				name: true,
+				orderBy: 'id',
+				orders: {
+					orderBy: 'id',
+					matchingLines: db.orderLine.many({
+						where: (line, { root, parent }) => line.orderId.eq(parent.id)
+							.and(parent.customer.name.eq(root.name))
+							.and(root.orders.any(order => order.id.eq(parent.id)))
+							.and(line.amount.lt(parent.customer.balance)),
+						orderBy: 'id'
+					})
+				}
+			});
+		}
+		finally {
+			orange.off('query', onQuery);
+		}
+
+		expect(rows.map(row => row.orders[0].matchingLines.map(line => line.id))).toEqual([[101], [201]]);
+		expect(queries.filter(isOrderLineSelect)).toHaveLength(1);
+	});
+
 	test('applies limit and offset independently per parent', async () => {
 		const rows = await db.order.getMany({
 			orderBy: 'id',
@@ -147,7 +176,7 @@ describe('ad-hoc relations', () => {
 		expect(targetQueries).toHaveLength(1);
 	});
 
-	test('keeps ad-hoc projections read-only while mapped changes can be saved', async () => {
+	test('refreshes read-only ad-hoc projections when mapped changes are saved', async () => {
 		const row = await db.order.getOne({
 			where: order => order.id.eq(10),
 			matchingLines: db.orderLine.many({
@@ -160,28 +189,52 @@ describe('ad-hoc relations', () => {
 		await row.saveChanges();
 
 		expect(await db.orderLine.count()).toBe(4);
-		expect(row.matchingLines).toEqual([]);
+		expect(row.matchingLines.map(line => line.id)).toEqual([101, 102]);
 		const reloaded = await db.order.getOne({ where: order => order.id.eq(10) });
 		expect(new Date(reloaded.orderDate).toISOString()).toBe('2025-01-01T00:00:00.000Z');
-		await row.refresh();
-		expect(row.matchingLines.map(line => line.id)).toEqual([101, 102]);
 	});
 
-	test('preserves ad-hoc projections when an array saves mapped changes', async () => {
+	test('refreshes ad-hoc projections when an array saves mapped changes', async () => {
 		const rows = await db.order.getMany({
-			where: order => order.id.eq(20),
+			orderBy: 'id',
 			matchingLines: db.orderLine.many({
 				where: (line, { root }) => line.orderId.eq(root.id),
 				orderBy: 'id'
 			})
 		});
 
-		rows[0].orderDate = new Date('2025-02-01T00:00:00Z');
-		await rows.saveChanges();
+		for (let i = 0; i < rows.length; i++) {
+			rows[i].matchingLines.length = 0;
+			rows[i].orderDate = new Date(`2025-02-0${i + 1}T00:00:00Z`);
+		}
+		const queries = [];
+		const onQuery = query => queries.push(query.sql);
+		orange.on('query', onQuery);
+		try {
+			await rows.saveChanges();
+		}
+		finally {
+			orange.off('query', onQuery);
+		}
 
-		expect(rows[0].matchingLines.map(line => line.id)).toEqual([201, 202]);
-		await rows.refresh();
-		expect(rows[0].matchingLines.map(line => line.id)).toEqual([201, 202]);
+		expect(rows.map(row => row.matchingLines.map(line => line.id))).toEqual([[101, 102], [201, 202]]);
+		expect(queries.filter(isOrderLineSelect)).toHaveLength(1);
+	});
+
+	test('refreshes ad-hoc projections after save over HTTP', async () => {
+		const row = await httpDb.order.getOne({
+			where: order => order.id.eq(10),
+			matchingLines: httpDb.orderLine.many({
+				where: (line, { root }) => line.orderId.eq(root.id),
+				orderBy: 'id'
+			})
+		});
+
+		row.matchingLines.length = 0;
+		row.orderDate = new Date('2025-03-01T00:00:00Z');
+		await row.saveChanges();
+
+		expect(row.matchingLines.map(line => line.id)).toEqual([101]);
 	});
 
 	test('supports composite root keys without mapped relation traversal', async () => {
@@ -191,6 +244,12 @@ describe('ad-hoc relations', () => {
 				where: (line, { root }) => line.companyId.eq(root.companyId)
 					.and(line.orderNo.eq(root.orderNo)),
 				orderBy: 'lineNo'
+			}),
+			relationFilteredLines: db.compositeOrderLine.many({
+				where: (line, { root }) => line.companyId.eq(root.companyId)
+					.and(line.orderNo.eq(root.orderNo))
+					.and(root.lines.any(related => related.product.eq('A-1'))),
+				orderBy: 'lineNo'
 			})
 		});
 
@@ -198,6 +257,11 @@ describe('ad-hoc relations', () => {
 			['A-1'],
 			['A-2'],
 			['B-1']
+		]);
+		expect(rows.map(row => row.relationFilteredLines.map(line => line.product))).toEqual([
+			['A-1'],
+			[],
+			[]
 		]);
 	});
 
@@ -225,7 +289,8 @@ describe('ad-hoc relations', () => {
 		const rows = await httpDb.order.getMany({
 			where: order => order.id.eq(10),
 			matchingLines: httpDb.orderLine.many({
-				where: (line, { root }) => line.orderId.eq(root.id),
+				where: (line, { root }) => line.orderId.eq(root.id)
+					.and(root.customer.name.eq('One')),
 				orderBy: 'id'
 			})
 		});
