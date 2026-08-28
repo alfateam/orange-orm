@@ -631,11 +631,14 @@ async function getRows() {
     deliveryAddress: true, 
     lines: {
       packages: true,
-      orderBy: 'product'
+      orderBy: 'product',
+      limit: 2
     },
   });
 }
 ```
+`limit` and `offset` inside a mapped many relation are applied independently for each parent. In this example, each order receives at most two lines. Primary and foreign keys needed for relation attachment and change tracking are selected internally even when they are not part of the TypeScript result selection.
+
 <a name="aggregate-results">  </a>
 __With aggregated results__  
 You can count records and aggregate numerical columns. 

@@ -464,10 +464,14 @@ const products = await db.product.getMany({
 const orders = await db.order.getMany({
   orderBy: ['orderDate desc', 'id'],
   lines: {
-    orderBy: 'product'
+    orderBy: 'product',
+    limit: 2,
+    offset: 1
   }
 });
 ```
+
+`limit` and `offset` inside a mapped many relation apply independently to each parent. Orange still selects primary and foreign keys internally when they are needed for relation attachment and change tracking, even if those keys are absent from the TypeScript result selection.
 
 ### Complete example: filter + order + limit
 

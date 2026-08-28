@@ -29,7 +29,8 @@ beforeAll(async () => {
 	await db.package.insert([
 		{ id: 1001, lineId: 101, sscc: 'A-1' },
 		{ id: 1002, lineId: 101, sscc: 'A-2' },
-		{ id: 2001, lineId: 201, sscc: 'C-1' }
+		{ id: 2001, lineId: 201, sscc: 'C-1' },
+		{ id: 2002, lineId: 201, sscc: 'C-2' }
 	]);
 	await db.compositeOrder.insert([
 		{ companyId: 'A', orderNo: 1 },
@@ -38,8 +39,11 @@ beforeAll(async () => {
 	]);
 	await db.compositeOrderLine.insert([
 		{ companyId: 'A', orderNo: 1, lineNo: 1, product: 'A-1' },
+		{ companyId: 'A', orderNo: 1, lineNo: 2, product: 'A-1b' },
 		{ companyId: 'A', orderNo: 2, lineNo: 1, product: 'A-2' },
-		{ companyId: 'B', orderNo: 1, lineNo: 1, product: 'B-1' }
+		{ companyId: 'A', orderNo: 2, lineNo: 2, product: 'A-2b' },
+		{ companyId: 'B', orderNo: 1, lineNo: 1, product: 'B-1' },
+		{ companyId: 'B', orderNo: 1, lineNo: 2, product: 'B-1b' }
 	]);
 
 	const app = express().use(json()).use('/rdb', db.express({
@@ -136,6 +140,112 @@ describe('ad-hoc relations', () => {
 
 		expect(rows.map(row => row.orders[0].matchingLines.map(line => line.id))).toEqual([[101], [201]]);
 		expect(queries.filter(isOrderLineSelect)).toHaveLength(1);
+	});
+
+	test('paginates mapped many relations independently per parent', async () => {
+		const firstRows = await db.order.getMany({
+			where: order => order.id.in([10, 20]),
+			orderBy: 'id',
+			lines: {
+				id: true,
+				orderId: false,
+				limit: 1
+			}
+		});
+
+		expect(firstRows.map(row => row.lines.map(line => line.id))).toEqual([[101], [201]]);
+
+		const secondRows = await db.order.getMany({
+			where: order => order.id.in([10, 20]),
+			orderBy: 'id',
+			lines: {
+				id: true,
+				orderId: false,
+				orderBy: 'id',
+				offset: 1,
+				limit: 1
+			}
+		});
+
+		expect(secondRows.map(row => row.lines.map(line => line.id))).toEqual([[102], [202]]);
+
+		const filteredRows = await db.order.getMany({
+			where: order => order.id.in([10, 20]),
+			orderBy: 'id',
+			lines: {
+				where: line => line.amount.lt(200),
+				orderBy: 'id desc',
+				limit: 1
+			}
+		});
+		expect(filteredRows.map(row => row.lines.map(line => line.id))).toEqual([[101], [202]]);
+
+		const emptyRows = await db.order.getMany({
+			where: order => order.id.in([10, 20]),
+			orderBy: 'id',
+			lines: { limit: 0 }
+		});
+		expect(emptyRows.map(row => row.lines)).toEqual([[], []]);
+	});
+
+	test('tracks paginated mapped children when their keys are not selected', async () => {
+		const rows = await db.order.getMany({
+			where: order => order.id.eq(10),
+			lines: {
+				product: true,
+				orderId: false,
+				orderBy: 'id',
+				limit: 1
+			}
+		});
+		const originalProduct = rows[0].lines[0].product;
+		rows[0].lines[0].product = 'Tracked through hidden key';
+		try {
+			await rows.saveChanges();
+			const saved = await db.orderLine.getById(101);
+			expect(saved.product).toBe('Tracked through hidden key');
+		}
+		finally {
+			const saved = await db.orderLine.getById(101);
+			saved.product = originalProduct;
+			await saved.saveChanges();
+		}
+	});
+
+	test('paginates nested and composite mapped many relations per parent', async () => {
+		const orders = await db.order.getMany({
+			where: order => order.id.in([10, 20]),
+			orderBy: 'id',
+			lines: {
+				orderBy: 'id',
+				limit: 1,
+				packages: {
+					orderBy: 'id',
+					offset: 1,
+					limit: 1
+				}
+			}
+		});
+
+		expect(orders.map(order => order.lines[0].packages.map(pkg => pkg.id))).toEqual([
+			[1002],
+			[2002]
+		]);
+
+		const compositeOrders = await db.compositeOrder.getMany({
+			orderBy: ['companyId', 'orderNo'],
+			lines: {
+				orderBy: 'lineNo',
+				offset: 1,
+				limit: 1
+			}
+		});
+
+		expect(compositeOrders.map(order => order.lines.map(line => line.product))).toEqual([
+			['A-1b'],
+			['A-2b'],
+			['B-1b']
+		]);
 	});
 
 	test('applies limit and offset independently per parent', async () => {
@@ -254,12 +364,12 @@ describe('ad-hoc relations', () => {
 		});
 
 		expect(rows.map(row => row.matchingLines.map(line => line.product))).toEqual([
-			['A-1'],
-			['A-2'],
-			['B-1']
+			['A-1', 'A-1b'],
+			['A-2', 'A-2b'],
+			['B-1', 'B-1b']
 		]);
 		expect(rows.map(row => row.relationFilteredLines.map(line => line.product))).toEqual([
-			['A-1'],
+			['A-1', 'A-1b'],
 			[],
 			[]
 		]);
@@ -297,6 +407,16 @@ describe('ad-hoc relations', () => {
 
 		// The target table's HTTP baseFilter is applied to ad-hoc reads as well.
 		expect(rows[0].matchingLines.map(line => line.id)).toEqual([101]);
+
+		const mappedRows = await httpDb.order.getMany({
+			where: order => order.id.in([10, 20]),
+			orderBy: 'id',
+			lines: {
+				orderBy: 'id',
+				limit: 1
+			}
+		});
+		expect(mappedRows.map(row => row.lines.map(line => line.id))).toEqual([[101], [201]]);
 	});
 
 	test('chunks 205 unique scope tuples without losing attachment identity', async () => {
@@ -322,6 +442,27 @@ describe('ad-hoc relations', () => {
 		expect(rows).toHaveLength(205);
 		expect(rows.every(row => row.matchingLines.length === 1)).toBe(true);
 		expect(rows.map(row => row.matchingLines[0].orderId)).toEqual(rows.map(row => row.id));
+		expect(queries.filter(isOrderLineSelect)).toHaveLength(3);
+
+		queries.length = 0;
+		orange.on('query', onQuery);
+		try {
+			rows = await db.order.getMany({
+				where: order => order.id.in(fixture.orderIds),
+				orderBy: 'id',
+				lines: {
+					orderBy: 'id',
+					limit: 1
+				}
+			});
+		}
+		finally {
+			orange.off('query', onQuery);
+		}
+
+		expect(rows).toHaveLength(205);
+		expect(rows.every(row => row.lines.length === 1)).toBe(true);
+		expect(rows.map(row => row.lines[0].orderId)).toEqual(rows.map(row => row.id));
 		expect(queries.filter(isOrderLineSelect)).toHaveLength(3);
 	});
 

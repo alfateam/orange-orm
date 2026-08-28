@@ -192,6 +192,38 @@ describe.each(providers)('ad-hoc relations on $name', provider => {
 			expect(targetQueries.every(sql => /row_number\s*\(/i.test(sql))).toBe(true);
 	});
 
+	test('paginates mapped many relations per owner', async () => {
+		const queries = [];
+		const onQuery = query => queries.push(query.sql);
+		orange.on('query', onQuery);
+		let rows;
+		try {
+			rows = await db.order.getMany({
+				where: order => order.id.in(fixture.orders.map(row => row.id)),
+				orderBy: 'id',
+				lines: {
+					id: true,
+					orderId: false,
+					orderBy: 'id',
+					offset: 1,
+					limit: 1
+				}
+			});
+		}
+		finally {
+			orange.off('query', onQuery);
+		}
+
+		expect(rows.map(row => row.lines.map(line => line.id))).toEqual([
+			[fixture.lines[1].id],
+			[fixture.lines[3].id]
+		]);
+		const targetQueries = queries.filter(isOrderLineSelect);
+		expect(targetQueries).toHaveLength(1);
+		if (provider.name !== 'sap ase')
+			expect(targetQueries[0]).toMatch(/row_number\s*\(\s*\)\s*over\s*\(\s*partition by/i);
+	});
+
 	test('resolves root and parent scope in nested strategies', async () => {
 		const queries = [];
 		const onQuery = query => queries.push(query.sql);

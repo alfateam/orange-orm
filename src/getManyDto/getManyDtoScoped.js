@@ -1,4 +1,3 @@
-const getManyDto = require('../getManyDto.js');
 const newQuery = require('./newQuery');
 const strategyToSpan = require('../table/strategyToSpan');
 const executeQueries = require('../table/executeQueries');
@@ -61,7 +60,10 @@ module.exports = async function getManyDtoScoped({
 		if (useWindowPagination)
 			delete rawRows[i][rowNumberKey];
 	}
-	const rows = await getManyDto.decode(context, strategy, span, rawRows);
+	// Resolve lazily because the mapped-relation loader in getManyDto also uses
+	// this helper. Requiring it at module initialization would leave the decoder
+	// pointing at a partial circular export.
+	const rows = await require('../getManyDto.js').decode(context, strategy, span, rawRows);
 	return rows.map((row, index) => ({ ownerId: ownerIds[index], row }));
 };
 
