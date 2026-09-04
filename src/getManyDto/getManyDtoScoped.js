@@ -4,6 +4,7 @@ const executeQueries = require('../table/executeQueries');
 const getSessionSingleton = require('../table/getSessionSingleton');
 const newParameterized = require('../table/query/newParameterized');
 const extractOrderBy = require('../table/query/extractOrderBy');
+const validatePagination = require('../table/query/validatePagination');
 
 const scopeAlias = '__rdb_s';
 const ownerColumnAlias = '__rdb_o';
@@ -23,6 +24,7 @@ module.exports = async function getManyDtoScoped({
 	offset,
 	limit
 }) {
+	validatePagination({ offset, limit });
 	if (scopeRows.length === 0)
 		return [];
 

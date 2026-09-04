@@ -78,7 +78,6 @@
         "build-browser": "rollup -c ./src/rollup.config.browser.js && npm run concat-browser",
         "lint": "eslint ./",
         "fix": "eslint ./ --fix",
-        "owasp": "owasp-dependency-check --project \"MY_PROJECT\" --scan \"package-lock.json\" --exclude \"dependency-check-bin\" --out \"owasp\" --format HTML",
         "beta": "npm publish --tag beta"
     },
     "dependencies": {
@@ -149,7 +148,6 @@
         "msnodesqlv8": "^4.1.0",
         "mysql2": "^3.9.4",
         "oracledb": "^6.3.0",
-        "owasp-dependency-check": "^0.0.21",
         "pg": "^8.5.1",
         "pg-query-stream": "^3.3.2",
         "rollup": "^2.52.7",

@@ -403,6 +403,73 @@ describe('ad-hoc relations', () => {
 		})).rejects.toThrow('conflicts with a mapped or reserved property');
 	});
 
+	test('rejects unsafe pagination before it can reach SQL', async () => {
+		const injection = '1; DROP TABLE customer; --';
+		const invalidValues = [injection, -1, 1.5, Number.MAX_SAFE_INTEGER + 1];
+
+		for (const value of invalidValues) {
+			await expect(db.order.getMany({ limit: value }))
+				.rejects.toThrow('Invalid limit');
+			await expect(db.order.getMany({ offset: value }))
+				.rejects.toThrow('Invalid offset');
+		}
+		await expect(db.order.getMany({
+			offset: Number.MAX_SAFE_INTEGER,
+			limit: 1
+		})).rejects.toThrow('Invalid pagination range');
+
+		await expect(db.order.getMany({
+			lines: { limit: injection }
+		})).rejects.toThrow('Invalid limit');
+
+		await expect(db.order.getMany({
+			matchingLines: (order, { db }) => db.orderLine.many({
+				where: line => line.orderId.eq(order.id),
+				limit: injection
+			})
+		})).rejects.toThrow('Invalid limit');
+
+		await expect(httpDb.order.getMany({ limit: injection }))
+			.rejects.toThrow('Invalid limit');
+		await expect(httpDb.order.getMany({
+			matchingLines: (order, { db }) => db.orderLine.many({
+				where: line => line.orderId.eq(order.id),
+				offset: injection
+			})
+		})).rejects.toThrow('Invalid offset');
+		await expect(db.db.transaction(context => map.order.getMany(
+			context,
+			orange.filter,
+			{ limit: injection }
+		))).rejects.toThrow('Invalid limit');
+
+		const customers = await db.customer.getMany({ limit: 1 });
+		expect(customers).toHaveLength(1);
+	});
+
+	test('rejects unsafe orderBy fragments in the low-level query path', async () => {
+		await expect(db.db.transaction(context => map.order.getMany(
+			context,
+			orange.filter,
+			{ orderBy: 'id desc;DROP TABLE customer' }
+		))).rejects.toThrow('Unable to get column on orderBy');
+
+		await expect(db.db.transaction(context => map.customer2.getMany(
+			context,
+			orange.filter,
+			{ orderBy: 'data->>\'name\';DROP TABLE customer;--' }
+		))).rejects.toThrow('Unable to get column on orderBy');
+		const jsonOrdered = await db.db.transaction(context => map.customer2.getMany(
+			context,
+			orange.filter,
+			{ orderBy: 'data->>\'name\'' }
+		));
+		expect(jsonOrdered).not.toHaveLength(0);
+
+		const customers = await db.customer.getMany({ limit: 1 });
+		expect(customers).toHaveLength(1);
+	});
+
 	test('round-trips descriptors and scope references over HTTP', async () => {
 		const rows = await httpDb.order.getMany({
 			where: order => order.id.eq(10),

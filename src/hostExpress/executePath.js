@@ -4,6 +4,7 @@ const negotiateRawSqlFilter = require('../table/column/negotiateRawSqlFilter');
 const parseAggregateOrderBy = require('../table/groupBy/parseOrderBy');
 const { isAdHocRelation } = require('../adHocRelation');
 const newAdHocPlan = require('../getManyDto/newAdHocPlan');
+const validatePagination = require('../table/query/validatePagination');
 let getMeta = require('./getMeta');
 let isSafe = Symbol();
 
@@ -626,20 +627,11 @@ function _executePath(context, ...rest) {
 	}
 
 	function validateLimit(strategy) {
-		if (!('limit' in strategy) || Number.isInteger(strategy.limit))
-			return;
-		const e = new Error('Invalid limit: ' + strategy.limit);
-		// @ts-ignore
-		e.status = 400;
+		validatePagination.limit(strategy);
 	}
 
 	function validateOffset(strategy) {
-		if (!('offset' in strategy) || Number.isInteger(strategy.offset))
-			return;
-		const e = new Error('Invalid offset: ' + strategy.offset);
-		// @ts-ignore
-		e.status = 400;
-		throw e;
+		validatePagination.offset(strategy);
 	}
 
 	function validateOrderBy(table, strategy) {

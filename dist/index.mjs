@@ -2293,6 +2293,10 @@ function requireExtractOrderBy$1 () {
 		if (orderBy) {
 			if (typeof orderBy === 'string')
 				orderBy = [orderBy];
+			else if (!Array.isArray(orderBy))
+				throwInvalidOrderBy(orderBy);
+			if (orderBy.length === 0)
+				throwInvalidOrderBy(orderBy);
 			for (i = 0; i < orderBy.length; i++) {
 				var nameAndDirection = extractNameAndDirection(orderBy[i]);
 				pushColumn(nameAndDirection.name, nameAndDirection.direction);
@@ -2307,37 +2311,57 @@ function requireExtractOrderBy$1 () {
 		}
 
 		function extractNameAndDirection(orderBy) {
-			var elements = orderBy.split(' ');
-			var direction = '';
-			if (elements.length > 1) {
-				direction = ' ' + elements[1];
-			}
+			if (typeof orderBy !== 'string')
+				throwInvalidOrderBy(orderBy);
+			var value = orderBy.trim();
+			var match = /^(.*?)(?:\s+(asc|desc))?$/i.exec(value);
 			return {
-				name: elements[0],
-				direction: direction
+				name: match[1],
+				direction: match[2] ? ' ' + match[2].toLowerCase() : ''
 			};
 		}
 		function pushColumn(property, direction) {
 			direction = direction || '';
-			var column = getTableColumn(property);
-			var jsonQuery = getJsonQuery(property, column.alias);
+			var result = getTableColumn(property);
+			var column = result.column;
+			var jsonQuery = result.jsonQuery;
 
 			dbNames.push(alias + '.' + quote(column._dbName) + jsonQuery + direction);
 		}
 
 		function getTableColumn(property) {
-			var column = table[property] || table[property.split(/(-|#)>+/g)[0]];
-			if(!column){
-				throw new Error(`Unable to get column on orderBy '${property}'. If jsonb query, only #>, #>>, -> and ->> allowed. Only use ' ' to seperate between query and direction. Does currently not support casting.`);
-			}
-			return column;
+			var directColumn = table[property];
+			if (isColumn(directColumn))
+				return { column: directColumn, jsonQuery: '' };
+
+			var operator = /#>>|#>|->>|->/.exec(property);
+			var columnName = operator ? property.slice(0, operator.index) : property;
+			var column = table[columnName];
+			var jsonQuery = operator ? property.slice(operator.index) : '';
+			if (!isColumn(column) || !isSafeJsonQuery(jsonQuery))
+				throwInvalidOrderBy(property);
+			return { column, jsonQuery };
 		}
-		function getJsonQuery(property, column) {
-			let containsJson = (/(-|#)>+/g).test(property);
-			if(!containsJson){
-				return '';
+
+		function isColumn(value) {
+			return !!value && typeof value._toFilterArg === 'function';
+		}
+
+		function isSafeJsonQuery(value) {
+			if (!value)
+				return true;
+			for (let i = 0; i < value.length; i++) {
+				const code = value.charCodeAt(i);
+				if (code < 32 || code === 127)
+					return false;
 			}
-			return property.replace(column, '');
+			return /^(?:(?:#>>|#>|->>|->)(?:-?[0-9]+|'(?:[^'\\]|'')*'))+$/.test(value);
+		}
+
+		function throwInvalidOrderBy(value) {
+			const error = new Error(`Unable to get column on orderBy '${String(value)}'. If jsonb query, only #>, #>>, -> and ->> allowed. Only use ' ' to seperate between query and direction. Does currently not support casting.`);
+			error.status = 400;
+			throw error;
 		}
 
 		return ' order by ' + dbNames.join(',');
@@ -2347,6 +2371,42 @@ function requireExtractOrderBy$1 () {
 	return extractOrderBy_1$1;
 }
 
+var validatePagination_1;
+var hasRequiredValidatePagination;
+
+function requireValidatePagination () {
+	if (hasRequiredValidatePagination) return validatePagination_1;
+	hasRequiredValidatePagination = 1;
+	function validatePagination(value) {
+		validateValue(value, 'limit');
+		validateValue(value, 'offset');
+		if (value?.limit !== undefined && value?.offset !== undefined
+			&& !Number.isSafeInteger(value.limit + value.offset))
+			throwInvalid('pagination range', `${value.offset} + ${value.limit}`);
+	}
+
+	function validateValue(value, name) {
+		if (!value || value[name] === undefined)
+			return;
+		if (Number.isSafeInteger(value[name]) && value[name] >= 0)
+			return;
+
+		throwInvalid(name, String(value[name]));
+	}
+
+	function throwInvalid(name, value) {
+		const error = new Error(`Invalid ${name}: ${value}`);
+		error.status = 400;
+		throw error;
+	}
+
+	validatePagination.limit = value => validateValue(value, 'limit');
+	validatePagination.offset = value => validateValue(value, 'offset');
+
+	validatePagination_1 = validatePagination;
+	return validatePagination_1;
+}
+
 var extractLimit_1;
 var hasRequiredExtractLimit;
 
@@ -2354,8 +2414,10 @@ function requireExtractLimit () {
 	if (hasRequiredExtractLimit) return extractLimit_1;
 	hasRequiredExtractLimit = 1;
 	var getSessionContext = requireGetSessionContext();
+	var validatePagination = requireValidatePagination();
 
 	function extractLimit(context, span) {
+		validatePagination.limit(span);
 		let limit = getSessionContext(context).limit;
 		if (limit)
 			return limit(span);
@@ -2374,8 +2436,10 @@ function requireExtractOffset () {
 	if (hasRequiredExtractOffset) return extractOffset_1;
 	hasRequiredExtractOffset = 1;
 	var getSessionContext = requireGetSessionContext();
+	var validatePagination = requireValidatePagination();
 
 	function extractOffset(context, span) {
+		validatePagination.offset(span);
 		let {limitAndOffset} = getSessionContext(context);
 		if (limitAndOffset)
 			return limitAndOffset(span);
@@ -2576,6 +2640,7 @@ function requireStrategyToSpan () {
 	var newCollection = requireNewCollection();
 	var newQueryContext = requireNewQueryContext();
 	var purifyStrategy = requirePurifyStrategy();
+	var validatePagination = requireValidatePagination();
 
 	function toSpan(table, strategy) {
 		var span = {};
@@ -2593,6 +2658,7 @@ function requireStrategyToSpan () {
 			var legs = span.legs;
 			if(!strategy)
 				return;
+			validatePagination(strategy);
 			for (var name in strategy) {
 				if (table._relations[name] && !strategy[name])
 					continue;
@@ -3453,6 +3519,7 @@ function requireGetManyDtoScoped () {
 	const getSessionSingleton = requireGetSessionSingleton();
 	const newParameterized = requireNewParameterized();
 	const extractOrderBy = requireExtractOrderBy$1();
+	const validatePagination = requireValidatePagination();
 
 	const scopeAlias = '__rdb_s';
 	const ownerColumnAlias = '__rdb_o';
@@ -3472,6 +3539,7 @@ function requireGetManyDtoScoped () {
 		offset,
 		limit
 	}) {
+		validatePagination({ offset, limit });
 		if (scopeRows.length === 0)
 			return [];
 
@@ -3614,6 +3682,7 @@ function requireNewAdHocPlan () {
 	const clone = require$$5;
 	const getSessionSingleton = requireGetSessionSingleton();
 	const getManyDtoScoped = requireGetManyDtoScoped();
+	const validatePagination = requireValidatePagination();
 
 	newAdHocPlan = function newAdHocPlan({
 		context,
@@ -3671,6 +3740,7 @@ function requireNewAdHocPlan () {
 		function prepare(currentTable, currentStrategy) {
 			if (!currentStrategy || typeof currentStrategy !== 'object')
 				return;
+			validatePagination(currentStrategy);
 			for (let name in currentStrategy) {
 				const value = currentStrategy[name];
 				if (isAdHocRelation(value)) {
@@ -4241,6 +4311,7 @@ function requireExecutePath () {
 	const parseAggregateOrderBy = requireParseOrderBy();
 	const { isAdHocRelation } = requireAdHocRelation();
 	const newAdHocPlan = requireNewAdHocPlan();
+	const validatePagination = requireValidatePagination();
 	let getMeta = requireGetMeta();
 	let isSafe = Symbol();
 
@@ -4863,20 +4934,11 @@ function requireExecutePath () {
 		}
 
 		function validateLimit(strategy) {
-			if (!('limit' in strategy) || Number.isInteger(strategy.limit))
-				return;
-			const e = new Error('Invalid limit: ' + strategy.limit);
-			// @ts-ignore
-			e.status = 400;
+			validatePagination.limit(strategy);
 		}
 
 		function validateOffset(strategy) {
-			if (!('offset' in strategy) || Number.isInteger(strategy.offset))
-				return;
-			const e = new Error('Invalid offset: ' + strategy.offset);
-			// @ts-ignore
-			e.status = 400;
-			throw e;
+			validatePagination.offset(strategy);
 		}
 
 		function validateOrderBy(table, strategy) {

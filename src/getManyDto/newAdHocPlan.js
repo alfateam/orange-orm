@@ -3,6 +3,7 @@ const { isAdHocRelation, ownerScopeMarker } = require('../adHocRelation');
 const clone = require('rfdc/default');
 const getSessionSingleton = require('../table/getSessionSingleton');
 const getManyDtoScoped = require('./getManyDtoScoped');
+const validatePagination = require('../table/query/validatePagination');
 
 module.exports = function newAdHocPlan({
 	context,
@@ -60,6 +61,7 @@ module.exports = function newAdHocPlan({
 	function prepare(currentTable, currentStrategy) {
 		if (!currentStrategy || typeof currentStrategy !== 'object')
 			return;
+		validatePagination(currentStrategy);
 		for (let name in currentStrategy) {
 			const value = currentStrategy[name];
 			if (isAdHocRelation(value)) {

@@ -8,6 +8,10 @@ function extractOrderBy(context, table, alias, orderBy, originalOrderBy) {
 	if (orderBy) {
 		if (typeof orderBy === 'string')
 			orderBy = [orderBy];
+		else if (!Array.isArray(orderBy))
+			throwInvalidOrderBy(orderBy);
+		if (orderBy.length === 0)
+			throwInvalidOrderBy(orderBy);
 		for (i = 0; i < orderBy.length; i++) {
 			var nameAndDirection = extractNameAndDirection(orderBy[i]);
 			pushColumn(nameAndDirection.name, nameAndDirection.direction);
@@ -22,37 +26,57 @@ function extractOrderBy(context, table, alias, orderBy, originalOrderBy) {
 	}
 
 	function extractNameAndDirection(orderBy) {
-		var elements = orderBy.split(' ');
-		var direction = '';
-		if (elements.length > 1) {
-			direction = ' ' + elements[1];
-		}
+		if (typeof orderBy !== 'string')
+			throwInvalidOrderBy(orderBy);
+		var value = orderBy.trim();
+		var match = /^(.*?)(?:\s+(asc|desc))?$/i.exec(value);
 		return {
-			name: elements[0],
-			direction: direction
+			name: match[1],
+			direction: match[2] ? ' ' + match[2].toLowerCase() : ''
 		};
 	}
 	function pushColumn(property, direction) {
 		direction = direction || '';
-		var column = getTableColumn(property);
-		var jsonQuery = getJsonQuery(property, column.alias);
+		var result = getTableColumn(property);
+		var column = result.column;
+		var jsonQuery = result.jsonQuery;
 
 		dbNames.push(alias + '.' + quote(column._dbName) + jsonQuery + direction);
 	}
 
 	function getTableColumn(property) {
-		var column = table[property] || table[property.split(/(-|#)>+/g)[0]];
-		if(!column){
-			throw new Error(`Unable to get column on orderBy '${property}'. If jsonb query, only #>, #>>, -> and ->> allowed. Only use ' ' to seperate between query and direction. Does currently not support casting.`);
-		}
-		return column;
+		var directColumn = table[property];
+		if (isColumn(directColumn))
+			return { column: directColumn, jsonQuery: '' };
+
+		var operator = /#>>|#>|->>|->/.exec(property);
+		var columnName = operator ? property.slice(0, operator.index) : property;
+		var column = table[columnName];
+		var jsonQuery = operator ? property.slice(operator.index) : '';
+		if (!isColumn(column) || !isSafeJsonQuery(jsonQuery))
+			throwInvalidOrderBy(property);
+		return { column, jsonQuery };
 	}
-	function getJsonQuery(property, column) {
-		let containsJson = (/(-|#)>+/g).test(property);
-		if(!containsJson){
-			return '';
+
+	function isColumn(value) {
+		return !!value && typeof value._toFilterArg === 'function';
+	}
+
+	function isSafeJsonQuery(value) {
+		if (!value)
+			return true;
+		for (let i = 0; i < value.length; i++) {
+			const code = value.charCodeAt(i);
+			if (code < 32 || code === 127)
+				return false;
 		}
-		return property.replace(column, '');
+		return /^(?:(?:#>>|#>|->>|->)(?:-?[0-9]+|'(?:[^'\\]|'')*'))+$/.test(value);
+	}
+
+	function throwInvalidOrderBy(value) {
+		const error = new Error(`Unable to get column on orderBy '${String(value)}'. If jsonb query, only #>, #>>, -> and ->> allowed. Only use ' ' to seperate between query and direction. Does currently not support casting.`);
+		error.status = 400;
+		throw error;
 	}
 
 	return ' order by ' + dbNames.join(',');
