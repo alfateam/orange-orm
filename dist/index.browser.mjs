@@ -3329,8 +3329,8 @@ function requireGetManyDto$1 () {
 			const fixedParameters = filter?.parameters?.length || 0;
 			const maxRows = maxParameters
 				? Math.max(1, Math.floor((maxParameters - fixedParameters) / columns.length))
-				: 100;
-			const chunkSize = Math.min(100, maxRows);
+				: 200;
+			const chunkSize = Math.min(200, maxRows);
 			const rowsByOwner = new Map();
 			for (const scopeRowsChunk of chunk(scopeRows, chunkSize)) {
 				const rows = await getManyDtoScoped({
@@ -3976,8 +3976,8 @@ function requireNewAdHocPlan () {
 			const fixedParameters = (filter?.parameters?.length || 0)
 				+ (scopeFilter?.parameters?.length || 0);
 			const chunkSize = maxParameters
-				? Math.max(1, Math.min(100, Math.floor((maxParameters - fixedParameters) / parametersPerPair)))
-				: 100;
+				? Math.max(1, Math.min(200, Math.floor((maxParameters - fixedParameters) / parametersPerPair)))
+				: 200;
 			const start = descriptor.strategy?.offset || 0;
 			const limit = descriptor.__rdbAdHocRelation === 'one' ? 1 : descriptor.strategy?.limit;
 			const databasePaginates = getSessionSingleton(context, 'engine') !== 'sap'

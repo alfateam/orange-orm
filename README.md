@@ -637,7 +637,7 @@ async function getRows() {
   });
 }
 ```
-`limit` and `offset` inside a mapped many relation are applied independently for each parent. In this example, each order receives at most two lines. Primary and foreign keys needed for relation attachment and change tracking are selected internally even when they are not part of the TypeScript result selection.
+`limit` and `offset` inside a mapped many relation are applied independently for each parent. In this example, each order receives at most two lines. The relation query is batched across up to 200 parents at a time, or fewer when required by the database's parameter limit, rather than issuing one query per parent. Primary and foreign keys needed for relation attachment and change tracking are selected internally even when they are not part of the TypeScript result selection.
 
 <a name="aggregate-results">  </a>
 __With aggregated results__  
@@ -1512,6 +1512,23 @@ async function getRows() {
 
 __Ad-hoc relations with lexical `current` and `root` scope__
 Return `db.table.many()` or `db.table.one()` from a fetch-strategy callback to add a read-only relation to a `getMany` or `getOne` result without declaring a mapped relation. The target can be any mapped table. The callback's first parameter is the current row that owns the ad-hoc property, while its context contains `db` and the `root` row returned by the top-level query.
+
+The ad-hoc relation can be declared directly on the top-level result. In this example, `recentOrders` does not need to be a mapped relation:
+
+```javascript
+const customers = await db.customer.getMany({
+  name: true,
+  recentOrders: (customer, { db }) => db.order.many({
+    where: order => order.customerId.eq(customer.id),
+    orderBy: 'id',
+    limit: 5
+  })
+});
+```
+
+The `limit` is applied independently for each customer. This form is batched, so it does not issue one query per customer: Orange fetches the customers first and then their recent orders in batches of up to 200 distinct scope tuples, or fewer when required by the database's parameter limit.
+
+Ad-hoc relations can also be nested beneath mapped relations and refer to the root row. Here, `orders` is mapped, while `affordableLines` and `firstLine` are ad-hoc:
 
 ```javascript
 const customers = await db.customer.getMany({

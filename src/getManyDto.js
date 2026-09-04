@@ -299,8 +299,8 @@ async function decodeManyRelations(context, strategy, span) {
 		const fixedParameters = filter?.parameters?.length || 0;
 		const maxRows = maxParameters
 			? Math.max(1, Math.floor((maxParameters - fixedParameters) / columns.length))
-			: 100;
-		const chunkSize = Math.min(100, maxRows);
+			: 200;
+		const chunkSize = Math.min(200, maxRows);
 		const rowsByOwner = new Map();
 		for (const scopeRowsChunk of chunk(scopeRows, chunkSize)) {
 			const rows = await getManyDtoScoped({

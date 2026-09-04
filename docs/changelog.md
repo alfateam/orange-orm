@@ -2,6 +2,7 @@
 __Next__
 Add read-only ad-hoc `many()` and `one()` query relations returned from fetch-strategy callbacks with a lexical current-row parameter and a context exposing `db` and `root`, including captured outer scopes, owner-tagged cross-provider batching, composite and non-key correlations, per-owner ordering/pagination, nesting, save refresh, and Express/Hono transport support.
 Deduplicate identical ad-hoc scope tuples before batching.
+Increase the scoped relation batch size from 100 to 200 parents while respecting each database's parameter limit.
 Fix mapped `hasMany` fetching strategies so nested `limit` and `offset` paginate independently per parent while retaining internal keys for change tracking.
 __5.4.2__  
 Support for limit and orderBy in `aggregate` and `distinct`  

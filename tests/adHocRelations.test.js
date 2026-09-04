@@ -523,7 +523,7 @@ describe('ad-hoc relations', () => {
 		expect(rows).toHaveLength(205);
 		expect(rows.every(row => row.matchingLines.length === 1)).toBe(true);
 		expect(rows.map(row => row.matchingLines[0].orderId)).toEqual(rows.map(row => row.id));
-		expect(queries.filter(isOrderLineSelect)).toHaveLength(3);
+		expect(queries.filter(isOrderLineSelect)).toHaveLength(2);
 
 		queries.length = 0;
 		orange.on('query', onQuery);
@@ -544,7 +544,7 @@ describe('ad-hoc relations', () => {
 		expect(rows).toHaveLength(205);
 		expect(rows.every(row => row.lines.length === 1)).toBe(true);
 		expect(rows.map(row => row.lines[0].orderId)).toEqual(rows.map(row => row.id));
-		expect(queries.filter(isOrderLineSelect)).toHaveLength(3);
+		expect(queries.filter(isOrderLineSelect)).toHaveLength(2);
 	});
 
 	test('deduplicates 205 identical scopes and deep-clones nested results per owner', async () => {

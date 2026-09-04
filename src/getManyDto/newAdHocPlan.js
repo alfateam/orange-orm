@@ -298,8 +298,8 @@ module.exports = function newAdHocPlan({
 		const fixedParameters = (filter?.parameters?.length || 0)
 			+ (scopeFilter?.parameters?.length || 0);
 		const chunkSize = maxParameters
-			? Math.max(1, Math.min(100, Math.floor((maxParameters - fixedParameters) / parametersPerPair)))
-			: 100;
+			? Math.max(1, Math.min(200, Math.floor((maxParameters - fixedParameters) / parametersPerPair)))
+			: 200;
 		const start = descriptor.strategy?.offset || 0;
 		const limit = descriptor.__rdbAdHocRelation === 'one' ? 1 : descriptor.strategy?.limit;
 		const databasePaginates = getSessionSingleton(context, 'engine') !== 'sap'
