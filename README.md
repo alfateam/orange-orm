@@ -631,11 +631,14 @@ async function getRows() {
     deliveryAddress: true, 
     lines: {
       packages: true,
-      orderBy: 'product'
+      orderBy: 'product',
+      limit: 2
     },
   });
 }
 ```
+`limit` and `offset` inside a mapped many relation are applied independently for each parent. In this example, each order receives at most two lines. The relation query is batched across up to 200 parents at a time, or fewer when required by the database's parameter limit, rather than issuing one query per parent. Primary and foreign keys needed for relation attachment and change tracking are selected internally even when they are not part of the TypeScript result selection.
+
 <a name="aggregate-results">  </a>
 __With aggregated results__  
 You can count records and aggregate numerical columns. 
@@ -1506,6 +1509,52 @@ async function getRows() {
   });  
 }
 ```
+
+__Ad-hoc relations with lexical `current` and `root` scope__
+Return `db.table.many()` or `db.table.one()` from a fetch-strategy callback to add a read-only relation to a `getMany` or `getOne` result without declaring a mapped relation. The target can be any mapped table. The callback's first parameter is the current row that owns the ad-hoc property, while its context contains `db` and the `root` row returned by the top-level query.
+
+The ad-hoc relation can be declared directly on the top-level result. In this example, `recentOrders` does not need to be a mapped relation:
+
+```javascript
+const customers = await db.customer.getMany({
+  name: true,
+  recentOrders: (customer, { db }) => db.order.many({
+    where: order => order.customerId.eq(customer.id),
+    orderBy: 'id',
+    limit: 5
+  })
+});
+```
+
+The `limit` is applied independently for each customer. This form is batched, so it does not issue one query per customer: Orange fetches the customers first and then their recent orders in batches of up to 200 distinct scope tuples, or fewer when required by the database's parameter limit.
+
+Ad-hoc relations can also be nested beneath mapped relations and refer to the root row. Here, `orders` is mapped, while `affordableLines` and `firstLine` are ad-hoc:
+
+```javascript
+const customers = await db.customer.getMany({
+  name: true,
+  orders: {
+    orderBy: 'id',
+    affordableLines: (order, { db, root }) => db.orderLine.many({
+      where: line =>
+        line.orderId.eq(order.id)
+          .and(line.amount.lt(root.balance)),
+      orderBy: 'id',
+      limit: 5
+    }),
+    firstLine: (order, { db }) => db.orderLine.one({
+      where: line => line.orderId.eq(order.id),
+      orderBy: 'id'
+    })
+  }
+});
+```
+
+The callback form is required; a descriptor cannot be placed directly in the strategy as `matchingLines: db.orderLine.many(...)`. TypeScript derives the exact current-row and `root` types from the property's placement. The inner `where` callback uses the same syntax and relation access as any ordinary filter. A nested ad-hoc callback may capture and reuse current-row variables from any outer callback; their lexical scope is preserved through batching and HTTP transport.
+
+`many()` returns an array and `one()` returns one row or `null`. The property name must not collide with a mapped column, mapped relation, or reserved strategy property. Their strategies support column selection, mapped relations, nested ad-hoc relations, `where`, `orderBy`, `limit`, and `offset`. Pagination is applied independently for each parent. Row locking is not available because ad-hoc projections are read-only. `saveChanges()` re-runs the ad-hoc strategy for affected rows and replaces those projection values with fresh results.
+
+Orange automatically selects and removes the hidden scope columns needed by the query; you do not need to include primary keys manually. Scope-dependent filters are evaluated against an internal, owner-tagged scope table and batched in chunks. The internal owner tag attaches every target row to its exact lexical scope values, including composite correlations, ordinary non-key equality fields, non-equality filters, and duplicate correlation values under different roots. `one()`, `limit`, and `offset` are partitioned per owner in the database where supported; SAP ASE keeps the query batched and applies the final page in memory. Scope references owned by a nested mapped relation may use a conservative per-owner fallback. The same syntax works through the Express and Hono HTTP adapters, including target-table `baseFilter` rules.
 
 </details>
 

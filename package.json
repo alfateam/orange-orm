@@ -1,6 +1,6 @@
 {
     "name": "orange-orm",
-    "version": "5.4.2",
+    "version": "5.5.0",
     "publishConfig": {
         "access": "public"
     },
@@ -70,7 +70,7 @@
         "test:all:parallel": "concurrently \"npm:test:node\" \"npm:test:bun\" \"npm:test:deno\"",
         "coverage": "vitest run --coverage.enabled --coverage.reporter='text-summary'",
         "testw": "vitest update",
-        "tscheck": "tsc ./src/index.d.ts ./tests/types/aggregate-order-by.types.ts --module commonjs --target es2022 --noEmit true --strict true --esModuleInterop true",
+        "tscheck": "tsc ./src/index.d.ts ./tests/types/aggregate-order-by.types.ts ./tests/types/ad-hoc-relations.types.ts --module commonjs --target es2022 --noEmit true --strict true --esModuleInterop true",
         "concat-server": "node ./src/merge-server.js",
         "concat-browser": "node ./src/merge-browser.js",
         "build": "npm run build-server && npm run build-browser",
@@ -78,7 +78,6 @@
         "build-browser": "rollup -c ./src/rollup.config.browser.js && npm run concat-browser",
         "lint": "eslint ./",
         "fix": "eslint ./ --fix",
-        "owasp": "owasp-dependency-check --project \"MY_PROJECT\" --scan \"package-lock.json\" --exclude \"dependency-check-bin\" --out \"owasp\" --format HTML",
         "beta": "npm publish --tag beta"
     },
     "dependencies": {
@@ -149,7 +148,6 @@
         "msnodesqlv8": "^4.1.0",
         "mysql2": "^3.9.4",
         "oracledb": "^6.3.0",
-        "owasp-dependency-check": "^0.0.21",
         "pg": "^8.5.1",
         "pg-query-stream": "^3.3.2",
         "rollup": "^2.52.7",

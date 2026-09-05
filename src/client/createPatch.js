@@ -97,6 +97,12 @@ module.exports = function createPatch(original, dto, options) {
 		else if (object === Object(object)) {
 			let copy = {};
 			for (let name in object) {
+				// Query projections (aggregates and ad-hoc relations) are intentionally
+				// outside the mapped metadata and must never become write patches.
+				if (!isRoot && options?.columns
+					&& !(name in options.columns)
+					&& !(name in (options.relations || {})))
+					continue;
 				copy[name] = toCompareObject(object[name], isRoot ? options : options && options.relations && options.relations[name]);
 			}
 			return copy;

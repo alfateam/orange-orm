@@ -44,6 +44,7 @@ function requireGetTSDefinition () {
 		if (isNamespace)
 			src += startNamespace(tables, isHttp);
 		src += defs;
+		src += getAdHocScopeTs(tables);
 		src += getRdbClientTs(tables, isHttp);
 		if (isNamespace)
 			src += '}';
@@ -63,12 +64,14 @@ function requireGetTSDefinition () {
 			return `
 export interface ${Name}Table {
 	count(filter?: RawFilter): Promise<number>;
+	getMany<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<${Name}AdHocArray<Strategy>>;
 	getAll(): Promise<${Name}Array>;
 	getAll(fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
 	getMany(filter?: RawFilter): Promise<${Name}Array>;
 	getMany(filter: RawFilter, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
 	getMany(${name}s: Array<${Name}>): Promise<${Name}Array>;
 	getMany(${name}s: Array<${Name}>, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+	getOne<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<${Name}AdHocRow<Strategy>>;
 	getOne(filter?: RawFilter): Promise<${Name}Row>;
 	getOne(filter?: RawFilter, fetchingStrategy?: ${Name}Strategy): Promise<${Name}Row>;
 	getOne(${name}: ${Name}): Promise<${Name}Row>;
@@ -214,7 +217,7 @@ ${Concurrency(table, Name, true)}
 
 				otherConcurrency += `${Concurrency(relation.childTable, tableTypeName)}`;
 				concurrencyRelations += `${relationName}?: ${tableTypeName}Concurrency;${separator}`;
-				strategyRelations += `${relationName}?: ${tableTypeName}Strategy | boolean;${separator}`;
+				strategyRelations += `${relationName}?: ${tableTypeName}Strategy<Root> | boolean;${separator}`;
 				regularRelations += `${relationName}?: ${tableTypeName} | null;${separator}`;
 			};
 			visitor.visitOne = visitor.visitJoin;
@@ -222,7 +225,7 @@ ${Concurrency(table, Name, true)}
 				const tableTypeName = getTableName(relation, relationName);
 				otherConcurrency += `${Concurrency(relation.childTable, tableTypeName)}`;
 				concurrencyRelations += `${relationName}?: ${tableTypeName}Concurrency;${separator}`;
-				strategyRelations += `${relationName}?: ${tableTypeName}Strategy | boolean;${separator}`;
+				strategyRelations += `${relationName}?: ${tableTypeName}Strategy<Root> | boolean;${separator}`;
 				regularRelations += `${relationName}?: ${tableTypeName}[] | null;${separator}`;
 			};
 
@@ -232,7 +235,12 @@ ${Concurrency(table, Name, true)}
 			}
 
 			let row = '';
+			let adHocResultTypes = `
+export type ${name}AdHocRow<Strategy extends ${name}Strategy> = ${name}Row & AdHocProperties<Strategy>;
+export type ${name}AdHocArray<Strategy extends ${name}Strategy> = ${name}Array & Array<${name}AdHocRow<Strategy>>;
+`;
 			if (!isRoot) {
+				adHocResultTypes = '';
 				row = `export interface ${name}RelatedTable {
 	${columns(table)}
 	${tableRelations(table)}
@@ -262,7 +270,14 @@ export interface ${name}TableBase {
 }
 
 
-export interface ${name}Strategy {
+export interface ${name}AdHocTable<Root, Current> {
+	many(fetchingStrategy?: ${name}AdHocStrategy<Root, Current>): AdHocMany<${name}>;
+	one(fetchingStrategy?: ${name}AdHocStrategy<Root, Current>): AdHocOne<${name}>;
+}
+
+export interface ${name}Strategy<Root = ${name}TableBase> {
+	[property: string]: boolean | number | string | object | undefined
+		| ((table: ${name}TableBase, context: AdHocFactoryContext<Root, ${name}TableBase>) => unknown);
 	${strategyColumns(table)}
 	${strategyRelations}
 	limit?: number;
@@ -272,6 +287,14 @@ export interface ${name}Strategy {
 	forUpdate?: boolean;
 	skipLocked?: boolean;
 }
+
+export type ${name}AdHocStrategy<Root, Current> = Omit<${name}Strategy<Root>, 'where' | 'forUpdate' | 'skipLocked'> & {
+	where?: RawFilter | ((table: ${name}TableBase) => RawFilter);
+	forUpdate?: never;
+	skipLocked?: never;
+};
+
+${adHocResultTypes}
 
 ${otherConcurrency}
 
@@ -295,6 +318,21 @@ ${row}`;
 				return name;
 			}
 		}
+	}
+
+	function getAdHocScopeTs(tables) {
+		const dbProperties = Object.keys(tables)
+			.map(name => `\t${name}: ${pascalCase(name)}AdHocTable<Root, Current>;`)
+			.join('\n');
+		return `
+export interface AdHocDb<Root, Current> {
+${dbProperties}
+}
+export interface AdHocFactoryContext<Root, Current> {
+	db: AdHocDb<Root, Current>;
+	root: Root;
+}
+`;
 	}
 
 	function regularColumns(table) {
@@ -412,6 +450,23 @@ type HttpResponse<T = any> = {
 	headers: Record<string, string>;
 	config: HttpRequestConfig;
 };
+interface AdHocMany<T> {
+	readonly __rdbAdHocRelation: 'many';
+	readonly table: string;
+	readonly strategy: Record<string, unknown>;
+	readonly __result?: T[];
+}
+interface AdHocOne<T> {
+	readonly __rdbAdHocRelation: 'one';
+	readonly table: string;
+	readonly strategy: Record<string, unknown>;
+	readonly __result?: T | null;
+}
+type AdHocProperties<Strategy> = {
+	[Property in keyof Strategy as Strategy[Property] extends (...args: any[]) => AdHocMany<any> | AdHocOne<any> ? Property : never]:
+		Strategy[Property] extends (...args: any[]) => AdHocMany<infer Row> ? Row[] :
+		Strategy[Property] extends (...args: any[]) => AdHocOne<infer Row> ? Row | null : never;
+};
 `;
 
 		return `
@@ -437,6 +492,23 @@ type HttpResponse<T = any> = {
 	statusText: string;
 	headers: Record<string, string>;
 	config: HttpRequestConfig;
+};
+interface AdHocMany<T> {
+	readonly __rdbAdHocRelation: 'many';
+	readonly table: string;
+	readonly strategy: Record<string, unknown>;
+	readonly __result?: T[];
+}
+interface AdHocOne<T> {
+	readonly __rdbAdHocRelation: 'one';
+	readonly table: string;
+	readonly strategy: Record<string, unknown>;
+	readonly __result?: T | null;
+}
+type AdHocProperties<Strategy> = {
+	[Property in keyof Strategy as Strategy[Property] extends (...args: any[]) => AdHocMany<any> | AdHocOne<any> ? Property : never]:
+		Strategy[Property] extends (...args: any[]) => AdHocMany<infer Row> ? Row[] :
+		Strategy[Property] extends (...args: any[]) => AdHocOne<infer Row> ? Row | null : never;
 };
 export default schema as RdbClient;`;
 	}
@@ -732,6 +804,8 @@ function requireHostExpress () {
 				...readonly,
 				...tableOptions,
 				table: client.tables[tableName],
+				tables: client.tables,
+				tableConfigs: options,
 				isHttp: true,
 				client,
 				hooks
@@ -865,6 +939,8 @@ function requireHostHono () {
 				...readonly,
 				...tableOptions,
 				table: client.tables[tableName],
+				tables: client.tables,
+				tableConfigs: options,
 				isHttp: true,
 				client,
 				hooks
@@ -1188,6 +1264,12 @@ function requireCreatePatch () {
 			else if (object === Object(object)) {
 				let copy = {};
 				for (let name in object) {
+					// Query projections (aggregates and ad-hoc relations) are intentionally
+					// outside the mapped metadata and must never become write patches.
+					if (!isRoot && options?.columns
+						&& !(name in options.columns)
+						&& !(name in (options.relations || {})))
+						continue;
 					copy[name] = toCompareObject(object[name], isRoot ? options : options && options.relations && options.relations[name]);
 				}
 				return copy;
@@ -1566,624 +1648,39 @@ function requireParseOrderBy () {
 	return parseOrderBy_1;
 }
 
-var executePath;
-var hasRequiredExecutePath;
-
-function requireExecutePath () {
-	if (hasRequiredExecutePath) return executePath;
-	hasRequiredExecutePath = 1;
-	const createPatch = requireCreatePatch();
-	const emptyFilter = requireEmptyFilter();
-	const negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
-	const parseAggregateOrderBy = requireParseOrderBy();
-	let getMeta = requireGetMeta();
-	let isSafe = Symbol();
-
-	let _allowedOps = {
-		and: true,
-		or: true,
-		not: true,
-		AND: true,
-		OR: true,
-		NOT: true,
-		equal: true,
-		eq: true,
-		EQ: true,
-		notEqual: true,
-		ne: true,
-		NE: true,
-		lessThan: true,
-		lt: true,
-		LT: true,
-		lessThanOrEqual: true,
-		le: true,
-		LE: true,
-		greaterThan: true,
-		gt: true,
-		GT: true,
-		greaterThanOrEqual: true,
-		ge: true,
-		GE: true,
-		between: true,
-		in: true,
-		IN: true,
-		startsWith: true,
-		iStartsWith: true,
-		endsWith: true,
-		iEndsWith: true,
-		contains: true,
-		iContains: true,
-		iEqual: true,
-		iEq: true,
-		ieq: true,
-		IEQ: true,
-		exists: true,
-		all: true,
-		any: true,
-		none: true,
-		where: true,
-		sum: true,
-		avg: true,
-		max: true,
-		min: true,
-		count: true,
-		groupSum: true,
-		groupAvg: true,
-		groupMax: true,
-		groupMin: true,
-		groupCount: true,
-		_aggregate: true,
-		self: true,
-	};
-
-	function _executePath(context, ...rest) {
-
-		const _ops = {
-			and: emptyFilter.and.bind(null, context),
-			or: emptyFilter.or.bind(null, context),
-			not: emptyFilter.not.bind(null, context),
-			AND: emptyFilter.and.bind(null, context),
-			OR: emptyFilter.or.bind(null, context),
-			NOT: emptyFilter.not.bind(null, context),
-		};
-
-		return executePath(...rest);
-
-		async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client }) {
-			let allowedOps = { ..._allowedOps, insert: !readonly, ...extractRelations(getMeta(table)) };
-			let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, aggregate, distinct, count, delete: _delete, cascadeDelete, update, replace };
-
-			let res = await parseFilter(JSONFilter, table);
-			if (res === undefined)
-				return {};
-			else
-				return res;
-
-			function parseFilter(json, table) {
-				if (isFilter(json)) {
-					let subFilters = [];
-
-					let anyAllNone = tryGetAnyAllNone(json.path, table);
-					if (anyAllNone) {
-						const arg0 = json.args[0];
-						if (isHttp && arg0 !== undefined)
-							validateArgs(arg0);
-						const f = arg0 === undefined
-							? anyAllNone(context)
-							: anyAllNone(context, x => parseFilter(arg0, x));
-						if(!('isSafe' in f))
-							f.isSafe = isSafe;
-						return f;
-					}
-					else {
-						for (let i = 0; i < json.args.length; i++) {
-							subFilters.push(parseFilter(json.args[i], nextTable(json.path, table)));
-						}
-					}
-					return executePath(json.path, subFilters);
-				}
-				else if (Array.isArray(json)) {
-					const result = [];
-					for (let i = 0; i < json.length; i++) {
-						result.push(parseFilter(json[i], table));
-					}
-					return result;
-				}
-				else if (isColumnRef(json)) {
-					return resolveColumnRef(table, json.__columnRef);
-				}
-				return json;
-
-				function tryGetAnyAllNone(path, table) {
-					const parts = path.split('.');
-					for (let i = 0; i < parts.length; i++) {
-						table = table[parts[i]];
-					}
-
-					let ops = new Set(['all', 'any', 'none', 'where', '_aggregate']);
-					// let ops = new Set(['all', 'any', 'none', 'where']);
-					let last = parts[parts.length - 1];
-					if (last === 'count' && parts.length > 1)
-						ops.add('count');
-					if (ops.has(last) || (table && (table._primaryColumns || (table.any && table.all))))
-						return table;
-				}
-
-				function executePath(path, args) {
-					if (path in ops) {
-						if (isHttp)
-							validateArgs(args);
-						let op = ops[path].apply(null, args);
-						if (op.then)
-							return op.then((o) => {
-								setSafe(o);
-								return o;
-							});
-						setSafe(op);
-						return op;
-					}
-					let pathArray = path.split('.');
-					let target = table;
-					let op = pathArray[pathArray.length - 1];
-					if (!allowedOps[op] && isHttp) {
-
-						let e = new Error('Disallowed operator ' + op);
-						// @ts-ignore
-						e.status = 403;
-						throw e;
-
-					}
-					for (let i = 0; i < pathArray.length; i++) {
-						target = target[pathArray[i]];
-					}
-
-					if (!target) {
-						const left = args && args[0];
-						if (left) {
-							target = left;
-							for (let i = 0; i < pathArray.length; i++) {
-								target = target[pathArray[i]];
-							}
-							if (target) {
-								let res = target.apply(null, [context].concat(args.slice(1)));
-								setSafe(res);
-								return res;
-							}
-						}
-						throw new Error(`Method '${path}' does not exist`);
-					}
-					let res = target.apply(null, [context, ...args]);
-					setSafe(res);
-					return res;
-				}
-			}
-
-			async function invokeBaseFilter() {
-				if (typeof baseFilter === 'function') {
-					const res = await baseFilter.apply(null, [bindDb(client), request, response]);
-					if (!res)
-						return;
-					const JSONFilter = JSON.parse(JSON.stringify(res));
-					//@ts-ignore
-					return executePath({ table, JSONFilter, request, response });
-				}
-				else
-					return;
-			}
-
-			function getCustomFilterPaths(customFilters) {
-				return getLeafNames(customFilters);
-
-				function getLeafNames(obj, result = {}, current = 'customFilters.') {
-					for (let p in obj) {
-						if (typeof obj[p] === 'object' && obj[p] !== null)
-							getLeafNames(obj[p], result, current + p + '.');
-						else
-							result[current + p] = resolveFilter.bind(null, obj[p]);
-					}
-					return result;
-				}
-
-				async function resolveFilter(fn, ...args) {
-					const context = { db: bindDb(client), request, response };
-					let res = fn.apply(null, [context, ...args]);
-					if (res.then)
-						res = await res;
-					const JSONFilter = JSON.parse(JSON.stringify(res));
-					//@ts-ignore
-					return executePath({ table, JSONFilter, request, response });
-				}
-			}
-
-			function nextTable(path, table) {
-				path = path.split('.');
-				let ops = new Set(['all', 'any', 'none', 'count']);
-				let last = path.slice(-1)[0];
-				if (ops.has(last)) {
-					for (let i = 0; i < path.length - 1; i++) {
-						table = table[path[i]];
-					}
-					return table;
-				}
-				else {
-					let lastObj = table;
-					for (let i = 0; i < path.length; i++) {
-						if (lastObj)
-							lastObj = lastObj[path[i]];
-					}
-					if (lastObj?._shallow)
-						return lastObj._shallow;
-					else return table;
-				}
-			}
-
-			async function _delete(filter) {
-				if (readonly || disableBulkDeletes) {
-					let e = new Error('Bulk deletes are not allowed. Parameter "disableBulkDeletes" must be true.');
-					// @ts-ignore
-					e.status = 403;
-					throw e;
-				}
-				filter = negotiateFilter(filter);
-				const _baseFilter = await invokeBaseFilter();
-				if (_baseFilter)
-					filter = filter.and(context, _baseFilter);
-				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
-				return table.delete.apply(null, args);
-			}
-
-			async function cascadeDelete(filter) {
-				if (readonly || disableBulkDeletes) {
-					const e = new Error('Bulk deletes are not allowed. Parameter "disableBulkDeletes" must be true.');
-					// @ts-ignore
-					e.status = 403;
-					throw e;
-
-				}
-				filter = negotiateFilter(filter);
-				const _baseFilter = await invokeBaseFilter();
-				if (_baseFilter)
-					filter = filter.and(context, _baseFilter);
-				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
-				return table.cascadeDelete.apply(null, args);
-			}
-
-			function negotiateFilter(filter) {
-				if (filter)
-					return negotiateRawSqlFilter(context, filter, table, true);
-				else
-					return emptyFilter;
-			}
-
-			async function count(filter, strategy) {
-				validateStrategy(table, strategy);
-				filter = negotiateFilter(filter);
-				const _baseFilter = await invokeBaseFilter();
-				if (_baseFilter)
-					filter = filter.and(context, _baseFilter);
-				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
-				return table.count.apply(null, args);
-			}
-
-			async function getManyDto(filter, strategy) {
-				validateStrategy(table, strategy);
-				filter = negotiateFilter(filter);
-				const _baseFilter = await invokeBaseFilter();
-				if (_baseFilter)
-					filter = filter.and(context, _baseFilter);
-				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
-				await negotiateWhereAndAggregate(strategy);
-				return table.getManyDto.apply(null, args);
-			}
-
-			async function replace(subject, strategy = { insertAndForget: true }) {
-				validateStrategy(table, strategy);
-				const refinedStrategy = withLockingStrategy(objectToStrategy(subject, {}, table), strategy);
-				const JSONFilter2 = {
-					path: 'getManyDto',
-					args: [subject, refinedStrategy]
-				};
-				const originals = await executePath({ table, JSONFilter: JSONFilter2, baseFilter, customFilters, request, response, readonly, disableBulkDeletes, isHttp, client });
-				const meta = getMeta(table);
-				const patch = createPatch(originals, Array.isArray(subject) ? subject : [subject], meta);
-				const { changed } = await table.patch(context, patch, { strategy });
-				if (Array.isArray(subject))
-					return changed;
-				else
-					return changed[0];
-			}
-
-			async function update(subject, whereStrategy, strategy = { insertAndForget: true }) {
-				validateStrategy(table, strategy);
-				const refinedWhereStrategy = withLockingStrategy(objectToStrategy(subject, whereStrategy, table), strategy);
-				const JSONFilter2 = {
-					path: 'getManyDto',
-					args: [null, refinedWhereStrategy]
-				};
-				const rows = await executePath({ table, JSONFilter: JSONFilter2, baseFilter, customFilters, request, response, readonly, disableBulkDeletes, isHttp, client });
-				const originals = new Array(rows.length);
-				for (let i = 0; i < rows.length; i++) {
-					const row = rows[i];
-					originals[i] = { ...row };
-					for (let p in subject) {
-						row[p] = subject[p];
-					}
-				}
-				const meta = getMeta(table);
-				const patch = createPatch(originals, rows, meta);
-				const { changed } = await table.patch(context, patch, { strategy });
-				return changed;
-			}
-
-			function withLockingStrategy(fetchStrategy, strategy) {
-				const lockStrategy = extractLockingStrategy(strategy);
-				if (!lockStrategy)
-					return fetchStrategy;
-				return mergeLockingStrategy(fetchStrategy, lockStrategy);
-			}
-
-			function extractLockingStrategy(strategy) {
-				if (!strategy || typeof strategy !== 'object')
-					return;
-				const result = {};
-				if (strategy.forUpdate)
-					result.forUpdate = strategy.forUpdate;
-				if (strategy.skipLocked)
-					result.skipLocked = strategy.skipLocked;
-				for (let name in strategy) {
-					if (name === 'where' || name === 'orderBy' || name === 'limit' || name === 'offset' || name === 'forUpdate' || name === 'skipLocked')
-						continue;
-					const child = extractLockingStrategy(strategy[name]);
-					if (child)
-						result[name] = child;
-				}
-				return Object.keys(result).length > 0 ? result : undefined;
-			}
-
-			function mergeLockingStrategy(fetchStrategy, lockStrategy) {
-				const result = { ...fetchStrategy };
-				for (let name in lockStrategy) {
-					const value = lockStrategy[name];
-					if (name === 'forUpdate' || name === 'skipLocked')
-						result[name] = value;
-					else
-						result[name] = mergeLockingStrategy(result[name] && typeof result[name] === 'object' ? result[name] : {}, value);
-				}
-				return result;
-			}
-
-			function objectToStrategy(object, whereStrategy, table, strategy = {}) {
-				strategy = { ...whereStrategy, ...strategy };
-				if (Array.isArray(object)) {
-					for (let i = 0; i < object.length; i++) {
-						objectToStrategy(object[i], table, strategy);
-					}
-					return;
-				}
-				for (let name in object) {
-					const relation = table[name]?._relation;
-					if (relation && !relation.columns) {//notJoin, that is one or many
-						strategy[name] = {};
-						objectToStrategy(object[name], whereStrategy?.[name], table[name], strategy[name]);
-					}
-					else
-						strategy[name] = true;
-				}
-				return strategy;
-			}
-
-
-			async function aggregate(filter, strategy) {
-				validateAggregateStrategy(strategy);
-				filter = negotiateFilter(filter);
-				const _baseFilter = await invokeBaseFilter();
-				if (_baseFilter)
-					filter = filter.and(context, _baseFilter);
-				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
-				await negotiateWhereAndAggregate(strategy);
-				return table.aggregate.apply(null, args);
-			}
-
-			async function distinct(filter, strategy) {
-				validateAggregateStrategy(strategy);
-				filter = negotiateFilter(filter);
-				const _baseFilter = await invokeBaseFilter();
-				if (_baseFilter)
-					filter = filter.and(context, _baseFilter);
-				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
-				await negotiateWhereAndAggregate(strategy);
-				return table.distinct.apply(null, args);
-			}
-
-
-
-			async function negotiateWhereAndAggregate(strategy) {
-				if (typeof strategy !== 'object')
-					return;
-
-				for (let name in strategy) {
-					const target = strategy[name];
-					if (isFilter(target))
-						strategy[name] = await parseFilter(strategy[name], table);
-					else
-						await negotiateWhereAndAggregate(strategy[name]);
-				}
-
-			}
-
-			async function getMany(filter, strategy) {
-				validateStrategy(table, strategy);
-				filter = negotiateFilter(filter);
-				const _baseFilter = await invokeBaseFilter();
-				if (_baseFilter)
-					filter = filter.and(context, _baseFilter);
-				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
-				await negotiateWhereAndAggregate(strategy);
-				return table.getMany.apply(null, args);
-			}
-
-		}
-
-		function validateStrategy(table, strategy) {
-			if (!strategy || !table)
-				return;
-
-			for (let p in strategy) {
-				validateOffset(strategy);
-				validateLimit(strategy);
-				validateOrderBy(table, strategy);
-				validateStrategy(table[p], strategy[p]);
-			}
-		}
-
-		function validateAggregateStrategy(strategy) {
-			if (!strategy)
-				return;
-
-			validateOffset(strategy);
-			validateLimit(strategy);
-			const reserved = new Set(['where', 'limit', 'offset', 'orderBy']);
-			const aliases = Object.keys(strategy).filter(name => !reserved.has(name));
-			try {
-				parseAggregateOrderBy(strategy.orderBy, aliases);
-			} catch (error) {
-				error.status = 400;
-				throw error;
-			}
-		}
-
-		function validateLimit(strategy) {
-			if (!('limit' in strategy) || Number.isInteger(strategy.limit))
-				return;
-			const e = new Error('Invalid limit: ' + strategy.limit);
-			// @ts-ignore
-			e.status = 400;
-		}
-
-		function validateOffset(strategy) {
-			if (!('offset' in strategy) || Number.isInteger(strategy.offset))
-				return;
-			const e = new Error('Invalid offset: ' + strategy.offset);
-			// @ts-ignore
-			e.status = 400;
-			throw e;
-		}
-
-		function validateOrderBy(table, strategy) {
-			if (!('orderBy' in strategy) || !table)
-				return;
-			let orderBy = strategy.orderBy;
-			if (!Array.isArray(orderBy))
-				orderBy = [orderBy];
-			orderBy.reduce(validate, []);
-
-			function validate(_, element) {
-				let parts = element.split(' ').filter(x => {
-					x = x.toLowerCase();
-					return (!(x === '' || x === 'asc' || x === 'desc'));
-				});
-				for (let p of parts) {
-					let col = table[p];
-					if (!(col && col.equal)) {
-						const e = new Error('Unknown column: ' + p);
-						// @ts-ignore
-						e.status = 400;
-						throw e;
-					}
-				}
-			}
-		}
-
-		function validateArgs() {
-			for (let i = 0; i < arguments.length; i++) {
-				const filter = arguments[i];
-				if (!filter)
-					continue;
-				if (filter && filter.isSafe === isSafe)
-					continue;
-				if (filter.sql || typeof (filter) === 'string') {
-					const e = new Error('Raw filters are disallowed');
-					// @ts-ignore
-					e.status = 403;
-					throw e;
-				}
-				if (Array.isArray(filter))
-					for (let i = 0; i < filter.length; i++) {
-
-						validateArgs(filter[i]);
-					}
-			}
-
-		}
-
-		function isFilter(json) {
-			return json instanceof Object && 'path' in json && 'args' in json;
-		}
-
-		function isColumnRef(json) {
-			return json instanceof Object && typeof json.__columnRef === 'string';
-		}
-
-		function resolveColumnRef(table, path) {
-			let current = table;
-			const parts = path.split('.');
-			for (let i = 0; i < parts.length; i++) {
-				if (current)
-					current = current[parts[i]];
-			}
-
-			if (!current || typeof current._toFilterArg !== 'function') {
-				let e = new Error(`Column reference '${path}' is invalid`);
-				// @ts-ignore
-				e.status = 400;
-				throw e;
-			}
-			return current;
-		}
-
-		function setSafe(o) {
-			if (o instanceof Object)
-				Object.defineProperty(o, 'isSafe', {
-					value: isSafe,
-					enumerable: false
-
-				});
-		}
-
-		function extractRelations(obj) {
-			let flattened = {};
-
-			function helper(relations) {
-				Object.keys(relations).forEach(key => {
-
-					flattened[key] = true;
-
-					if (typeof relations[key] === 'object' && Object.keys(relations[key]?.relations)?.length > 0) {
-						helper(relations[key].relations);
-					}
-				});
-			}
-
-			helper(obj.relations);
-
-			return flattened;
-		}
-
-		function bindDb(client) {
-			var domain = context;
-			let p = domain.run(() => true);
-
-			function run(fn) {
-				return p.then(domain.run.bind(domain, fn));
-			}
-
-			return client({ transaction: run });
-
-		}
+var adHocRelation;
+var hasRequiredAdHocRelation;
+
+function requireAdHocRelation () {
+	if (hasRequiredAdHocRelation) return adHocRelation;
+	hasRequiredAdHocRelation = 1;
+	const marker = '__rdbAdHocRelation';
+	const ownerScopeMarker = '__rdbAdHocOwnerScope';
+
+	function isAdHocRelation(value) {
+		return !!value && typeof value === 'object'
+			&& (value[marker] === 'many' || value[marker] === 'one')
+			&& typeof value.table === 'string';
 	}
-	executePath = _executePath;
-	return executePath;
+
+	function newAdHocRelation(kind, table, strategy) {
+		return {
+			[marker]: kind,
+			table,
+			strategy: strategy || {}
+		};
+	}
+
+	adHocRelation = {
+		marker,
+		ownerScopeMarker,
+		isAdHocRelation,
+		newAdHocRelation
+	};
+	return adHocRelation;
 }
+
+var require$$5 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(_default);
 
 var tryGetSessionContext_1;
 var hasRequiredTryGetSessionContext;
@@ -2219,23 +1716,6 @@ function requireGetSessionContext () {
 	return getSessionContext_1;
 }
 
-var setSessionSingleton_1;
-var hasRequiredSetSessionSingleton;
-
-function requireSetSessionSingleton () {
-	if (hasRequiredSetSessionSingleton) return setSessionSingleton_1;
-	hasRequiredSetSessionSingleton = 1;
-	const getSessionContext = requireGetSessionContext();
-
-	function setSessionSingleton(context, name, value) {
-		const rdb = getSessionContext(context);
-		rdb[name] = value;
-	}
-
-	setSessionSingleton_1 = setSessionSingleton;
-	return setSessionSingleton_1;
-}
-
 var getSessionSingleton;
 var hasRequiredGetSessionSingleton;
 
@@ -2249,6 +1729,965 @@ function requireGetSessionSingleton () {
 		return rdb[name];
 	};
 	return getSessionSingleton;
+}
+
+var getManyDtoScoped = {exports: {}};
+
+var newShallowColumnSql;
+var hasRequiredNewShallowColumnSql;
+
+function requireNewShallowColumnSql () {
+	if (hasRequiredNewShallowColumnSql) return newShallowColumnSql;
+	hasRequiredNewShallowColumnSql = 1;
+	const getSessionSingleton = requireGetSessionSingleton();
+
+	function _new(context, table, alias, span, ignoreNulls) {
+		const quote = getSessionSingleton(context, 'quote');
+		const quotedAlias = quote(alias);
+		let columnsMap = span.columns;
+		var columns = table._columns;
+		var sql = '';
+		var separator = '';
+
+		for (let i = 0; i < columns.length; i++) {
+			var column = columns[i];
+			if (!columnsMap || (columnsMap.get(column))) {
+				sql = sql + separator + formatColumn(column) + ' as ' + quote('s' + alias + i);
+				separator = ',';
+			}
+			else if (!ignoreNulls) {
+				sql = sql + separator + 'null as ' + quote('s' + alias + i);
+				separator = ',';
+			}
+		}
+
+		for (let name in span.aggregates || {}) {
+			sql = sql + separator + span.aggregates[name].expression(name);
+			separator = ',';
+		}
+
+		return sql;
+
+		function formatColumn(column) {
+			const formatted = column.formatOut ? column.formatOut(context, quotedAlias) : quotedAlias + '.' + quote(column._dbName);
+			if (column.dbNull === null)
+				return formatted;
+			else {
+				const encoded = column.encode.unsafe(context, column.dbNull);
+				return `CASE WHEN ${formatted}=${encoded} THEN null ELSE ${formatted} END`;
+			}
+		}
+	}
+
+	newShallowColumnSql = _new;
+	return newShallowColumnSql;
+}
+
+var sharedJoinUtils;
+var hasRequiredSharedJoinUtils;
+
+function requireSharedJoinUtils () {
+	if (hasRequiredSharedJoinUtils) return sharedJoinUtils;
+	hasRequiredSharedJoinUtils = 1;
+	var newShallowColumnSql = requireNewShallowColumnSql();
+
+	function joinLegToColumnSql(context, leg, alias, ignoreNull) {
+		var span = leg.span;
+		var shallowColumnSql = newShallowColumnSql(context, span.table, alias, span, ignoreNull);
+		var joinedColumnSql = newJoinedColumnSql(context, span, alias, ignoreNull);
+		return ',' + shallowColumnSql + joinedColumnSql;
+	}
+
+	function newJoinedColumnSql(context, span, alias, ignoreNull) {
+		var c = {};
+		var sql = '';
+
+		c.visitJoin = function(leg) {
+			var joinSql = joinLegToColumnSql(context, leg, alias + leg.name, ignoreNull);
+			sql = sql + joinSql;
+		};
+
+		c.visitOne = function(leg) {
+			c.visitJoin(leg);
+		};
+
+		c.visitMany = function() {
+		};
+
+
+		span.legs.forEach(onEach);
+
+		function onEach(leg) {
+			leg.accept(c);
+		}
+
+		return sql;
+	}
+
+
+	sharedJoinUtils = { joinLegToColumnSql, newJoinedColumnSql };
+	return sharedJoinUtils;
+}
+
+var newJoinedColumnSql_1;
+var hasRequiredNewJoinedColumnSql;
+
+function requireNewJoinedColumnSql () {
+	if (hasRequiredNewJoinedColumnSql) return newJoinedColumnSql_1;
+	hasRequiredNewJoinedColumnSql = 1;
+	const { newJoinedColumnSql } = requireSharedJoinUtils();
+
+
+	newJoinedColumnSql_1 = newJoinedColumnSql;
+	return newJoinedColumnSql_1;
+}
+
+var newColumnSql;
+var hasRequiredNewColumnSql;
+
+function requireNewColumnSql () {
+	if (hasRequiredNewColumnSql) return newColumnSql;
+	hasRequiredNewColumnSql = 1;
+	var newShallowColumnSql = requireNewShallowColumnSql();
+	var newJoinedColumnSql = requireNewJoinedColumnSql();
+
+	newColumnSql = function(context,table,span,alias,ignoreNull) {
+		var shallowColumnSql = newShallowColumnSql(context,table,alias, span, ignoreNull);
+		var joinedColumnSql = newJoinedColumnSql(context, span,alias, ignoreNull);
+		return shallowColumnSql + joinedColumnSql;
+	};
+	return newColumnSql;
+}
+
+var newDiscriminatorSql_1$1;
+var hasRequiredNewDiscriminatorSql$1;
+
+function requireNewDiscriminatorSql$1 () {
+	if (hasRequiredNewDiscriminatorSql$1) return newDiscriminatorSql_1$1;
+	hasRequiredNewDiscriminatorSql$1 = 1;
+	const getSessionSingleton = requireGetSessionSingleton();
+
+	function newDiscriminatorSql(context, table, alias) {
+		const quote = getSessionSingleton(context, 'quote');
+		alias = quote(alias);
+		var result = '';
+		var formulaDiscriminators = table._formulaDiscriminators;
+		var columnDiscriminators = table._columnDiscriminators;
+		addFormula();
+		addColumn();
+		return result;
+
+		function addFormula() {
+			for (var i = 0; i<formulaDiscriminators.length; i++) {
+				var current = formulaDiscriminators[i].replace('@this',alias);
+				and();
+				result += '(' + current + ')';
+			}
+		}
+
+		function addColumn() {
+			for (var i = 0; i< columnDiscriminators.length; i++) {
+				var current = columnDiscriminators[i].split('=');
+				and();
+				result += alias + '.' + quote(current[0]) + '=' + current[1];
+			}
+		}
+
+		function and() {
+			if(result)
+				result += ' AND ';
+			else
+				result = ' ';
+		}
+	}
+
+	newDiscriminatorSql_1$1 = newDiscriminatorSql;
+	return newDiscriminatorSql_1$1;
+}
+
+var newWhereSql_1;
+var hasRequiredNewWhereSql;
+
+function requireNewWhereSql () {
+	if (hasRequiredNewWhereSql) return newWhereSql_1;
+	hasRequiredNewWhereSql = 1;
+	var newDiscriminatorSql = requireNewDiscriminatorSql$1();
+	var newParameterized = requireNewParameterized();
+
+	function newWhereSql(context, table, filter, alias) {
+		var separator = ' where';
+		var result = newParameterized('');
+		var sql = filter.sql();
+		var discriminator = newDiscriminatorSql(context, table, alias);
+		if (sql) {
+			result = filter.prepend(separator + ' ');
+			separator = ' AND';
+		}
+		if (discriminator)
+			result = result.append(separator + discriminator);
+
+		return result;
+	}
+
+	newWhereSql_1 = newWhereSql;
+	return newWhereSql_1;
+}
+
+var newDiscriminatorSql_1;
+var hasRequiredNewDiscriminatorSql;
+
+function requireNewDiscriminatorSql () {
+	if (hasRequiredNewDiscriminatorSql) return newDiscriminatorSql_1;
+	hasRequiredNewDiscriminatorSql = 1;
+	var newDiscriminatorSqlCore = requireNewDiscriminatorSql$1();
+
+	function newDiscriminatorSql(context, table, alias) {
+		var result = newDiscriminatorSqlCore(context,table,alias);
+		if (result)
+			return ' AND' + result;
+		return result;
+
+	}
+
+	newDiscriminatorSql_1 = newDiscriminatorSql;
+	return newDiscriminatorSql_1;
+}
+
+var newShallowJoinSqlCore;
+var hasRequiredNewShallowJoinSqlCore;
+
+function requireNewShallowJoinSqlCore () {
+	if (hasRequiredNewShallowJoinSqlCore) return newShallowJoinSqlCore;
+	hasRequiredNewShallowJoinSqlCore = 1;
+	const newDiscriminatorSql = requireNewDiscriminatorSql();
+	const newParameterized = requireNewParameterized();
+	const getSessionSingleton = requireGetSessionSingleton();
+
+	function _new(context, rightTable, leftColumns, rightColumns, leftAlias, rightAlias, filter) {
+		const quote = getSessionSingleton(context, 'quote');
+		const leftAliasRaw = leftAlias;
+		const rightAliasRaw = rightAlias;
+		leftAlias = quote(leftAliasRaw);
+		rightAlias = quote(rightAliasRaw);
+		var sql = '';
+		var delimiter = '';
+		for (var i = 0; i < leftColumns.length; i++) {
+			addColumn(i);
+			delimiter = ' AND ';
+		}
+
+		function addColumn(index) {
+			var leftColumn = leftColumns[index];
+			var rightColumn = rightColumns[index];
+			sql += delimiter + leftAlias + '.' + quote(leftColumn._dbName) + '=' + rightAlias + '.' + quote(rightColumn._dbName);
+		}
+
+		sql += newDiscriminatorSql(context, rightTable, rightAliasRaw);
+		var result = newParameterized(sql);
+		if (filter)
+			result = result.append(delimiter).append(filter);
+		return result;
+	}
+
+	newShallowJoinSqlCore = _new;
+	return newShallowJoinSqlCore;
+}
+
+var lockSql;
+var hasRequiredLockSql;
+
+function requireLockSql () {
+	if (hasRequiredLockSql) return lockSql;
+	hasRequiredLockSql = 1;
+	const getSessionSingleton = requireGetSessionSingleton();
+
+	function selectLockSql(context, span, alias, exclusive) {
+		const lock = collectSelectLock(span, alias, exclusive);
+		if (!hasLock(lock))
+			return '';
+		const encode = getSessionSingleton(context, 'selectForUpdateSql');
+		if (!encode)
+			return '';
+		return encode(context, lock);
+	}
+
+	function tableHintSql(context, span, exclusive) {
+		const lock = spanToLock(span, exclusive);
+		if (!hasLock(lock))
+			return '';
+		const encode = getSessionSingleton(context, 'selectForUpdateSql');
+		if (!encode || !encode.tableHint)
+			return '';
+		return encode.tableHint(context, lock);
+	}
+
+	function collectSelectLock(span, alias, exclusive) {
+		const lock = {
+			aliases: [],
+			forUpdate: Boolean(exclusive),
+			skipLocked: false
+		};
+		collect(span, alias, lock);
+		if (exclusive && lock.aliases.indexOf(alias) === -1)
+			lock.aliases.unshift(alias);
+		return lock;
+	}
+
+	function collect(span, alias, lock) {
+		if (!span)
+			return;
+		if (span.forUpdate) {
+			lock.forUpdate = true;
+			lock.aliases.push(alias);
+		}
+		if (span.skipLocked)
+			lock.skipLocked = true;
+
+		if (!span.legs)
+			return;
+		const visitor = {};
+		visitor.visitJoin = visitJoinedLeg;
+		visitor.visitOne = visitJoinedLeg;
+		visitor.visitMany = function() {};
+
+		function visitJoinedLeg(leg) {
+			collect(leg.span, alias + leg.name, lock);
+		}
+
+		span.legs.forEach(leg => leg.accept(visitor));
+	}
+
+	function spanToLock(span, exclusive) {
+		return {
+			aliases: [],
+			forUpdate: Boolean(exclusive || span?.forUpdate),
+			skipLocked: Boolean(span?.skipLocked)
+		};
+	}
+
+	function hasLock(lock) {
+		return Boolean(lock.forUpdate || lock.skipLocked);
+	}
+
+	lockSql = {
+		selectLockSql,
+		tableHintSql
+	};
+	return lockSql;
+}
+
+var newShallowJoinSql;
+var hasRequiredNewShallowJoinSql;
+
+function requireNewShallowJoinSql () {
+	if (hasRequiredNewShallowJoinSql) return newShallowJoinSql;
+	hasRequiredNewShallowJoinSql = 1;
+	const newJoinCore = requireNewShallowJoinSqlCore();
+	const getSessionSingleton = requireGetSessionSingleton();
+	const lockSql = requireLockSql();
+
+	function _new(context, rightTable, leftColumns, rightColumns, leftAlias, rightAlias, filter, span) {
+		const quote = getSessionSingleton(context, 'quote');
+		const tableHint = lockSql.tableHintSql(context, span);
+		const sql = ' JOIN ' + quote(rightTable._dbName) + ' ' + quote(rightAlias) + tableHint + ' ON (';
+		const joinCore = newJoinCore(context, rightTable, leftColumns, rightColumns, leftAlias, rightAlias, filter);
+		return joinCore.prepend(sql).append(')');
+	}
+
+	newShallowJoinSql = _new;
+	return newShallowJoinSql;
+}
+
+var joinLegToShallowJoinSql;
+var hasRequiredJoinLegToShallowJoinSql;
+
+function requireJoinLegToShallowJoinSql () {
+	if (hasRequiredJoinLegToShallowJoinSql) return joinLegToShallowJoinSql;
+	hasRequiredJoinLegToShallowJoinSql = 1;
+	var newShallowJoinSql = requireNewShallowJoinSql();
+
+	function toJoinSql(context,leg,alias,childAlias) {
+		var columns = leg.columns;
+		var childTable = leg.span.table;
+		return newShallowJoinSql(context,childTable,columns,childTable._primaryColumns,alias,childAlias,leg.span.where,leg.span).prepend(' LEFT');
+	}
+
+	joinLegToShallowJoinSql = toJoinSql;
+	return joinLegToShallowJoinSql;
+}
+
+var joinLegToJoinSql;
+var hasRequiredJoinLegToJoinSql;
+
+function requireJoinLegToJoinSql () {
+	if (hasRequiredJoinLegToJoinSql) return joinLegToJoinSql;
+	hasRequiredJoinLegToJoinSql = 1;
+	var joinLegToShallowJoinSql = requireJoinLegToShallowJoinSql();
+
+	function toJoinSql(newJoinSql, context,leg,alias,childAlias) {
+		return joinLegToShallowJoinSql(context,leg,alias,childAlias).append(newJoinSql(context,leg.span,childAlias));
+	}
+
+
+	joinLegToJoinSql = toJoinSql;
+	return joinLegToJoinSql;
+}
+
+var oneLegToShallowJoinSql;
+var hasRequiredOneLegToShallowJoinSql;
+
+function requireOneLegToShallowJoinSql () {
+	if (hasRequiredOneLegToShallowJoinSql) return oneLegToShallowJoinSql;
+	hasRequiredOneLegToShallowJoinSql = 1;
+	var newShallowJoinSql = requireNewShallowJoinSql();
+
+	function toJoinSql(context,leg,alias,childAlias) {
+		var parentTable = leg.table;
+		var columns = leg.columns;
+		var childTable = leg.span.table;
+		return newShallowJoinSql(context,childTable,parentTable._primaryColumns,columns,alias,childAlias, leg.span.where,leg.span).prepend(' LEFT');
+	}
+
+	oneLegToShallowJoinSql = toJoinSql;
+	return oneLegToShallowJoinSql;
+}
+
+var oneLegToJoinSql;
+var hasRequiredOneLegToJoinSql;
+
+function requireOneLegToJoinSql () {
+	if (hasRequiredOneLegToJoinSql) return oneLegToJoinSql;
+	hasRequiredOneLegToJoinSql = 1;
+	var oneLegToShallowJoinSql = requireOneLegToShallowJoinSql();
+
+	function toJoinSql(newJoinSql, context,leg,alias,childAlias) {
+		return oneLegToShallowJoinSql(context,leg,alias,childAlias).append(newJoinSql(context,leg.span,childAlias));
+	}
+
+	oneLegToJoinSql = toJoinSql;
+	return oneLegToJoinSql;
+}
+
+var newJoinSql_1;
+var hasRequiredNewJoinSql;
+
+function requireNewJoinSql () {
+	if (hasRequiredNewJoinSql) return newJoinSql_1;
+	hasRequiredNewJoinSql = 1;
+	const joinLegToJoinSql = requireJoinLegToJoinSql();
+	const oneLegToJoinSql = requireOneLegToJoinSql();
+	const newParameterized = requireNewParameterized();
+
+	function newJoinSql(context,span,alias = '') {
+		var sql = newParameterized('');
+		var childAlias;
+
+		var c = {};
+		c.visitJoin = function(leg) {
+			sql = joinLegToJoinSql(newJoinSql, context,leg,alias,childAlias).prepend(sql);
+		};
+
+		c.visitOne = function(leg) {
+			sql = oneLegToJoinSql(newJoinSql, context,leg,alias,childAlias).prepend(sql);
+		};
+
+		c.visitMany = function() {};
+
+		function onEachLeg(leg) {
+			childAlias = alias + leg.name;
+			leg.accept(c);
+		}
+
+		span.legs.forEach(onEachLeg);
+
+		const set = new Set();
+		for(let key in span.aggregates) {
+			const agg = span.aggregates[key];
+			for(let join of agg.joins) {
+				if (!set.has(join)) {
+					sql = sql.append(join);
+					set.add(join);
+				}
+			}
+		}
+
+		return sql;
+	}
+
+	newJoinSql_1 = newJoinSql;
+	return newJoinSql_1;
+}
+
+var newSingleQuery$1;
+var hasRequiredNewSingleQuery$1;
+
+function requireNewSingleQuery$1 () {
+	if (hasRequiredNewSingleQuery$1) return newSingleQuery$1;
+	hasRequiredNewSingleQuery$1 = 1;
+	var newColumnSql = requireNewColumnSql();
+	var newWhereSql = requireNewWhereSql();
+	var newJoinSql = requireNewJoinSql();
+	var newParameterized = requireNewParameterized();
+	var getSessionSingleton = requireGetSessionSingleton();
+	var lockSql = requireLockSql();
+
+	function _new(context,table,filter,span, alias,orderBy,limit,offset,distinct = false, options = {}) {
+		var quote = getSessionSingleton(context, 'quote');
+		var name = quote(table._dbName);
+		var quotedAlias = quote(alias);
+		var columnSql = newColumnSql(context,table,span,alias,true);
+		var joinSql = newJoinSql(context, span, alias);
+		var whereSql = newWhereSql(context,table,filter,alias);
+		if (limit)
+			limit = limit + ' ';
+		const selectClause = distinct ? 'select distinct ' : 'select ';
+		const lockClause = lockSql.selectLockSql(context, span, alias);
+		const tableHint = lockSql.tableHintSql(context, span);
+		const extraSelect = options.extraSelect || '';
+		const fromSuffix = options.fromSuffix || '';
+
+		return newParameterized(selectClause + limit + extraSelect + columnSql + ' from ' + name + ' ' + quotedAlias + tableHint)
+			.append(fromSuffix)
+			.append(joinSql)
+			.append(whereSql)
+			.append(orderBy + offset + lockClause);
+
+	}
+
+	newSingleQuery$1 = _new;
+	return newSingleQuery$1;
+}
+
+var extractFilter;
+var hasRequiredExtractFilter;
+
+function requireExtractFilter () {
+	if (hasRequiredExtractFilter) return extractFilter;
+	hasRequiredExtractFilter = 1;
+	var emptyFilter = requireEmptyFilter();
+
+	function extract(filter) {
+		if (filter)
+			return filter;
+		return emptyFilter;
+	}
+
+	extractFilter = extract;
+	return extractFilter;
+}
+
+var extractOrderBy_1$1;
+var hasRequiredExtractOrderBy$1;
+
+function requireExtractOrderBy$1 () {
+	if (hasRequiredExtractOrderBy$1) return extractOrderBy_1$1;
+	hasRequiredExtractOrderBy$1 = 1;
+	const getSessionSingleton = requireGetSessionSingleton();
+
+	function extractOrderBy(context, table, alias, orderBy, originalOrderBy) {
+		const quote = getSessionSingleton(context, 'quote');
+		alias = quote(alias);
+		var dbNames = [];
+		var i;
+		if (orderBy) {
+			if (typeof orderBy === 'string')
+				orderBy = [orderBy];
+			else if (!Array.isArray(orderBy))
+				throwInvalidOrderBy(orderBy);
+			if (orderBy.length === 0)
+				throwInvalidOrderBy(orderBy);
+			for (i = 0; i < orderBy.length; i++) {
+				var nameAndDirection = extractNameAndDirection(orderBy[i]);
+				pushColumn(nameAndDirection.name, nameAndDirection.direction);
+			}
+		} else {
+			if(originalOrderBy)
+				return originalOrderBy;
+
+			for (i = 0; i < table._primaryColumns.length; i++) {
+				pushColumn(table._primaryColumns[i].alias);
+			}
+		}
+
+		function extractNameAndDirection(orderBy) {
+			if (typeof orderBy !== 'string')
+				throwInvalidOrderBy(orderBy);
+			var value = orderBy.trim();
+			var match = /^(.*?)(?:\s+(asc|desc))?$/i.exec(value);
+			return {
+				name: match[1],
+				direction: match[2] ? ' ' + match[2].toLowerCase() : ''
+			};
+		}
+		function pushColumn(property, direction) {
+			direction = direction || '';
+			var result = getTableColumn(property);
+			var column = result.column;
+			var jsonQuery = result.jsonQuery;
+
+			dbNames.push(alias + '.' + quote(column._dbName) + jsonQuery + direction);
+		}
+
+		function getTableColumn(property) {
+			var directColumn = table[property];
+			if (isColumn(directColumn))
+				return { column: directColumn, jsonQuery: '' };
+
+			var operator = /#>>|#>|->>|->/.exec(property);
+			var columnName = operator ? property.slice(0, operator.index) : property;
+			var column = table[columnName];
+			var jsonQuery = operator ? property.slice(operator.index) : '';
+			if (!isColumn(column) || !isSafeJsonQuery(jsonQuery))
+				throwInvalidOrderBy(property);
+			return { column, jsonQuery };
+		}
+
+		function isColumn(value) {
+			return !!value && typeof value._toFilterArg === 'function';
+		}
+
+		function isSafeJsonQuery(value) {
+			if (!value)
+				return true;
+			for (let i = 0; i < value.length; i++) {
+				const code = value.charCodeAt(i);
+				if (code < 32 || code === 127)
+					return false;
+			}
+			return /^(?:(?:#>>|#>|->>|->)(?:-?[0-9]+|'(?:[^'\\]|'')*'))+$/.test(value);
+		}
+
+		function throwInvalidOrderBy(value) {
+			const error = new Error(`Unable to get column on orderBy '${String(value)}'. If jsonb query, only #>, #>>, -> and ->> allowed. Only use ' ' to seperate between query and direction. Does currently not support casting.`);
+			error.status = 400;
+			throw error;
+		}
+
+		return ' order by ' + dbNames.join(',');
+	}
+
+	extractOrderBy_1$1 = extractOrderBy;
+	return extractOrderBy_1$1;
+}
+
+var validatePagination_1;
+var hasRequiredValidatePagination;
+
+function requireValidatePagination () {
+	if (hasRequiredValidatePagination) return validatePagination_1;
+	hasRequiredValidatePagination = 1;
+	function validatePagination(value) {
+		validateValue(value, 'limit');
+		validateValue(value, 'offset');
+		if (value?.limit !== undefined && value?.offset !== undefined
+			&& !Number.isSafeInteger(value.limit + value.offset))
+			throwInvalid('pagination range', `${value.offset} + ${value.limit}`);
+	}
+
+	function validateValue(value, name) {
+		if (!value || value[name] === undefined)
+			return;
+		if (Number.isSafeInteger(value[name]) && value[name] >= 0)
+			return;
+
+		throwInvalid(name, String(value[name]));
+	}
+
+	function throwInvalid(name, value) {
+		const error = new Error(`Invalid ${name}: ${value}`);
+		error.status = 400;
+		throw error;
+	}
+
+	validatePagination.limit = value => validateValue(value, 'limit');
+	validatePagination.offset = value => validateValue(value, 'offset');
+
+	validatePagination_1 = validatePagination;
+	return validatePagination_1;
+}
+
+var extractLimit_1;
+var hasRequiredExtractLimit;
+
+function requireExtractLimit () {
+	if (hasRequiredExtractLimit) return extractLimit_1;
+	hasRequiredExtractLimit = 1;
+	var getSessionContext = requireGetSessionContext();
+	var validatePagination = requireValidatePagination();
+
+	function extractLimit(context, span) {
+		validatePagination.limit(span);
+		let limit = getSessionContext(context).limit;
+		if (limit)
+			return limit(span);
+		else
+			return '';
+	}
+
+	extractLimit_1 = extractLimit;
+	return extractLimit_1;
+}
+
+var extractOffset_1;
+var hasRequiredExtractOffset;
+
+function requireExtractOffset () {
+	if (hasRequiredExtractOffset) return extractOffset_1;
+	hasRequiredExtractOffset = 1;
+	var getSessionContext = requireGetSessionContext();
+	var validatePagination = requireValidatePagination();
+
+	function extractOffset(context, span) {
+		validatePagination.offset(span);
+		let {limitAndOffset} = getSessionContext(context);
+		if (limitAndOffset)
+			return limitAndOffset(span);
+		else
+			return '';
+	}
+
+	extractOffset_1 = extractOffset;
+	return extractOffset_1;
+}
+
+var newQuery_1$2;
+var hasRequiredNewQuery$2;
+
+function requireNewQuery$2 () {
+	if (hasRequiredNewQuery$2) return newQuery_1$2;
+	hasRequiredNewQuery$2 = 1;
+	var newSingleQuery = requireNewSingleQuery$1();
+	var extractFilter = requireExtractFilter();
+	var extractOrderBy = requireExtractOrderBy$1();
+	var extractLimit = requireExtractLimit();
+	var newParameterized = requireNewParameterized();
+	var extractOffset = requireExtractOffset();
+
+	function newQuery(context,table,filter,span,alias,options = {}) {
+		filter = extractFilter(filter);
+		var orderBy = Object.prototype.hasOwnProperty.call(options, 'orderBy')
+			? options.orderBy
+			: extractOrderBy(context,table,alias,span.orderBy);
+		var limit = extractLimit(context, span);
+		var offset = extractOffset(context, span);
+
+		var query = newSingleQuery(context,table,filter,span,alias,orderBy,limit,offset,false,options);
+		return newParameterized(query.sql(), query.parameters);
+	}
+
+	newQuery_1$2 = newQuery;
+	return newQuery_1$2;
+}
+
+var newCollection_1;
+var hasRequiredNewCollection;
+
+function requireNewCollection () {
+	if (hasRequiredNewCollection) return newCollection_1;
+	hasRequiredNewCollection = 1;
+	function newCollection() {
+		var c = {};
+		var initialArgs = [];
+		for (var i = 0; i < arguments.length; i++) {
+			initialArgs.push(arguments[i]);
+		}
+		var ranges = [initialArgs];
+
+		c.addRange = function(otherCollection) {
+			ranges.push(otherCollection);
+		};
+
+		c.add = function(element) {
+			c.addRange([element]);
+		};
+
+		c.toArray = function() {
+			var result = [];
+			c.forEach(onEach);
+			return result;
+
+			function onEach(element) {
+				result.push(element);
+			}
+		};
+
+		c.forEach = function(callback) {
+			var index = 0;
+			for (var i = 0; i < ranges.length; i++) {
+				ranges[i].forEach(onEach);
+			}
+
+			function onEach(element) {
+				callback(element, index);
+				index++;
+			}
+
+		};
+
+		Object.defineProperty(c, 'length', {
+			enumerable: false,
+			get: function() {
+				var result = 0;
+				for (var i = 0; i < ranges.length; i++) {
+					result += ranges[i].length;
+				}
+				return result;
+			},
+		});
+
+
+		return c;
+	}
+
+	newCollection_1 = newCollection;
+	return newCollection_1;
+}
+
+var newQueryContext_1;
+var hasRequiredNewQueryContext;
+
+function requireNewQueryContext () {
+	if (hasRequiredNewQueryContext) return newQueryContext_1;
+	hasRequiredNewQueryContext = 1;
+	function newQueryContext() {
+		var rows = [];
+
+		var c = {};
+		c.rows = rows;
+
+		c.expand = function(relation) {
+			rows.forEach(function(row) {
+				relation.expand(row);
+			});
+		};
+
+		c.add = function(row) {
+			rows.push(row);
+		};
+
+		return c;
+	}
+
+	newQueryContext_1 = newQueryContext;
+	return newQueryContext_1;
+}
+
+var purifyStrategy_1;
+var hasRequiredPurifyStrategy;
+
+function requirePurifyStrategy () {
+	if (hasRequiredPurifyStrategy) return purifyStrategy_1;
+	hasRequiredPurifyStrategy = 1;
+	function purifyStrategy(table, strategy, columns = new Map()) {
+		strategy = { ...strategy };
+		for (let p in strategy) {
+			if (strategy[p] === null)
+				strategy[p] = true;
+		}
+
+		let hasIncludedColumns;
+		for (let name in strategy) {
+			if (table._relations[name] && !strategy[name])
+				continue;
+			else if (table._relations[name])
+				strategy[name] = addLeg(table._relations[name], strategy[name], columns);
+			else if (table[name] && table[name].eq ) {
+				if (!columns.has(table[name]))
+					columns.set(table[name], strategy[name]);
+				hasIncludedColumns = hasIncludedColumns || strategy[name];
+			}
+		}
+		for (let i = 0; i < table._columns.length; i++) {
+			let column = table._columns[i];
+			strategy[column.alias] = !hasIncludedColumns;
+		}
+
+		table._primaryColumns.forEach(column => {
+			strategy[column.alias] = true;
+		});
+		columns.forEach((value, key) => strategy[key.alias] = value);
+
+		return strategy;
+
+	}
+
+	function addLeg(relation, strategy, columns) {
+		let nextColumns = new Map();
+		if (!relation.joinRelation)
+			for (let i = 0; i < relation.columns.length; i++) {
+				columns.set(relation.columns[i], true);
+			}
+		else {
+			relation.joinRelation.columns.forEach(column => {
+				nextColumns.set(column, true);
+			});
+		}
+		let childTable = relation.childTable;
+		return purifyStrategy(childTable, strategy, nextColumns);
+	}
+
+	purifyStrategy_1 = purifyStrategy;
+	return purifyStrategy_1;
+}
+
+var strategyToSpan;
+var hasRequiredStrategyToSpan;
+
+function requireStrategyToSpan () {
+	if (hasRequiredStrategyToSpan) return strategyToSpan;
+	hasRequiredStrategyToSpan = 1;
+	var newCollection = requireNewCollection();
+	var newQueryContext = requireNewQueryContext();
+	var purifyStrategy = requirePurifyStrategy();
+	var validatePagination = requireValidatePagination();
+
+	function toSpan(table, strategy) {
+		var span = {};
+		span.aggregates = {};
+		span.legs = newCollection();
+		span.table = table;
+		strategy = purifyStrategy(table, strategy);
+		applyStrategy(table,span,strategy);
+		span.queryContext = newQueryContext();
+		span.queryContext.strategy = strategy;
+		return span;
+
+		function applyStrategy(table,span,strategy) {
+			let columns = new Map();
+			var legs = span.legs;
+			if(!strategy)
+				return;
+			validatePagination(strategy);
+			for (var name in strategy) {
+				if (table._relations[name] && !strategy[name])
+					continue;
+				if (table._relations[name])
+					addLeg(legs,table,strategy,name);
+				else if (strategy[name]?.expression && (strategy[name]?.joins || strategy[name]?.join || strategy[name]?.column))
+					span.aggregates[name] = strategy[name];
+				else if (table[name] && table[name].eq)
+					columns.set(table[name], strategy[name]);
+				else
+					span[name] = strategy[name];
+			}
+			span.columns = columns;
+		}
+
+		function addLeg(legs,table,strategy,name) {
+			var relation = table._relations[name];
+			var leg = relation.toLeg();
+			leg.span.queryContext.strategy = strategy;
+			leg.span.where = strategy[name].where;
+			leg.span.aggregates = {};
+			legs.add(leg);
+			var subStrategy = strategy[name];
+			var childTable = relation.childTable;
+			applyStrategy(childTable,leg.span,subStrategy);
+		}
+	}
+
+	strategyToSpan = toSpan;
+	return strategyToSpan;
 }
 
 var negotiateNullParams_1;
@@ -2582,6 +3021,2063 @@ function requireExecuteQueries () {
 	return executeQueries_1;
 }
 
+var getManyDto = {exports: {}};
+
+var hasRequiredGetManyDto$1;
+
+function requireGetManyDto$1 () {
+	if (hasRequiredGetManyDto$1) return getManyDto.exports;
+	hasRequiredGetManyDto$1 = 1;
+	const emptyFilter = requireEmptyFilter();
+	const newQuery = requireNewQuery$2();
+	const negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
+	const strategyToSpan = requireStrategyToSpan();
+	const executeQueries = requireExecuteQueries();
+	const getSessionSingleton = requireGetSessionSingleton();
+	const getManyDtoScoped = requireGetManyDtoScoped();
+
+	async function getManyDto$1(context, table, filter, strategy, spanFromParent, updateParent) {
+		filter = negotiateRawSqlFilter(context, filter, table);
+		if (strategy && strategy.where) {
+			let arg = typeof strategy.where === 'function' ? strategy.where(context, table) : strategy.where;
+			filter = filter.and(context, arg);
+		}
+
+		let span = spanFromParent || strategyToSpan(table, strategy);
+		let alias = table._dbName;
+
+		const query = newQuery(context, table, filter, span, alias);
+		const res = await executeQueries(context, [query]);
+		return decode(context, strategy, span, await res[0], undefined, updateParent);
+	}
+
+	function newCreateRow(span) {
+		let columnsMap = span.columns;
+		const columns = span.table._columns.filter(column => !columnsMap || columnsMap.get(column));
+		const protoRow = createProto(columns, span);
+		const manyNames = [];
+
+		const c = {};
+		c.visitJoin = () => { };
+		c.visitOne = () => { };
+		c.visitMany = function(leg) {
+			manyNames.push(leg.name);
+		};
+
+		span.legs.forEach(onEachLeg);
+		return createRow;
+
+		function onEachLeg(leg) {
+			leg.accept(c);
+		}
+
+		function createRow() {
+			const obj = Object.create(protoRow);
+			for (let i = 0; i < manyNames.length; i++) {
+				obj[manyNames[i]] = [];
+			}
+			return obj;
+		}
+	}
+
+	function createProto(columns, span) {
+		let obj = {};
+		for (let i = 0; i < columns.length; i++) {
+			obj[columns[i].alias] = null;
+		}
+		for (let key in span.aggregates) {
+			obj[key] = null;
+		}
+		const c = {};
+
+		c.visitJoin = function(leg) {
+			obj[leg.name] = null;
+		};
+		c.visitOne = c.visitJoin;
+		c.visitMany = function(leg) {
+			obj[leg.name] = null;
+		};
+
+		span.legs.forEach(onEachLeg);
+
+		function onEachLeg(leg) {
+			leg.accept(c);
+		}
+
+		return obj;
+	}
+
+	function hasManyRelations(span) {
+		let result;
+		const c = {};
+		c.visitJoin = () => { };
+		c.visitOne = c.visitJoin;
+		c.visitMany = function() {
+			result = true;
+		};
+
+		span.legs.forEach(onEachLeg);
+		return result;
+
+		function onEachLeg(leg) {
+			leg.accept(c);
+		}
+	}
+
+	async function decode(context, strategy, span, rows, keys = rows.length > 0 ? Object.keys(rows[0]) : [], updateParent) {
+		const table = span.table;
+		let columnsMap = span.columns;
+		const columns = table._columns.filter(column => !columnsMap || columnsMap.get(column));
+		const rowsLength = rows.length;
+		const columnsLength = columns.length;
+		const primaryColumns = table._primaryColumns;
+		const primaryColumnsLength = primaryColumns.length;
+		const rowsMap = new Map();
+		const fkIds = new Array(rows.length);
+		const getIds = createGetIds();
+		const aggregateKeys = Object.keys(span.aggregates);
+
+		const outRows = new Array(rowsLength);
+		const createRow = newCreateRow(span);
+		const shouldCreateMap = hasManyRelations(span);
+		for (let i = 0; i < rowsLength; i++) {
+			const row = rows[i];
+			let outRow = createRow();
+			let pkWithNullCount = 0;
+			for (let j = 0; j < columnsLength; j++) {
+				if (j < primaryColumnsLength) {
+					if (row[keys[j]] === null)
+						pkWithNullCount++;
+					if (pkWithNullCount === primaryColumnsLength) {
+						outRow = null;
+						break;
+					}
+				}
+				const column = columns[j];
+				outRow[column.alias] = column.decode(context, row[keys[j]]);
+			}
+
+			if (outRow) {
+				for (let j = 0; j < aggregateKeys.length; j++) {
+					const key = aggregateKeys[j];
+					const parse = span.aggregates[key].column?.decode || ((context, arg) => Number.parseFloat(arg));
+					outRow[key] = parse(context, row[keys[j + columnsLength]]);
+				}
+			}
+
+			outRows[i] = outRow;
+			if (updateParent)
+				updateParent(outRow, i);
+			if (shouldCreateMap && outRow) {
+				fkIds[i] = getIds(outRow);
+				addToMap(rowsMap, fkIds[i], outRow);
+			}
+		}
+		span._rowsMap = rowsMap;
+		span._ids = fkIds;
+		span._rows = outRows;
+
+		keys.splice(0, columnsLength + aggregateKeys.length);
+		if (span.legs.toArray().length === 0)
+			return outRows;
+
+		const all = [];
+
+		if (shouldCreateMap) {
+			all.push(decodeManyRelations(context, strategy, span));
+			all.push(decodeRelations2(context, strategy, span, rows, outRows, keys));
+		}
+		else
+			all.push(decodeRelations2(context, strategy, span, rows, outRows, keys));
+
+		await Promise.all(all);
+
+		return outRows;
+
+
+		function createGetIds() {
+			const primaryColumns = table._primaryColumns;
+			const length = primaryColumns.length;
+			if (length === 1) {
+				const alias = table._primaryColumns[0].alias;
+				return (row) => row[alias];
+			}
+			else
+				return (row) => {
+					const result = new Array(length);
+					for (let i = 0; i < length; i++) {
+						result[i] = row[primaryColumns[i].alias];
+					}
+					return result;
+				};
+		}
+
+	}
+
+	async function decodeManyRelations(context, strategy, span) {
+		const maxParameters = getSessionSingleton(context, 'maxParameters');
+
+		const promises = [];
+		const c = {};
+		c.visitJoin = () => { };
+		c.visitOne = c.visitJoin;
+
+		// Helper function to split an array into chunks
+		function chunk(array, size) {
+			const results = [];
+			for (let i = 0; i < array.length; i += size) {
+				results.push(array.slice(i, i + size));
+			}
+			return results;
+		}
+
+		c.visitMany = function(leg) {
+			const name = leg.name;
+			const table = span.table;
+			const relation = table._relations[name];
+			const relationStrategy = strategy[name];
+			if (hasPagination(leg.span)) {
+				promises.push(fetchPagedRelation(leg, relation, relationStrategy));
+				return;
+			}
+			const parametersPerRow = relation.joinRelation.columns.length;
+			const maxRows = maxParameters
+				? Math.max(1, Math.floor((maxParameters - 1) / parametersPerRow))
+				: undefined;
+			const rowsMap = span._rowsMap;
+
+			const extractKey = createExtractKey(leg);
+			const extractFromMap = createExtractFromMap(rowsMap, table._primaryColumns);
+
+			if (span._ids.length === 0) {
+				return;
+			}
+
+			// If maxRows is defined, chunk the IDs before calling getManyDto
+			if (maxRows) {
+				const chunkedIds = chunk(span._ids, maxRows);
+				for (const idsChunk of chunkedIds) {
+					const filter = createOneFilter(context, relation, idsChunk);
+					const p = getManyDto$1(
+						context,
+						relation.childTable,
+						filter,
+						strategy[name],
+						leg.span,
+						updateParent
+					);
+					promises.push(p);
+				}
+			} else {
+				// Otherwise, do the entire set in one go
+				const filter = createOneFilter(context, relation, span._ids);
+				const p = getManyDto$1(
+					context,
+					relation.childTable,
+					filter,
+					strategy[name],
+					leg.span,
+					updateParent
+				);
+				promises.push(p);
+			}
+
+			function updateParent(subRow) {
+				const key = extractKey(subRow);
+				const parentRows = extractFromMap(key) || [];
+				parentRows.forEach(parentRow => {
+					parentRow[name].push(subRow);
+				});
+			}
+		};
+
+		async function fetchPagedRelation(leg, relation, relationStrategy) {
+			const columns = relation.joinRelation.columns;
+			const childTable = relation.childTable;
+			// Build a fresh span through getManyDtoScoped so strategyToSpan keeps
+			// omitted primary keys and relation foreign keys in the internal projection.
+			// The public Selection type still follows the caller's original strategy.
+			const executionStrategy = withoutPagination(relationStrategy);
+			const filter = strategyFilter(childTable, relationStrategy);
+			const scopeColumns = columns.map((column, index) => ({
+				column,
+				alias: `__rdb_m${index}`,
+				value: scopeRow => scopeRow.key[index]
+			}));
+			let scopeFilter = emptyFilter;
+			for (let i = 0; i < columns.length; i++) {
+				const scopeRef = getManyDtoScoped.newScopeColumnRef(context, scopeColumns[i].alias);
+				const columnFilter = columns[i].eq(context, scopeRef);
+				scopeFilter = scopeFilter === emptyFilter
+					? columnFilter
+					: scopeFilter.and(context, columnFilter);
+			}
+
+			const scopeRows = [];
+			for (let ownerId = 0; ownerId < span._rows.length; ownerId++) {
+				if (!span._rows[ownerId])
+					continue;
+				const id = span._ids[ownerId];
+				scopeRows.push({
+					ownerId,
+					key: columns.length === 1 ? [id] : id
+				});
+			}
+			if (scopeRows.length === 0)
+				return;
+
+			const fixedParameters = filter?.parameters?.length || 0;
+			const maxRows = maxParameters
+				? Math.max(1, Math.floor((maxParameters - fixedParameters) / columns.length))
+				: 200;
+			const chunkSize = Math.min(200, maxRows);
+			const rowsByOwner = new Map();
+			for (const scopeRowsChunk of chunk(scopeRows, chunkSize)) {
+				const rows = await getManyDtoScoped({
+					context,
+					table: childTable,
+					filter,
+					scopeFilter,
+					strategy: executionStrategy,
+					scopeColumns,
+					scopeRows: scopeRowsChunk,
+					offset: leg.span.offset || 0,
+					limit: leg.span.limit
+				});
+				for (const { ownerId, row } of rows) {
+					if (!row)
+						continue;
+					if (!rowsByOwner.has(ownerId))
+						rowsByOwner.set(ownerId, []);
+					rowsByOwner.get(ownerId).push(row);
+				}
+			}
+
+			const paginateInMemory = getSessionSingleton(context, 'engine') === 'sap';
+			const start = leg.span.offset || 0;
+			const end = leg.span.limit === undefined ? undefined : start + leg.span.limit;
+			for (const scopeRow of scopeRows) {
+				const parentRow = span._rows[scopeRow.ownerId];
+				let rows = rowsByOwner.get(scopeRow.ownerId) || [];
+				if (paginateInMemory)
+					rows = rows.slice(start, end);
+				parentRow[leg.name].push(...rows);
+			}
+		}
+
+		function strategyFilter(table, relationStrategy) {
+			if (!relationStrategy?.where)
+				return emptyFilter;
+			const where = typeof relationStrategy.where === 'function'
+				? relationStrategy.where(context, table)
+				: relationStrategy.where;
+			return emptyFilter.and(context, where);
+		}
+
+		function withoutPagination(relationStrategy) {
+			const result = { ...relationStrategy };
+			delete result.limit;
+			delete result.offset;
+			return result;
+		}
+
+		function hasPagination(relationSpan) {
+			return relationSpan.limit !== undefined || (relationSpan.offset || 0) > 0;
+		}
+
+		function createExtractKey(leg) {
+			if (leg.columns.length === 1) {
+				const alias = leg.columns[0].alias;
+				return (row) => row[alias];
+			} else {
+				const aliases = leg.columns.map(column => column.alias);
+				return (row) => aliases.map(alias => row[alias]);
+			}
+		}
+
+		function createExtractFromMap(map, primaryColumns) {
+			if (primaryColumns.length === 1) {
+				return (key) => map.get(key);
+			} else {
+				return getFromMap.bind(null, map, primaryColumns);
+			}
+		}
+
+		// Visit all legs
+		span.legs.forEach(onEachLeg);
+
+		function onEachLeg(leg) {
+			leg.accept(c);
+		}
+
+		// Wait until all promises resolve
+		await Promise.all(promises);
+	}
+
+	async function decodeRelations2(context, strategy, span, rawRows, resultRows, keys) {
+		const c = {};
+		c.visitJoin = function(leg) {
+			const name = leg.name;
+			return decode(context, strategy[name], leg.span, rawRows, keys, updateParent);
+
+			function updateParent(subRow, i) {
+				if (resultRows[i])
+					resultRows[i][name] = subRow;
+			}
+		};
+
+		c.visitOne = c.visitJoin;
+		c.visitMany = () => { };
+
+		async function processLegsSequentially(legs) {
+			for (const leg of legs.toArray()) {
+				await leg.accept(c);
+			}
+		}
+
+		await processLegsSequentially(span.legs);
+	}
+
+	function createOneFilter(context, relation, ids) {
+		const columns = relation.joinRelation.columns;
+
+		if (columns.length === 1)
+			return columns[0].in(context, ids);
+
+		else
+			return createCompositeFilter();
+
+		function createCompositeFilter() {
+			let filter = emptyFilter;
+			for (let id of ids) {
+				let nextFilter;
+				for (let i = 0; i < columns.length; i++) {
+					if (nextFilter)
+						nextFilter = nextFilter.and(context, columns[i].eq(context, id[i]));
+					else
+						nextFilter = columns[i].eq(context, id[i]);
+				}
+				filter = filter.or(context, nextFilter);
+			}
+			return filter;
+		}
+	}
+
+	function addToMap(map, values, row) {
+		if (Array.isArray(values)) {
+			let m = map;
+			const lastIndex = values.length - 1;
+			for (let i = 0; i < lastIndex; i++) {
+				const id = values[i];
+				if (!m.has(id)) {
+					m.set(id, new Map());
+				}
+				m = m.get(id);
+			}
+			const leafKey = values[lastIndex];
+			if (!m.has(leafKey)) {
+				m.set(leafKey, [row]);
+			} else {
+				m.get(leafKey).push(row);
+			}
+		}
+		else {
+			if (!map.has(values)) {
+				map.set(values, [row]);
+			} else {
+				map.get(values).push(row);
+			}
+		}
+	}
+
+	function getFromMap(map, primaryColumns, values) {
+		if (Array.isArray(values)) {
+			const length = primaryColumns.length;
+			for (let i = 0; i < length; i++) {
+				map = map.get(values[i]);
+			}
+			return map;
+		}
+		else
+			return map.get(values);
+	}
+
+	getManyDto.exports = getManyDto$1;
+	getManyDto.exports.decode = decode;
+	return getManyDto.exports;
+}
+
+var hasRequiredGetManyDtoScoped;
+
+function requireGetManyDtoScoped () {
+	if (hasRequiredGetManyDtoScoped) return getManyDtoScoped.exports;
+	hasRequiredGetManyDtoScoped = 1;
+	const newQuery = requireNewQuery$2();
+	const strategyToSpan = requireStrategyToSpan();
+	const executeQueries = requireExecuteQueries();
+	const getSessionSingleton = requireGetSessionSingleton();
+	const newParameterized = requireNewParameterized();
+	const extractOrderBy = requireExtractOrderBy$1();
+	const validatePagination = requireValidatePagination();
+
+	const scopeAlias = '__rdb_s';
+	const ownerColumnAlias = '__rdb_o';
+	const resultOwnerAlias = '__rdb_owner';
+	const rowNumberAlias = '__rdb_rn';
+	const pagedRowsAlias = '__rdb_paged';
+
+	getManyDtoScoped.exports = async function getManyDtoScoped({
+		context,
+		table,
+		filter,
+		scopeFilter,
+		strategy,
+		scopeColumns,
+		scopeTables = [],
+		scopeRows,
+		offset,
+		limit
+	}) {
+		validatePagination({ offset, limit });
+		if (scopeRows.length === 0)
+			return [];
+
+		const quote = getSessionSingleton(context, 'quote');
+		const span = strategyToSpan(table, strategy);
+		const alias = table._dbName;
+		const scopeSource = newScopeSource(context, scopeColumns, scopeRows);
+		const scopeJoin = scopeSource
+			.prepend(' INNER JOIN ')
+			.append(' ON 1=1')
+			.append(newScopeTableJoins(context, scopeTables, scopeColumns));
+		const scopedFilter = filter.and(context, scopeFilter);
+		const ownerSelect = `${quote(scopeAlias)}.${quote(ownerColumnAlias)} as ${quote(resultOwnerAlias)},`;
+		const useWindowPagination = shouldUseWindowPagination(getSessionSingleton(context, 'engine'), offset, limit);
+		const orderBy = extractOrderBy(context, table, alias, span.orderBy);
+		const rowNumberSelect = useWindowPagination
+			? `ROW_NUMBER() OVER (PARTITION BY ${quote(scopeAlias)}.${quote(ownerColumnAlias)}${orderBy}) as ${quote(rowNumberAlias)},`
+			: '';
+		let query = newQuery(context, table, scopedFilter, span, alias, {
+			extraSelect: ownerSelect + rowNumberSelect,
+			fromSuffix: scopeJoin,
+			...(useWindowPagination ? { orderBy: '' } : {})
+		});
+		if (useWindowPagination)
+			query = applyWindowPagination(query, quote, offset, limit);
+		const resultSets = await executeQueries(context, [query]);
+		const rawRows = await resultSets[0];
+		const ownerIds = new Array(rawRows.length);
+		const resultKeys = rawRows.length > 0 ? Object.keys(rawRows[0]) : [];
+		const ownerKey = resultKeys[0];
+		const rowNumberKey = useWindowPagination ? resultKeys[1] : undefined;
+		for (let i = 0; i < rawRows.length; i++) {
+			ownerIds[i] = Number(rawRows[i][ownerKey]);
+			delete rawRows[i][ownerKey];
+			if (useWindowPagination)
+				delete rawRows[i][rowNumberKey];
+		}
+		// Resolve lazily because the mapped-relation loader in getManyDto also uses
+		// this helper. Requiring it at module initialization would leave the decoder
+		// pointing at a partial circular export.
+		const rows = await requireGetManyDto$1().decode(context, strategy, span, rawRows);
+		return rows.map((row, index) => ({ ownerId: ownerIds[index], row }));
+	};
+
+	getManyDtoScoped.exports.newScopeColumnRef = function newScopeColumnRef(context, alias) {
+		const quote = getSessionSingleton(context, 'quote');
+		return {
+			_toFilterArg() {
+				return newParameterized(`${quote(scopeAlias)}.${quote(alias)}`);
+			}
+		};
+	};
+
+	function newScopeTableJoins(context, scopeTables, scopeColumns) {
+		const quote = getSessionSingleton(context, 'quote');
+		let result = newParameterized('');
+		for (const { scopeName, table, alias } of scopeTables) {
+			result = result.append(` INNER JOIN ${quote(table._dbName)} ${quote(alias)} ON `);
+			for (let index = 0; index < table._primaryColumns.length; index++) {
+				if (index > 0)
+					result = result.append(' AND ');
+				const column = table._primaryColumns[index];
+				const scopeColumn = scopeColumns.find(candidate =>
+					candidate.scopeName === scopeName && candidate.name === column.alias);
+				if (!scopeColumn)
+					throw new Error(`Missing ${scopeName} scope key '${column.alias}'`);
+				result = result.append(
+					`${quote(alias)}.${quote(column._dbName)}=${quote(scopeAlias)}.${quote(scopeColumn.alias)}`
+				);
+			}
+		}
+		return result;
+	}
+
+	function newScopeSource(context, scopeColumns, scopeRows) {
+		const quote = getSessionSingleton(context, 'quote');
+		const engine = getSessionSingleton(context, 'engine');
+		let result = newParameterized('(');
+		for (let rowIndex = 0; rowIndex < scopeRows.length; rowIndex++) {
+			if (rowIndex > 0)
+				result = result.append(' UNION ALL ');
+			result = result.append('SELECT ' + scopeRows[rowIndex].ownerId);
+			if (rowIndex === 0)
+				result = result.append(' as ' + quote(ownerColumnAlias));
+			for (let columnIndex = 0; columnIndex < scopeColumns.length; columnIndex++) {
+				const scopeColumn = scopeColumns[columnIndex];
+				let encoded = scopeColumn.column.encode(context, scopeColumn.value(scopeRows[rowIndex]));
+				encoded = castScopeValue(engine, scopeColumn.column, encoded);
+				result = result.append(',').append(encoded);
+				if (rowIndex === 0)
+					result = result.append(' as ' + quote(scopeColumn.alias));
+			}
+			if (engine === 'oracle')
+				result = result.append(' FROM DUAL');
+		}
+		return result.append(') ' + quote(scopeAlias));
+	}
+
+	function castScopeValue(engine, column, encoded) {
+		if (engine !== 'pg')
+			return encoded;
+		const type = {
+			BigintColumn: 'bigint',
+			BinaryColumn: 'bytea',
+			BooleanColumn: 'boolean',
+			DateColumn: 'timestamp',
+			JSONColumn: 'jsonb',
+			StringColumn: 'text',
+			UUIDColumn: 'uuid'
+		}[column.tsType];
+		if (!type)
+			return encoded;
+		return encoded.prepend('CAST(').append(` AS ${type})`);
+	}
+
+	function shouldUseWindowPagination(engine, offset, limit) {
+		return engine !== 'sap' && ((offset || 0) > 0 || limit !== undefined);
+	}
+
+	function applyWindowPagination(query, quote, offset = 0, limit) {
+		let result = query
+			.prepend('SELECT * FROM (')
+			.append(') ' + quote(pagedRowsAlias))
+			.append(` WHERE ${quote(pagedRowsAlias)}.${quote(rowNumberAlias)} > ${offset}`);
+		if (limit !== undefined)
+			result = result.append(` AND ${quote(pagedRowsAlias)}.${quote(rowNumberAlias)} <= ${offset + limit}`);
+		return result.append(` ORDER BY ${quote(pagedRowsAlias)}.${quote(resultOwnerAlias)},${quote(pagedRowsAlias)}.${quote(rowNumberAlias)}`);
+	}
+	return getManyDtoScoped.exports;
+}
+
+var newAdHocPlan;
+var hasRequiredNewAdHocPlan;
+
+function requireNewAdHocPlan () {
+	if (hasRequiredNewAdHocPlan) return newAdHocPlan;
+	hasRequiredNewAdHocPlan = 1;
+	const emptyFilter = requireEmptyFilter();
+	const { isAdHocRelation, ownerScopeMarker } = requireAdHocRelation();
+	const clone = require$$5;
+	const getSessionSingleton = requireGetSessionSingleton();
+	const getManyDtoScoped = requireGetManyDtoScoped();
+	const validatePagination = requireValidatePagination();
+
+	newAdHocPlan = function newAdHocPlan({
+		context,
+		rootTable,
+		sourceStrategy,
+		tables,
+		parseFilter,
+		negotiateStrategy,
+		resolveBaseFilter
+	}) {
+		const strategy = JSON.parse(JSON.stringify(sourceStrategy || {}));
+		const hiddenColumns = new Map();
+		const selectionModes = new Map();
+		const scopeDefinitions = new Map([
+			['root', { table: rootTable, strategy }]
+		]);
+		registerScopes(rootTable, strategy);
+		prepare(rootTable, strategy);
+
+		return {
+			strategy: stripAdHocRelations(rootTable, strategy),
+			materialize
+		};
+
+		async function materialize(rows) {
+			await populateAdHocRelations(
+				rows.map(row => ({ row, root: row, scopes: Object.create(null) })),
+				rootTable,
+				strategy
+			);
+			stripHiddenColumns(rows, rootTable, strategy);
+			return rows;
+		}
+
+		function registerScopes(currentTable, currentStrategy) {
+			if (!currentStrategy || typeof currentStrategy !== 'object')
+				return;
+			for (let name in currentStrategy) {
+				const value = currentStrategy[name];
+				if (isAdHocRelation(value)) {
+					const scopeName = value[ownerScopeMarker];
+					if (typeof scopeName !== 'string' || !/^s[1-9][0-9]*$/.test(scopeName))
+						throwBadRequest('Ad-hoc relation is missing its lexical owner scope');
+					const existing = scopeDefinitions.get(scopeName);
+					if (existing && (existing.table !== currentTable || existing.strategy !== currentStrategy))
+						throwBadRequest(`Ad-hoc lexical scope '${scopeName}' is ambiguous`);
+					scopeDefinitions.set(scopeName, { table: currentTable, strategy: currentStrategy });
+					registerScopes(resolveAdHocTable(value.table), value.strategy || {});
+				}
+				else if (currentTable._relations[name] && value && typeof value === 'object')
+					registerScopes(currentTable._relations[name].childTable, value);
+			}
+		}
+
+		function prepare(currentTable, currentStrategy) {
+			if (!currentStrategy || typeof currentStrategy !== 'object')
+				return;
+			validatePagination(currentStrategy);
+			for (let name in currentStrategy) {
+				const value = currentStrategy[name];
+				if (isAdHocRelation(value)) {
+					const targetTable = resolveAdHocTable(value.table);
+					const refs = collectOwnedScopeRefs(value.strategy);
+					addScopeTableKeys(refs);
+					for (const [scopeName, columns] of refs.columns) {
+						const definition = getScopeDefinition(scopeName);
+						for (const column of columns)
+							includeColumn(definition.table, definition.strategy, column);
+					}
+					prepare(targetTable, value.strategy || {});
+				}
+				else if (currentTable._relations[name] && value && typeof value === 'object')
+					prepare(currentTable._relations[name].childTable, value);
+			}
+		}
+
+		function collectOwnedScopeRefs(value, result = { columns: new Map(), tables: new Set() }) {
+			if (!value || typeof value !== 'object' || isAdHocRelation(value))
+				return result;
+			if (Array.isArray(value)) {
+				for (const item of value)
+					collectOwnedScopeRefs(item, result);
+				return result;
+			}
+			if (typeof value.__columnRef === 'string') {
+				const scopePath = parseScopePath(value.__columnRef);
+				if (scopePath) {
+					if (scopePath.path.includes('.'))
+						result.tables.add(scopePath.scopeName);
+					else
+						getScopeColumns(result, scopePath.scopeName).add(scopePath.path);
+				}
+			}
+			if (typeof value.path === 'string') {
+				const scopePath = parseScopePath(value.path);
+				if (scopePath)
+					result.tables.add(scopePath.scopeName);
+			}
+			for (let name in value)
+				collectOwnedScopeRefs(value[name], result);
+			return result;
+		}
+
+		function hasOwnedScopeRefs(value) {
+			const refs = collectOwnedScopeRefs(value);
+			return refs.columns.size > 0 || refs.tables.size > 0;
+		}
+
+		function addScopeTableKeys(refs) {
+			for (const scopeName of refs.tables) {
+				const definition = getScopeDefinition(scopeName);
+				for (const column of definition.table._primaryColumns)
+					getScopeColumns(refs, scopeName).add(column.alias);
+			}
+		}
+
+		function getScopeColumns(refs, scopeName) {
+			let columns = refs.columns.get(scopeName);
+			if (!columns) {
+				columns = new Set();
+				refs.columns.set(scopeName, columns);
+			}
+			return columns;
+		}
+
+		function getScopeDefinition(scopeName) {
+			const definition = scopeDefinitions.get(scopeName);
+			if (!definition)
+				throwBadRequest(`Ad-hoc lexical scope '${scopeName}' is invalid`);
+			return definition;
+		}
+
+		function parseScopePath(path) {
+			const rootMatch = /^\$root\.(.+)$/.exec(path);
+			if (rootMatch)
+				return { scopeName: 'root', path: rootMatch[1] };
+			const lexicalMatch = /^\$scope\.([^.]+)\.(.+)$/.exec(path);
+			return lexicalMatch
+				? { scopeName: lexicalMatch[1], path: lexicalMatch[2] }
+				: undefined;
+		}
+
+		function resolveAdHocTable(name) {
+			const target = tables?.[name];
+			if (!target || !target._primaryColumns)
+				throwBadRequest(`Ad-hoc relation target '${name}' is not mapped or exposed`);
+			return target;
+		}
+
+		function stripAdHocRelations(currentTable, currentStrategy) {
+			if (!currentStrategy || typeof currentStrategy !== 'object')
+				return currentStrategy;
+			const result = {};
+			for (let name in currentStrategy) {
+				const value = currentStrategy[name];
+				if (isAdHocRelation(value))
+					continue;
+				if (currentTable._relations[name] && value && typeof value === 'object')
+					result[name] = stripAdHocRelations(currentTable._relations[name].childTable, value);
+				else
+					result[name] = value;
+			}
+			return result;
+		}
+
+		async function populateAdHocRelations(pairs, currentTable, currentStrategy) {
+			if (!currentStrategy || pairs.length === 0)
+				return;
+
+			for (let name in currentStrategy) {
+				const value = currentStrategy[name];
+				if (isAdHocRelation(value))
+					await populateDescriptor(name, value);
+				else if (currentTable._relations[name] && value && typeof value === 'object') {
+					const childPairs = [];
+					for (const pair of pairs) {
+						const child = pair.row?.[name];
+						if (Array.isArray(child)) {
+							for (const row of child)
+								if (row)
+									childPairs.push(inheritScopes(row, pair));
+						}
+						else if (child)
+							childPairs.push(inheritScopes(child, pair));
+					}
+					await populateAdHocRelations(childPairs, currentTable._relations[name].childTable, value);
+				}
+			}
+
+			async function populateDescriptor(name, descriptor) {
+				const targetTable = resolveAdHocTable(descriptor.table);
+				const ownerScopeName = descriptor[ownerScopeMarker];
+				const ownerPairs = pairs.map(pair => bindOwnerScope(pair, ownerScopeName));
+				const childPairs = [];
+				if (!hasOwnedScopeRefs(descriptor.strategy)) {
+					const rows = await fetchDescriptorRows(descriptor, targetTable);
+					for (const pair of ownerPairs) {
+						const attached = descriptor.__rdbAdHocRelation === 'many'
+							? clone(rows)
+							: (rows.length ? clone(rows[0]) : null);
+						pair.row[name] = attached;
+						addChildPairs(attached, pair);
+					}
+					await populateChildren();
+					return;
+				}
+
+				if (canUseScopedBatch(descriptor)) {
+					const attachedRows = await fetchDescriptorRowsScoped(
+						descriptor,
+						targetTable,
+						ownerPairs
+					);
+					for (let i = 0; i < ownerPairs.length; i++) {
+						const pair = ownerPairs[i];
+						const rows = attachedRows[i];
+						const attached = descriptor.__rdbAdHocRelation === 'many' ? rows : (rows[0] || null);
+						pair.row[name] = attached;
+						addChildPairs(attached, pair);
+					}
+					await populateChildren();
+					return;
+				}
+
+				for (const pair of ownerPairs) {
+					const scope = createScope(pair);
+					const rows = await fetchDescriptorRows(descriptor, targetTable, scope);
+					pair.row[name] = descriptor.__rdbAdHocRelation === 'many'
+						? rows
+						: (rows[0] || null);
+					addChildPairs(pair.row[name], pair);
+				}
+				await populateChildren();
+
+				function addChildPairs(value, ownerPair) {
+					const rows = Array.isArray(value) ? value : value ? [value] : [];
+					for (const row of rows)
+						childPairs.push(inheritScopes(row, ownerPair));
+				}
+
+				async function populateChildren() {
+					await populateAdHocRelations(childPairs, targetTable, descriptor.strategy || {});
+				}
+			}
+		}
+
+		function bindOwnerScope(pair, scopeName) {
+			getScopeDefinition(scopeName);
+			return {
+				row: pair.row,
+				root: pair.root,
+				scopes: { ...pair.scopes, [scopeName]: pair.row }
+			};
+		}
+
+		function inheritScopes(row, pair) {
+			return {
+				row,
+				root: pair.root,
+				scopes: { ...pair.scopes }
+			};
+		}
+
+		function canUseScopedBatch(descriptor) {
+			const descriptorStrategy = descriptor.strategy || {};
+			const outsideWhere = { ...descriptorStrategy };
+			delete outsideWhere.where;
+			return !!descriptorStrategy.where && hasOwnedScopeRefs(descriptorStrategy.where)
+				&& !hasOwnedScopeRefs(outsideWhere);
+		}
+
+		async function fetchDescriptorRowsScoped(descriptor, targetTable, pairs) {
+			const result = pairs.map(() => []);
+			const refs = collectOwnedScopeRefs(descriptor.strategy.where);
+			addScopeTableKeys(refs);
+			const { scope, scopeColumns, scopeTables } = createVirtualScope(refs);
+			const scopeGroups = createScopeGroups(pairs, scopeColumns);
+			const rowsByGroup = scopeGroups.map(() => []);
+			const targetBaseFilter = await resolveBaseFilter(descriptor.table, targetTable);
+			const queryStrategy = JSON.parse(JSON.stringify(descriptor.strategy || {}));
+			const jsonWhere = queryStrategy.where;
+			delete queryStrategy.where;
+			delete queryStrategy.limit;
+			delete queryStrategy.offset;
+			const executionStrategy = stripAdHocRelations(targetTable, queryStrategy);
+			await negotiateStrategy(executionStrategy, targetTable, scope);
+			const scopeFilter = await parseFilter(jsonWhere, targetTable, scope);
+			const filter = targetBaseFilter || emptyFilter;
+
+			const maxParameters = getSessionSingleton(context, 'maxParameters');
+			const parametersPerPair = Math.max(1, scopeColumns.length);
+			const fixedParameters = (filter?.parameters?.length || 0)
+				+ (scopeFilter?.parameters?.length || 0);
+			const chunkSize = maxParameters
+				? Math.max(1, Math.min(200, Math.floor((maxParameters - fixedParameters) / parametersPerPair)))
+				: 200;
+			const start = descriptor.strategy?.offset || 0;
+			const limit = descriptor.__rdbAdHocRelation === 'one' ? 1 : descriptor.strategy?.limit;
+			const databasePaginates = getSessionSingleton(context, 'engine') !== 'sap'
+				&& (start > 0 || limit !== undefined);
+			for (let offset = 0; offset < scopeGroups.length; offset += chunkSize) {
+				const scopeRows = scopeGroups.slice(offset, offset + chunkSize).map(group =>
+					({ ownerId: group.groupId, ...group.scopeRows }));
+				const rows = await getManyDtoScoped({
+					context,
+					table: targetTable,
+					filter,
+					scopeFilter,
+					strategy: executionStrategy,
+					scopeColumns,
+					scopeTables,
+					scopeRows,
+					offset: start,
+					limit
+				});
+				for (const { ownerId, row } of rows)
+					if (row)
+						rowsByGroup[ownerId].push(row);
+			}
+
+			const end = limit === undefined ? undefined : start + limit;
+			for (const group of scopeGroups) {
+				const rows = databasePaginates
+					? rowsByGroup[group.groupId]
+					: rowsByGroup[group.groupId].slice(start, end);
+				for (const pairIndex of group.pairIndexes)
+					result[pairIndex] = clone(rows);
+			}
+			return result;
+		}
+
+		function createScopeGroups(pairs, scopeColumns) {
+			const groups = [];
+			const groupsByKey = new Map();
+			for (let pairIndex = 0; pairIndex < pairs.length; pairIndex++) {
+				const pair = pairs[pairIndex];
+				const scopeRow = createScopeRows(pair);
+				const key = createScopeKey(scopeColumns, scopeRow);
+				let group = key === undefined ? undefined : groupsByKey.get(key);
+				if (!group) {
+					group = {
+						groupId: groups.length,
+						scopeRows: scopeRow,
+						pairIndexes: []
+					};
+					groups.push(group);
+					if (key !== undefined)
+						groupsByKey.set(key, group);
+				}
+				group.pairIndexes.push(pairIndex);
+			}
+			return groups;
+		}
+
+		function createScopeKey(scopeColumns, scopeRow) {
+			try {
+				const values = new Array(scopeColumns.length);
+				for (let index = 0; index < scopeColumns.length; index++) {
+					const scopeColumn = scopeColumns[index];
+					let value = scopeColumn.value(scopeRow);
+					if (value !== null && value !== undefined
+						&& typeof scopeColumn.column.encode?.direct === 'function')
+						value = scopeColumn.column.encode.direct(context, value);
+					const canonical = canonicalizeScopeValue(value);
+					if (canonical === undefined)
+						return;
+					values[index] = [index, canonical];
+				}
+				return JSON.stringify(values);
+			}
+			catch (_error) {
+				return;
+			}
+		}
+
+		function createVirtualScope(refs) {
+			const scope = Object.create(null);
+			const scopeColumns = [];
+			for (const [scopeName, columns] of refs.columns) {
+				const definition = getScopeDefinition(scopeName);
+				scope[scopeName] = {
+					row: {},
+					table: definition.table,
+					alias: refs.tables.has(scopeName) ? `__rdb_scope_${scopeName}` : undefined
+				};
+				for (const name of columns) {
+					const alias = `c${scopeColumns.length}`;
+					const column = scope[scopeName].table[name];
+					scope[scopeName].row[name] = getManyDtoScoped.newScopeColumnRef(context, alias);
+					scopeColumns.push({
+						alias,
+						scopeName,
+						name,
+						column,
+						value: row => row[scopeName][name]
+					});
+				}
+			}
+			const scopeTables = [...refs.tables].map(scopeName => ({
+				scopeName,
+				table: scope[scopeName].table,
+				alias: scope[scopeName].alias
+			}));
+			return { scope, scopeColumns, scopeTables };
+		}
+
+		function createScope(pair) {
+			const scope = {
+				root: { row: pair.root, table: rootTable }
+			};
+			for (const [scopeName, row] of Object.entries(pair.scopes))
+				scope[scopeName] = { row, table: getScopeDefinition(scopeName).table };
+			return scope;
+		}
+
+		function createScopeRows(pair) {
+			return {
+				root: pair.root,
+				...pair.scopes
+			};
+		}
+
+		function includeColumn(targetTable, targetStrategy, name) {
+			const column = targetTable[name];
+			if (!column || typeof column._toFilterArg !== 'function')
+				throwBadRequest(`Unknown scope column '${name}' on table '${targetTable._dbName}'`);
+
+			let mode = selectionModes.get(targetStrategy);
+			if (!mode) {
+				mode = { hasIncludes: targetTable._columns.some(col => targetStrategy[col.alias] === true) };
+				selectionModes.set(targetStrategy, mode);
+			}
+			const isPrimaryColumn = targetTable._primaryColumns.includes(column);
+			const wasVisible = targetStrategy[name] !== false
+				&& (isPrimaryColumn || !mode.hasIncludes || targetStrategy[name] === true);
+			if (!wasVisible) {
+				let hidden = hiddenColumns.get(targetStrategy);
+				if (!hidden) {
+					hidden = new Set();
+					hiddenColumns.set(targetStrategy, hidden);
+				}
+				hidden.add(name);
+				targetStrategy[name] = true;
+			}
+		}
+
+		async function fetchDescriptorRows(descriptor, targetTable, scope) {
+			const queryStrategy = JSON.parse(JSON.stringify(descriptor.strategy || {}));
+			if (descriptor.__rdbAdHocRelation === 'one')
+				queryStrategy.limit = 1;
+			const executionStrategy = stripAdHocRelations(targetTable, queryStrategy);
+			await negotiateStrategy(executionStrategy, targetTable, scope);
+			let filter = emptyFilter;
+			const targetBaseFilter = await resolveBaseFilter(descriptor.table, targetTable);
+			if (targetBaseFilter)
+				filter = filter.and(context, targetBaseFilter);
+			return targetTable.getManyDto(context, filter, executionStrategy);
+		}
+
+		function stripHiddenColumns(rows, currentTable, currentStrategy) {
+			if (!currentStrategy || !Array.isArray(rows))
+				return;
+			const hidden = hiddenColumns.get(currentStrategy);
+			for (const row of rows) {
+				if (!row)
+					continue;
+				if (hidden)
+					for (const name of hidden) {
+						delete row[name];
+						const prototype = Object.getPrototypeOf(row);
+						if (prototype && Object.prototype.hasOwnProperty.call(prototype, name))
+							delete prototype[name];
+					}
+				for (let name in currentStrategy) {
+					const value = currentStrategy[name];
+					if (isAdHocRelation(value)) {
+						const child = row[name];
+						const childRows = Array.isArray(child) ? child : child ? [child] : [];
+						stripHiddenColumns(childRows, resolveAdHocTable(value.table), value.strategy || {});
+					}
+					else if (currentTable._relations[name] && value && typeof value === 'object') {
+						const child = row[name];
+						const childRows = Array.isArray(child) ? child : child ? [child] : [];
+						stripHiddenColumns(childRows, currentTable._relations[name].childTable, value);
+					}
+				}
+			}
+		}
+	};
+
+	function canonicalizeScopeValue(value, seen = new Set()) {
+		if (value === undefined)
+			return ['undefined'];
+		if (value === null)
+			return ['null'];
+
+		const type = typeof value;
+		if (type === 'string')
+			return ['string', value];
+		if (type === 'boolean')
+			return ['boolean', value];
+		if (type === 'bigint')
+			return ['bigint', value.toString()];
+		if (type === 'number') {
+			if (Number.isNaN(value))
+				return ['number', 'NaN'];
+			if (value === Infinity)
+				return ['number', 'Infinity'];
+			if (value === -Infinity)
+				return ['number', '-Infinity'];
+			if (Object.is(value, -0))
+				return ['number', '-0'];
+			return ['number', String(value)];
+		}
+		if (type !== 'object')
+			return;
+
+		const bytes = getBinaryBytes(value);
+		if (bytes)
+			return ['binary', binaryToBase64(bytes)];
+		if (value instanceof Date) {
+			const timestamp = Date.prototype.getTime.call(value);
+			return Number.isNaN(timestamp)
+				? undefined
+				: ['date', Date.prototype.toISOString.call(value)];
+		}
+		if (seen.has(value))
+			return;
+
+		seen.add(value);
+		try {
+			if (Array.isArray(value)) {
+				const ownKeys = Reflect.ownKeys(value);
+				for (const key of ownKeys)
+					if (key !== 'length' && !isArrayIndex(key, value.length))
+						return;
+
+				const items = new Array(value.length);
+				for (let index = 0; index < value.length; index++) {
+					const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+					if (!descriptor) {
+						items[index] = ['hole'];
+						continue;
+					}
+					if (!Object.prototype.hasOwnProperty.call(descriptor, 'value'))
+						return;
+					const item = canonicalizeScopeValue(descriptor.value, seen);
+					if (item === undefined)
+						return;
+					items[index] = item;
+				}
+				return ['array', items];
+			}
+
+			const prototype = Object.getPrototypeOf(value);
+			if (prototype !== Object.prototype && prototype !== null)
+				return;
+			const ownKeys = Reflect.ownKeys(value);
+			if (ownKeys.some(key => typeof key !== 'string'))
+				return;
+			const keys = ownKeys.sort();
+			const entries = new Array(keys.length);
+			for (let index = 0; index < keys.length; index++) {
+				const key = keys[index];
+				const descriptor = Object.getOwnPropertyDescriptor(value, key);
+				if (!descriptor?.enumerable
+					|| !Object.prototype.hasOwnProperty.call(descriptor, 'value'))
+					return;
+				const item = canonicalizeScopeValue(descriptor.value, seen);
+				if (item === undefined)
+					return;
+				entries[index] = [key, item];
+			}
+			return ['object', entries];
+		}
+		finally {
+			seen.delete(value);
+		}
+	}
+
+	function getBinaryBytes(value) {
+		if (typeof Buffer !== 'undefined' && Buffer.isBuffer(value))
+			return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+		if (typeof Uint8Array !== 'undefined' && value instanceof Uint8Array)
+			return value;
+		if (typeof ArrayBuffer !== 'undefined' && value instanceof ArrayBuffer)
+			return new Uint8Array(value);
+	}
+
+	function binaryToBase64(bytes) {
+		if (typeof Buffer !== 'undefined')
+			return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString('base64');
+		if (typeof btoa !== 'undefined') {
+			let binary = '';
+			for (const byte of bytes)
+				binary += String.fromCharCode(byte);
+			return btoa(binary);
+		}
+		throw new Error('No base64 encoder is available');
+	}
+
+	function isArrayIndex(key, length) {
+		if (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/.test(key))
+			return false;
+		const index = Number(key);
+		return Number.isSafeInteger(index) && index < length;
+	}
+
+	function throwBadRequest(message) {
+		const error = new Error(message);
+		error.status = 400;
+		throw error;
+	}
+	return newAdHocPlan;
+}
+
+var executePath;
+var hasRequiredExecutePath;
+
+function requireExecutePath () {
+	if (hasRequiredExecutePath) return executePath;
+	hasRequiredExecutePath = 1;
+	const createPatch = requireCreatePatch();
+	const emptyFilter = requireEmptyFilter();
+	const negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
+	const parseAggregateOrderBy = requireParseOrderBy();
+	const { isAdHocRelation } = requireAdHocRelation();
+	const newAdHocPlan = requireNewAdHocPlan();
+	const validatePagination = requireValidatePagination();
+	let getMeta = requireGetMeta();
+	let isSafe = Symbol();
+
+	let _allowedOps = {
+		and: true,
+		or: true,
+		not: true,
+		AND: true,
+		OR: true,
+		NOT: true,
+		equal: true,
+		eq: true,
+		EQ: true,
+		notEqual: true,
+		ne: true,
+		NE: true,
+		lessThan: true,
+		lt: true,
+		LT: true,
+		lessThanOrEqual: true,
+		le: true,
+		LE: true,
+		greaterThan: true,
+		gt: true,
+		GT: true,
+		greaterThanOrEqual: true,
+		ge: true,
+		GE: true,
+		between: true,
+		in: true,
+		IN: true,
+		startsWith: true,
+		iStartsWith: true,
+		endsWith: true,
+		iEndsWith: true,
+		contains: true,
+		iContains: true,
+		iEqual: true,
+		iEq: true,
+		ieq: true,
+		IEQ: true,
+		exists: true,
+		all: true,
+		any: true,
+		none: true,
+		where: true,
+		sum: true,
+		avg: true,
+		max: true,
+		min: true,
+		count: true,
+		groupSum: true,
+		groupAvg: true,
+		groupMax: true,
+		groupMin: true,
+		groupCount: true,
+		_aggregate: true,
+		self: true,
+	};
+
+	function _executePath(context, ...rest) {
+
+		const _ops = {
+			and: emptyFilter.and.bind(null, context),
+			or: emptyFilter.or.bind(null, context),
+			not: emptyFilter.not.bind(null, context),
+			AND: emptyFilter.and.bind(null, context),
+			OR: emptyFilter.or.bind(null, context),
+			NOT: emptyFilter.not.bind(null, context),
+		};
+
+		return executePath(...rest);
+
+		async function executePath({ table, tables, tableConfigs, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client, prepareAdHoc, sourceStrategy }) {
+			tables = tables || client?.tables || {};
+			let allowedOps = { ..._allowedOps, insert: !readonly, ...extractRelations(getMeta(table)) };
+			let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, aggregate, distinct, count, delete: _delete, cascadeDelete, update, replace };
+			if (prepareAdHoc)
+				return prepareAdHocPlan(sourceStrategy);
+
+			let res = await parseFilter(JSONFilter, table);
+			if (res === undefined)
+				return {};
+			else
+				return res;
+
+			function parseFilter(json, table, scope) {
+				if (isFilter(json)) {
+					const scopePath = parseScopePath(json.path);
+					if (scopePath) {
+						const selectedScope = getScope(scopePath.scopeName, scope);
+						return withScopeAlias(selectedScope, () => parseFilter(
+							{ ...json, path: scopePath.path },
+							selectedScope.table,
+							scope
+						));
+					}
+					let subFilters = [];
+
+					let anyAllNone = tryGetAnyAllNone(json.path, table);
+					if (anyAllNone) {
+						const arg0 = json.args[0];
+						if (isHttp && arg0 !== undefined)
+							validateArgs(arg0);
+						const f = arg0 === undefined
+							? anyAllNone(context)
+							: anyAllNone(context, x => parseFilter(arg0, x, scope));
+						if(!('isSafe' in f))
+							f.isSafe = isSafe;
+						return f;
+					}
+					else {
+						for (let i = 0; i < json.args.length; i++) {
+							subFilters.push(parseFilter(json.args[i], nextTable(json.path, table), scope));
+						}
+					}
+					return executePath(json.path, subFilters);
+				}
+				else if (Array.isArray(json)) {
+					const result = [];
+					for (let i = 0; i < json.length; i++) {
+						result.push(parseFilter(json[i], table, scope));
+					}
+					return result;
+				}
+				else if (isScopeRef(json)) {
+					return resolveScopeRef(json.__columnRef, scope);
+				}
+				else if (isColumnRef(json)) {
+					return resolveColumnRef(table, json.__columnRef);
+				}
+				return json;
+
+				function resolveScopeRef(path, scope) {
+					const scopePath = parseScopePath(path);
+					const selectedScope = scopePath && getScope(scopePath.scopeName, scope);
+					if (!selectedScope) {
+						const e = new Error(`Scope column reference '${path}' is invalid`);
+						// @ts-ignore
+						e.status = 400;
+						throw e;
+					}
+					if (!scopePath.path.includes('.')) {
+						const column = selectedScope.table?.[scopePath.path];
+						if (!column || typeof column._toFilterArg !== 'function')
+							throwInvalidScopeRef(path);
+						return selectedScope.row[scopePath.path];
+					}
+					const column = withScopeAlias(selectedScope, () =>
+						resolveColumnRef(selectedScope.table, scopePath.path));
+					const filterArg = withScopeAlias(selectedScope, () => column._toFilterArg(context));
+					return {
+						_toFilterArg() {
+							return filterArg;
+						}
+					};
+
+					function throwInvalidScopeRef(invalidPath) {
+						const e = new Error(`Scope column reference '${invalidPath}' is invalid`);
+						// @ts-ignore
+						e.status = 400;
+						throw e;
+					}
+				}
+
+				function parseScopePath(path) {
+					const rootMatch = /^\$root\.(.+)$/.exec(path);
+					if (rootMatch)
+						return { scopeName: 'root', path: rootMatch[1] };
+					const lexicalMatch = /^\$scope\.([^.]+)\.(.+)$/.exec(path);
+					return lexicalMatch
+						? { scopeName: lexicalMatch[1], path: lexicalMatch[2] }
+						: undefined;
+				}
+
+				function getScope(scopeName, scope) {
+					const selectedScope = scope?.[scopeName];
+					if (!selectedScope?.table) {
+						const e = new Error(`Scope table reference '${scopeName}' is invalid`);
+						// @ts-ignore
+						e.status = 400;
+						throw e;
+					}
+					return selectedScope;
+				}
+
+				function withScopeAlias(selectedScope, fn) {
+					if (!selectedScope.alias) {
+						const e = new Error('Scope table reference is unavailable outside a scoped query');
+						// @ts-ignore
+						e.status = 400;
+						throw e;
+					}
+					const table = selectedScope.table;
+					const previousAlias = table._rootAlias;
+					table._rootAlias = selectedScope.alias;
+					try {
+						return fn();
+					}
+					finally {
+						if (previousAlias === undefined)
+							delete table._rootAlias;
+						else
+							table._rootAlias = previousAlias;
+					}
+				}
+
+				function tryGetAnyAllNone(path, table) {
+					const parts = path.split('.');
+					for (let i = 0; i < parts.length; i++) {
+						table = table[parts[i]];
+					}
+
+					let ops = new Set(['all', 'any', 'none', 'where', '_aggregate']);
+					// let ops = new Set(['all', 'any', 'none', 'where']);
+					let last = parts[parts.length - 1];
+					if (last === 'count' && parts.length > 1)
+						ops.add('count');
+					if (ops.has(last) || (table && (table._primaryColumns || (table.any && table.all))))
+						return table;
+				}
+
+				function executePath(path, args) {
+					if (path in ops) {
+						if (isHttp)
+							validateArgs(args);
+						let op = ops[path].apply(null, args);
+						if (op.then)
+							return op.then((o) => {
+								setSafe(o);
+								return o;
+							});
+						setSafe(op);
+						return op;
+					}
+					let pathArray = path.split('.');
+					let target = table;
+					let op = pathArray[pathArray.length - 1];
+					if (!allowedOps[op] && isHttp) {
+
+						let e = new Error('Disallowed operator ' + op);
+						// @ts-ignore
+						e.status = 403;
+						throw e;
+
+					}
+					for (let i = 0; i < pathArray.length; i++) {
+						target = target[pathArray[i]];
+					}
+
+					if (!target) {
+						const left = args && args[0];
+						if (left) {
+							target = left;
+							for (let i = 0; i < pathArray.length; i++) {
+								target = target[pathArray[i]];
+							}
+							if (target) {
+								let res = target.apply(null, [context].concat(args.slice(1)));
+								setSafe(res);
+								return res;
+							}
+						}
+						throw new Error(`Method '${path}' does not exist`);
+					}
+					let res = target.apply(null, [context, ...args]);
+					setSafe(res);
+					return res;
+				}
+			}
+
+			async function invokeBaseFilter() {
+				let res;
+				if (typeof baseFilter === 'function') {
+					res = await baseFilter.apply(null, [bindDb(client), request, response]);
+				}
+				else
+					res = baseFilter;
+				if (!res)
+					return;
+				const JSONFilter = JSON.parse(JSON.stringify(res));
+				//@ts-ignore
+				return executePath({ table, JSONFilter, request, response });
+			}
+
+			function getCustomFilterPaths(customFilters) {
+				return getLeafNames(customFilters);
+
+				function getLeafNames(obj, result = {}, current = 'customFilters.') {
+					for (let p in obj) {
+						if (typeof obj[p] === 'object' && obj[p] !== null)
+							getLeafNames(obj[p], result, current + p + '.');
+						else
+							result[current + p] = resolveFilter.bind(null, obj[p]);
+					}
+					return result;
+				}
+
+				async function resolveFilter(fn, ...args) {
+					const context = { db: bindDb(client), request, response };
+					let res = fn.apply(null, [context, ...args]);
+					if (res.then)
+						res = await res;
+					const JSONFilter = JSON.parse(JSON.stringify(res));
+					//@ts-ignore
+					return executePath({ table, JSONFilter, request, response });
+				}
+			}
+
+			function nextTable(path, table) {
+				path = path.split('.');
+				let ops = new Set(['all', 'any', 'none', 'count']);
+				let last = path.slice(-1)[0];
+				if (ops.has(last)) {
+					for (let i = 0; i < path.length - 1; i++) {
+						table = table[path[i]];
+					}
+					return table;
+				}
+				else {
+					let lastObj = table;
+					for (let i = 0; i < path.length; i++) {
+						if (lastObj)
+							lastObj = lastObj[path[i]];
+					}
+					if (lastObj?._shallow)
+						return lastObj._shallow;
+					else return table;
+				}
+			}
+
+			async function _delete(filter) {
+				if (readonly || disableBulkDeletes) {
+					let e = new Error('Bulk deletes are not allowed. Parameter "disableBulkDeletes" must be true.');
+					// @ts-ignore
+					e.status = 403;
+					throw e;
+				}
+				filter = negotiateFilter(filter);
+				const _baseFilter = await invokeBaseFilter();
+				if (_baseFilter)
+					filter = filter.and(context, _baseFilter);
+				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
+				return table.delete.apply(null, args);
+			}
+
+			async function cascadeDelete(filter) {
+				if (readonly || disableBulkDeletes) {
+					const e = new Error('Bulk deletes are not allowed. Parameter "disableBulkDeletes" must be true.');
+					// @ts-ignore
+					e.status = 403;
+					throw e;
+
+				}
+				filter = negotiateFilter(filter);
+				const _baseFilter = await invokeBaseFilter();
+				if (_baseFilter)
+					filter = filter.and(context, _baseFilter);
+				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
+				return table.cascadeDelete.apply(null, args);
+			}
+
+			function negotiateFilter(filter) {
+				if (filter)
+					return negotiateRawSqlFilter(context, filter, table, true);
+				else
+					return emptyFilter;
+			}
+
+			async function count(filter, strategy) {
+				validateStrategy(table, strategy, tables);
+				filter = negotiateFilter(filter);
+				const _baseFilter = await invokeBaseFilter();
+				if (_baseFilter)
+					filter = filter.and(context, _baseFilter);
+				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
+				return table.count.apply(null, args);
+			}
+
+			async function getManyDto(filter, strategy) {
+				filter = negotiateFilter(filter);
+				const _baseFilter = await invokeBaseFilter();
+				if (_baseFilter)
+					filter = filter.and(context, _baseFilter);
+
+				const adHocPlan = await prepareAdHocPlan(strategy);
+				const rows = await table.getManyDto(context, filter, adHocPlan.strategy);
+				return adHocPlan.materialize(rows);
+			}
+
+			async function prepareAdHocPlan(strategy) {
+				validateStrategy(table, strategy, tables);
+				const adHocPlan = newAdHocPlan({
+					context,
+					rootTable: table,
+					sourceStrategy: strategy,
+					tables,
+					parseFilter,
+					negotiateStrategy: negotiateWhereAndAggregate,
+					resolveBaseFilter: invokeAdHocBaseFilter
+				});
+				await negotiateWhereAndAggregate(adHocPlan.strategy, table);
+				return adHocPlan;
+			}
+
+			async function invokeAdHocBaseFilter(tableName, targetTable) {
+				const configured = tableConfigs?.[tableName]?.baseFilter;
+				const res = typeof configured === 'function'
+					? await configured.apply(null, [bindDb(client), request, response])
+					: configured;
+				if (!res)
+					return;
+				const json = JSON.parse(JSON.stringify(res));
+				return parseFilter(json, targetTable);
+			}
+
+			async function replace(subject, strategy = { insertAndForget: true }) {
+				validateStrategy(table, strategy, tables);
+				const refinedStrategy = withLockingStrategy(objectToStrategy(subject, {}, table), strategy);
+				const JSONFilter2 = {
+					path: 'getManyDto',
+					args: [subject, refinedStrategy]
+				};
+				const originals = await executePath({ table, tables, tableConfigs, JSONFilter: JSONFilter2, baseFilter, customFilters, request, response, readonly, disableBulkDeletes, isHttp, client });
+				const meta = getMeta(table);
+				const patch = createPatch(originals, Array.isArray(subject) ? subject : [subject], meta);
+				const { changed } = await table.patch(context, patch, { strategy });
+				if (Array.isArray(subject))
+					return changed;
+				else
+					return changed[0];
+			}
+
+			async function update(subject, whereStrategy, strategy = { insertAndForget: true }) {
+				validateStrategy(table, strategy, tables);
+				const refinedWhereStrategy = withLockingStrategy(objectToStrategy(subject, whereStrategy, table), strategy);
+				const JSONFilter2 = {
+					path: 'getManyDto',
+					args: [null, refinedWhereStrategy]
+				};
+				const rows = await executePath({ table, tables, tableConfigs, JSONFilter: JSONFilter2, baseFilter, customFilters, request, response, readonly, disableBulkDeletes, isHttp, client });
+				const originals = new Array(rows.length);
+				for (let i = 0; i < rows.length; i++) {
+					const row = rows[i];
+					originals[i] = { ...row };
+					for (let p in subject) {
+						row[p] = subject[p];
+					}
+				}
+				const meta = getMeta(table);
+				const patch = createPatch(originals, rows, meta);
+				const { changed } = await table.patch(context, patch, { strategy });
+				return changed;
+			}
+
+			function withLockingStrategy(fetchStrategy, strategy) {
+				const lockStrategy = extractLockingStrategy(strategy);
+				if (!lockStrategy)
+					return fetchStrategy;
+				return mergeLockingStrategy(fetchStrategy, lockStrategy);
+			}
+
+			function extractLockingStrategy(strategy) {
+				if (!strategy || typeof strategy !== 'object')
+					return;
+				const result = {};
+				if (strategy.forUpdate)
+					result.forUpdate = strategy.forUpdate;
+				if (strategy.skipLocked)
+					result.skipLocked = strategy.skipLocked;
+				for (let name in strategy) {
+					if (name === 'where' || name === 'orderBy' || name === 'limit' || name === 'offset' || name === 'forUpdate' || name === 'skipLocked')
+						continue;
+					const child = extractLockingStrategy(strategy[name]);
+					if (child)
+						result[name] = child;
+				}
+				return Object.keys(result).length > 0 ? result : undefined;
+			}
+
+			function mergeLockingStrategy(fetchStrategy, lockStrategy) {
+				const result = { ...fetchStrategy };
+				for (let name in lockStrategy) {
+					const value = lockStrategy[name];
+					if (name === 'forUpdate' || name === 'skipLocked')
+						result[name] = value;
+					else
+						result[name] = mergeLockingStrategy(result[name] && typeof result[name] === 'object' ? result[name] : {}, value);
+				}
+				return result;
+			}
+
+			function objectToStrategy(object, whereStrategy, table, strategy = {}) {
+				strategy = { ...whereStrategy, ...strategy };
+				if (Array.isArray(object)) {
+					for (let i = 0; i < object.length; i++) {
+						objectToStrategy(object[i], table, strategy);
+					}
+					return;
+				}
+				for (let name in object) {
+					const relation = table[name]?._relation;
+					if (relation && !relation.columns) {//notJoin, that is one or many
+						strategy[name] = {};
+						objectToStrategy(object[name], whereStrategy?.[name], table[name], strategy[name]);
+					}
+					else
+						strategy[name] = true;
+				}
+				return strategy;
+			}
+
+
+			async function aggregate(filter, strategy) {
+				validateAggregateStrategy(strategy);
+				filter = negotiateFilter(filter);
+				const _baseFilter = await invokeBaseFilter();
+				if (_baseFilter)
+					filter = filter.and(context, _baseFilter);
+				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
+				await negotiateWhereAndAggregate(strategy);
+				return table.aggregate.apply(null, args);
+			}
+
+			async function distinct(filter, strategy) {
+				validateAggregateStrategy(strategy);
+				filter = negotiateFilter(filter);
+				const _baseFilter = await invokeBaseFilter();
+				if (_baseFilter)
+					filter = filter.and(context, _baseFilter);
+				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
+				await negotiateWhereAndAggregate(strategy);
+				return table.distinct.apply(null, args);
+			}
+
+
+
+			async function negotiateWhereAndAggregate(strategy, filterTable = table, scope) {
+				if (typeof strategy !== 'object')
+					return;
+
+				for (let name in strategy) {
+					const target = strategy[name];
+					if (isAdHocRelation(target))
+						continue;
+					if (isFilter(target))
+						strategy[name] = await parseFilter(strategy[name], filterTable, scope);
+					else
+						await negotiateWhereAndAggregate(strategy[name], filterTable, scope);
+				}
+
+			}
+
+			async function getMany(filter, strategy) {
+				validateStrategy(table, strategy, tables);
+				filter = negotiateFilter(filter);
+				const _baseFilter = await invokeBaseFilter();
+				if (_baseFilter)
+					filter = filter.and(context, _baseFilter);
+				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
+				await negotiateWhereAndAggregate(strategy);
+				return table.getMany.apply(null, args);
+			}
+
+		}
+
+		function validateStrategy(table, strategy, tables) {
+			if (!strategy || !table)
+				return;
+
+			for (let p in strategy) {
+				validateOffset(strategy);
+				validateLimit(strategy);
+				validateOrderBy(table, strategy);
+				if (isAdHocRelation(strategy[p])) {
+					const isMappedName = table._columns?.some(column => column.alias === p) || table._relations?.[p];
+					const reservedNames = new Set(['where', 'orderBy', 'limit', 'offset', 'forUpdate', 'skipLocked']);
+					const isReservedName = reservedNames.has(p);
+					if (isMappedName || isReservedName) {
+						const e = new Error(`Ad-hoc relation property '${p}' conflicts with a mapped or reserved property`);
+						// @ts-ignore
+						e.status = 400;
+						throw e;
+					}
+					const descriptor = strategy[p];
+					const target = tables?.[descriptor.table];
+					if (!target) {
+						const e = new Error(`Ad-hoc relation target '${descriptor.table}' is not mapped or exposed`);
+						// @ts-ignore
+						e.status = 400;
+						throw e;
+					}
+					if (descriptor.strategy?.forUpdate || descriptor.strategy?.skipLocked) {
+						const e = new Error('Ad-hoc relations are read-only and cannot use row locking');
+						// @ts-ignore
+						e.status = 400;
+						throw e;
+					}
+					validateStrategy(target, descriptor.strategy, tables);
+				}
+				else
+					validateStrategy(table[p], strategy[p], tables);
+			}
+		}
+
+		function validateAggregateStrategy(strategy) {
+			if (!strategy)
+				return;
+
+			validateOffset(strategy);
+			validateLimit(strategy);
+			const reserved = new Set(['where', 'limit', 'offset', 'orderBy']);
+			const aliases = Object.keys(strategy).filter(name => !reserved.has(name));
+			try {
+				parseAggregateOrderBy(strategy.orderBy, aliases);
+			} catch (error) {
+				error.status = 400;
+				throw error;
+			}
+		}
+
+		function validateLimit(strategy) {
+			validatePagination.limit(strategy);
+		}
+
+		function validateOffset(strategy) {
+			validatePagination.offset(strategy);
+		}
+
+		function validateOrderBy(table, strategy) {
+			if (!('orderBy' in strategy) || !table)
+				return;
+			let orderBy = strategy.orderBy;
+			if (!Array.isArray(orderBy))
+				orderBy = [orderBy];
+			orderBy.reduce(validate, []);
+
+			function validate(_, element) {
+				let parts = element.split(' ').filter(x => {
+					x = x.toLowerCase();
+					return (!(x === '' || x === 'asc' || x === 'desc'));
+				});
+				for (let p of parts) {
+					let col = table[p];
+					if (!(col && col.equal)) {
+						const e = new Error('Unknown column: ' + p);
+						// @ts-ignore
+						e.status = 400;
+						throw e;
+					}
+				}
+			}
+		}
+
+		function validateArgs() {
+			for (let i = 0; i < arguments.length; i++) {
+				const filter = arguments[i];
+				if (!filter)
+					continue;
+				if (filter && filter.isSafe === isSafe)
+					continue;
+				if (filter.sql || typeof (filter) === 'string') {
+					const e = new Error('Raw filters are disallowed');
+					// @ts-ignore
+					e.status = 403;
+					throw e;
+				}
+				if (Array.isArray(filter))
+					for (let i = 0; i < filter.length; i++) {
+
+						validateArgs(filter[i]);
+					}
+			}
+
+		}
+
+		function isFilter(json) {
+			return json instanceof Object && 'path' in json && 'args' in json;
+		}
+
+		function isColumnRef(json) {
+			return json instanceof Object && typeof json.__columnRef === 'string';
+		}
+
+		function isScopeRef(json) {
+			return isColumnRef(json) && (/^\$root\./.test(json.__columnRef)
+				|| /^\$scope\.[^.]+\./.test(json.__columnRef));
+		}
+
+		function resolveColumnRef(table, path) {
+			let current = table;
+			const parts = path.split('.');
+			for (let i = 0; i < parts.length; i++) {
+				if (current)
+					current = current[parts[i]];
+			}
+
+			if (!current || typeof current._toFilterArg !== 'function') {
+				let e = new Error(`Column reference '${path}' is invalid`);
+				// @ts-ignore
+				e.status = 400;
+				throw e;
+			}
+			return current;
+		}
+
+		function setSafe(o) {
+			if (o instanceof Object)
+				Object.defineProperty(o, 'isSafe', {
+					value: isSafe,
+					enumerable: false
+
+				});
+		}
+
+		function extractRelations(obj) {
+			let flattened = {};
+
+			function helper(relations) {
+				Object.keys(relations).forEach(key => {
+
+					flattened[key] = true;
+
+					if (typeof relations[key] === 'object' && Object.keys(relations[key]?.relations)?.length > 0) {
+						helper(relations[key].relations);
+					}
+				});
+			}
+
+			helper(obj.relations);
+
+			return flattened;
+		}
+
+		function bindDb(client) {
+			var domain = context;
+			let p = domain.run(() => true);
+
+			function run(fn) {
+				return p.then(domain.run.bind(domain, fn));
+			}
+
+			return client({ transaction: run });
+
+		}
+	}
+	executePath = _executePath;
+	return executePath;
+}
+
+var setSessionSingleton_1;
+var hasRequiredSetSessionSingleton;
+
+function requireSetSessionSingleton () {
+	if (hasRequiredSetSessionSingleton) return setSessionSingleton_1;
+	hasRequiredSetSessionSingleton = 1;
+	const getSessionContext = requireGetSessionContext();
+
+	function setSessionSingleton(context, name, value) {
+		const rdb = getSessionContext(context);
+		rdb[name] = value;
+	}
+
+	setSessionSingleton_1 = setSessionSingleton;
+	return setSessionSingleton_1;
+}
+
 var negotiateSql_1;
 var hasRequiredNegotiateSql;
 
@@ -2761,7 +5257,15 @@ function requireHostLocal () {
 			async function fn(context) {
 				setSessionSingleton(context, 'ignoreSerializable', true);
 				let patch = body.patch;
-				result = await table.patch(context, patch, { ..._options, ...body.options, isHttp });
+				const options = { ..._options, ...body.options, isHttp };
+				const adHocPlan = await executePath(context, {
+					...options,
+					request: _req,
+					response: _res,
+					prepareAdHoc: true,
+					sourceStrategy: options.strategy
+				});
+				result = await table.patch(context, patch, { ...options, adHocPlan });
 			}
 		}
 
@@ -3151,7 +5655,13 @@ function requireNetAdapter () {
 				return httpAdapter(db, `?table=${tableName}`, http);
 			}
 			else if (db && db.transaction) {
-				return db.hostLocal({ ...tableOptions, db, table: url });
+				return db.hostLocal({
+					...tableOptions,
+					db,
+					table: url,
+					tables: tableOptions.tables,
+					tableConfigs: tableOptions.tableConfigs
+				});
 			}
 			else
 				throw new Error('Invalid arguments');
@@ -3304,8 +5814,6 @@ function requireClientMap () {
 	return clientMap;
 }
 
-var require$$5 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(_default);
-
 var httpInterceptor;
 var hasRequiredHttpInterceptor;
 
@@ -3408,6 +5916,9 @@ function requireClient () {
 	const clone = require$$5;
 	const createHttpInterceptor = requireHttpInterceptor();
 	const flags = requireFlags();
+	const { isAdHocRelation, newAdHocRelation, ownerScopeMarker } = requireAdHocRelation();
+	const adHocFactoryMarker = '__rdbAdHocFactory';
+	const columnScopeMarker = '__rdbColumnScope';
 
 	function rdbClient(options = {}) {
 		flags.useLazyDefaults = false;
@@ -3496,7 +6007,8 @@ function requireClient () {
 			}
 
 		};
-		return new Proxy(client, handler);
+		const clientProxy = new Proxy(client, handler);
+		return clientProxy;
 		// }
 
 		function getMetaData() {
@@ -3606,6 +6118,8 @@ function requireClient () {
 		function table(url, tableName, tableOptions) {
 			tableOptions = tableOptions || {};
 			tableOptions = { db: baseUrl, ...tableOptions, transaction };
+			Object.defineProperty(tableOptions, 'tables', { value: options.tables, enumerable: false });
+			Object.defineProperty(tableOptions, 'tableConfigs', { value: options, enumerable: false });
 			let meta;
 			let c = {
 				count,
@@ -3625,6 +6139,8 @@ function requireClient () {
 				deleteCascade,
 				patch,
 				expand,
+				many: adHoc.bind(null, 'many'),
+				one: adHoc.bind(null, 'one'),
 			};
 
 
@@ -3644,6 +6160,37 @@ function requireClient () {
 				return c;
 			}
 
+			function adHoc(kind, strategy = {}) {
+				return newAdHocRelation(kind, tableName, serializeAdHocStrategy(strategy));
+			}
+
+			function serializeAdHocStrategy(_strategy, path = '') {
+				if (!_strategy || typeof _strategy !== 'object' || Array.isArray(_strategy))
+					return _strategy;
+				if (isAdHocRelation(_strategy)) {
+					if (!_strategy[adHocFactoryMarker])
+						throw new Error('Ad-hoc relations must be returned by a fetch strategy function');
+					return _strategy;
+				}
+
+				const strategy = { ..._strategy };
+				for (let name in strategy) {
+					if (isAdHocRelation(strategy[name])) {
+						if (!strategy[name][adHocFactoryMarker])
+							throw new Error('Ad-hoc relations must be returned by a fetch strategy function');
+						continue;
+					}
+					if (name === 'where' && typeof strategy[name] === 'function') {
+						strategy[name] = column(path + 'where')(strategy[name]);
+					}
+					else if (typeof strategy[name] === 'function')
+						strategy[name] = aggregate(path, strategy[name], adHocStrategyContext());
+					else
+						strategy[name] = serializeAdHocStrategy(strategy[name], path + name + '.');
+				}
+				return strategy;
+			}
+
 			async function getAll() {
 				let _getMany = getMany.bind(null, undefined);
 				return _getMany.apply(null, arguments);
@@ -3660,6 +6207,7 @@ function requireClient () {
 					}
 				}
 				strategy = extractFetchingStrategy({}, strategy);
+				strategy = negotiateWhereSingle(strategy);
 				let args = [_, strategy].concat(Array.prototype.slice.call(arguments).slice(2));
 				let rows = await getManyCore.apply(null, args);
 				await metaPromise;
@@ -3710,7 +6258,7 @@ function requireClient () {
 					return true;
 				for (let key in value) {
 					const v = value[key];
-					if (typeof v === 'boolean')
+					if (typeof v === 'boolean' || typeof v === 'function')
 						return true;
 					if (v && typeof v === 'object' && !Array.isArray(v))
 						return true;
@@ -3734,6 +6282,8 @@ function requireClient () {
 					if (!keyNames.includes(key))
 						return false;
 					const val = value[key];
+					if (typeof val === 'function')
+						return false;
 					if (val && typeof val === 'object' && !(val instanceof Date))
 						return false;
 				}
@@ -3754,6 +6304,7 @@ function requireClient () {
 				let normalized = normalizeGetOneArgs(meta, filter, strategy);
 				filter = normalized.filter;
 				strategy = extractFetchingStrategy({}, normalized.strategy);
+				strategy = negotiateWhereSingle(strategy);
 				let _strategy = { ...strategy, ...{ limit: 1 } };
 				let args = [filter, _strategy].concat(Array.prototype.slice.call(arguments).slice(2));
 				let rows = await getManyCore.apply(null, args);
@@ -3777,7 +6328,7 @@ function requireClient () {
 			}
 
 			async function getManyCore() {
-				let args = negotiateWhere.apply(null, arguments);
+				let args = Array.prototype.slice.call(arguments);
 				let body = stringify({
 					path: 'getManyDto',
 					args
@@ -3786,19 +6337,14 @@ function requireClient () {
 				return adapter.post(body);
 			}
 
-			function negotiateWhere(_, strategy, ...rest) {
-				const args = Array.prototype.slice.call(arguments);
-				if (strategy)
-					return [_, negotiateWhereSingle(strategy), ...rest];
-				else
-					return args;
-
-
-			}
-
 			function negotiateWhereSingle(_strategy, path = '') {
 				if (typeof _strategy !== 'object' || _strategy === null)
 					return _strategy;
+				if (isAdHocRelation(_strategy)) {
+					if (!_strategy[adHocFactoryMarker])
+						throw new Error('Ad-hoc relations must be returned by a fetch strategy function');
+					return _strategy;
+				}
 
 				if (Array.isArray(_strategy)) {
 					return _strategy.map(item => negotiateWhereSingle(item, path));
@@ -3809,12 +6355,19 @@ function requireClient () {
 					if (name === 'where' && typeof strategy[name] === 'function')
 						strategy.where = column(path + 'where')(strategy.where); // Assuming `column` is defined elsewhere.
 					else if (typeof strategy[name] === 'function') {
-						strategy[name] = aggregate(path, strategy[name]);
+						strategy[name] = aggregate(path, strategy[name], adHocStrategyContext());
 					}
 					else
 						strategy[name] = negotiateWhereSingle(_strategy[name], path + name + '.');
 				}
 				return strategy;
+			}
+
+			function adHocStrategyContext() {
+				return {
+					db: clientProxy,
+					root: tableProxy('$root.')
+				};
 			}
 
 
@@ -4096,6 +6649,7 @@ function requireClient () {
 					return;
 				strategy = extractStrategy({ strategy }, array);
 				strategy = extractFetchingStrategy(array, strategy);
+				strategy = negotiateWhereSingle(strategy);
 
 				let meta = await getMeta();
 				const patch = createPatch(json, array, meta);
@@ -4113,14 +6667,18 @@ function requireClient () {
 				let insertedPositions = getInsertedRowsPosition(array);
 				let { changed, strategy: newStrategy } = await p;
 				copyIntoArray(changed, array, [...insertedPositions, ...updatedPositions]);
-				rootMap.set(array, { json: cloneFromDb(array), strategy: toStoredFetchStrategy(newStrategy), originalArray: [...array] });
+				rootMap.set(array, {
+					json: cloneFromDb(array),
+					strategy: toStoredFetchStrategy(newStrategy),
+					originalArray: [...array]
+				});
 			}
 
 			async function patch(patch, concurrencyOptions, strategy) {
 				let deduceStrategy = false;
 				if (patch.length === 0)
 					return;
-				let body = stringify({ patch, options: { strategy, ...tableOptions, ...concurrencyOptions, deduceStrategy } });
+				let body = stringify({ patch, options: { strategy: stripAdHocStrategy(strategy), ...tableOptions, ...concurrencyOptions, deduceStrategy } });
 				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				await adapter.patch(body);
 				return;
@@ -4192,6 +6750,11 @@ function requireClient () {
 			function toStoredFetchStrategy(strategy) {
 				if (strategy === undefined || strategy === null || typeof strategy !== 'object')
 					return strategy;
+				if (isAdHocRelation(strategy))
+					return {
+						...strategy,
+						strategy: cloneAdHocStrategy(strategy.strategy)
+					};
 				if (Array.isArray(strategy))
 					return strategy.map(toStoredFetchStrategy);
 				const cleanStrategy = { ...strategy };
@@ -4203,6 +6766,48 @@ function requireClient () {
 						cleanStrategy[name] = toStoredFetchStrategy(cleanStrategy[name]);
 				}
 				return cleanStrategy;
+			}
+
+			function cloneAdHocStrategy(strategy) {
+				if (strategy === undefined || strategy === null || typeof strategy !== 'object')
+					return strategy;
+				const clean = clone(strategy);
+				stripLocking(clean);
+				return clean;
+
+				function stripLocking(value) {
+					if (!value || typeof value !== 'object')
+						return;
+					if (!Array.isArray(value)) {
+						if (!isPlainObject(value))
+							return;
+						delete value.forUpdate;
+						delete value.skipLocked;
+					}
+					for (let name in value)
+						stripLocking(value[name]);
+				}
+			}
+
+			function stripAdHocStrategy(strategy) {
+				if (!strategy || typeof strategy !== 'object')
+					return strategy;
+				if (Array.isArray(strategy))
+					return strategy.map(stripAdHocStrategy);
+				if (!isPlainObject(strategy))
+					return strategy;
+				const clean = {};
+				for (let name in strategy) {
+					if (isAdHocRelation(strategy[name]))
+						continue;
+					clean[name] = stripAdHocStrategy(strategy[name]);
+				}
+				return clean;
+			}
+
+			function isPlainObject(value) {
+				const prototype = Object.getPrototypeOf(value);
+				return prototype === Object.prototype || prototype === null;
 			}
 
 			function clearChangesArray(array) {
@@ -4259,6 +6864,7 @@ function requireClient () {
 				clearChangesArray(array);
 				strategy = extractStrategy({ strategy }, array);
 				strategy = extractFetchingStrategy(array, strategy);
+				strategy = negotiateWhereSingle(strategy);
 				if (array.length === 0)
 					return;
 				let meta = await getMeta();
@@ -4314,6 +6920,7 @@ function requireClient () {
 					deduceStrategy = false;
 				strategy = extractStrategy({ strategy }, row);
 				strategy = extractFetchingStrategy(row, strategy);
+				strategy = negotiateWhereSingle(strategy);
 
 				let json = rootMap.get(row)?.json;
 				if (!json)
@@ -4329,13 +6936,17 @@ function requireClient () {
 				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				let { changed, strategy: newStrategy } = await adapter.patch(body);
 				copyInto(changed, [row]);
-				rootMap.set(row, { json: cloneFromDb(row), strategy: toStoredFetchStrategy(newStrategy) });
+				rootMap.set(row, {
+					json: cloneFromDb(row),
+					strategy: toStoredFetchStrategy(newStrategy)
+				});
 			}
 
 			async function refreshRow(row, strategy) {
 				clearChangesRow(row);
 				strategy = extractStrategy({ strategy }, row);
 				strategy = extractFetchingStrategy(row, strategy);
+				strategy = negotiateWhereSingle(strategy);
 
 				let meta = await getMeta();
 				let keyFilter = client.filter;
@@ -4381,17 +6992,20 @@ function requireClient () {
 		}
 	}
 
-	function tableProxy() {
+	function tableProxy(prefix = '') {
 		let handler = {
 			get(_target, property,) {
-				return column(property);
+				return column(prefix + String(property));
 			}
 
 		};
 		return new Proxy({}, handler);
 	}
 
-	function aggregate(path, arg) {
+	let nextAdHocScopeId = 0;
+
+	function aggregate(path, arg, strategyContext) {
+		const scopeId = `s${++nextAdHocScopeId}`;
 
 		const c = {
 			sum,
@@ -4407,7 +7021,7 @@ function requireClient () {
 					return Reflect.get(...arguments);
 				else {
 					subColumn = column(path + '_aggregate');
-					return column(property);
+					return scopedColumn(String(property), scopeId);
 				}
 			}
 
@@ -4415,10 +7029,19 @@ function requireClient () {
 		let subColumn;
 		const proxy = new Proxy(c, handler);
 
-		const result = arg(proxy);
+		const result = arg(proxy, strategyContext);
 
-		if (subColumn)
-			return subColumn(result.self());
+		if (isAdHocRelation(result)) {
+			result[ownerScopeMarker] = scopeId;
+			result[adHocFactoryMarker] = true;
+			materializeSelectorScopes(result, true);
+			return result;
+		}
+		else if (subColumn) {
+			const selection = result.self();
+			materializeSelectorScopes(selection, false);
+			return subColumn(selection);
+		}
 		else
 			return result;
 
@@ -4494,12 +7117,24 @@ function requireClient () {
 	const columnRefKey = '__columnRef';
 
 	function column(path, ...previous) {
+		return newColumn(path, previous);
+	}
+
+	function scopedColumn(path, scopeId) {
+		return newColumn(path, [], scopeId);
+	}
+
+	function newColumn(path, previous, scopeId) {
 		function c() {
 			let args = [];
 			for (let i = 0; i < arguments.length; i++) {
 				if (typeof arguments[i] === 'function') {
-					if (arguments[i][isColumnProxyKey])
+					if (arguments[i][isColumnProxyKey]) {
 						args[i] = { [columnRefKey]: arguments[i][columnPathKey] };
+						const argumentScopeId = arguments[i][columnScopeMarker];
+						if (argumentScopeId)
+							args[i][columnScopeMarker] = argumentScopeId;
+					}
 					else
 						args[i] = arguments[i](tableProxy());
 				}
@@ -4508,6 +7143,8 @@ function requireClient () {
 			}
 			args = previous.concat(Array.prototype.slice.call(args));
 			let result = { path, args };
+			if (scopeId)
+				result[columnScopeMarker] = scopeId;
 			let handler = {
 				get(_target, property) {
 					if (property === 'toJSON')
@@ -4529,19 +7166,44 @@ function requireClient () {
 					return true;
 				if (property === columnPathKey)
 					return path;
+				if (property === columnScopeMarker)
+					return scopeId;
 				if (property === 'toJSON')
 					return Reflect.get(...arguments);
 				else if (property === 'then')
 					return;
 				else {
 					const nextPath = path ? path + '.' : '';
-					return column(nextPath + property);
+					return newColumn(nextPath + property, [], scopeId);
 				}
 			}
 
 		};
 		return new Proxy(c, handler);
 
+	}
+
+	function materializeSelectorScopes(value, scoped, seen = new Set()) {
+		if (!value || typeof value !== 'object' || seen.has(value))
+			return;
+		const prototype = Object.getPrototypeOf(value);
+		if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null)
+			return;
+		seen.add(value);
+		const scopeId = Object.prototype.hasOwnProperty.call(value, columnScopeMarker)
+			? value[columnScopeMarker]
+			: undefined;
+		if (scopeId) {
+			if (scoped) {
+				if (typeof value.path === 'string')
+					value.path = `$scope.${scopeId}.${value.path}`;
+				if (typeof value[columnRefKey] === 'string')
+					value[columnRefKey] = `$scope.${scopeId}.${value[columnRefKey]}`;
+			}
+			delete value[columnScopeMarker];
+		}
+		for (const name of Object.keys(value))
+			materializeSelectorScopes(value[name], scoped, seen);
 	}
 
 	function onChange(target, onChange) {
@@ -4842,112 +7504,6 @@ function requireColumnAggregate$1 () {
 
 	columnAggregate_1$1 = columnAggregate;
 	return columnAggregate_1$1;
-}
-
-var newDiscriminatorSql_1$1;
-var hasRequiredNewDiscriminatorSql$1;
-
-function requireNewDiscriminatorSql$1 () {
-	if (hasRequiredNewDiscriminatorSql$1) return newDiscriminatorSql_1$1;
-	hasRequiredNewDiscriminatorSql$1 = 1;
-	const getSessionSingleton = requireGetSessionSingleton();
-
-	function newDiscriminatorSql(context, table, alias) {
-		const quote = getSessionSingleton(context, 'quote');
-		alias = quote(alias);
-		var result = '';
-		var formulaDiscriminators = table._formulaDiscriminators;
-		var columnDiscriminators = table._columnDiscriminators;
-		addFormula();
-		addColumn();
-		return result;
-
-		function addFormula() {
-			for (var i = 0; i<formulaDiscriminators.length; i++) {
-				var current = formulaDiscriminators[i].replace('@this',alias);
-				and();
-				result += '(' + current + ')';
-			}
-		}
-
-		function addColumn() {
-			for (var i = 0; i< columnDiscriminators.length; i++) {
-				var current = columnDiscriminators[i].split('=');
-				and();
-				result += alias + '.' + quote(current[0]) + '=' + current[1];
-			}
-		}
-
-		function and() {
-			if(result)
-				result += ' AND ';
-			else
-				result = ' ';
-		}
-	}
-
-	newDiscriminatorSql_1$1 = newDiscriminatorSql;
-	return newDiscriminatorSql_1$1;
-}
-
-var newDiscriminatorSql_1;
-var hasRequiredNewDiscriminatorSql;
-
-function requireNewDiscriminatorSql () {
-	if (hasRequiredNewDiscriminatorSql) return newDiscriminatorSql_1;
-	hasRequiredNewDiscriminatorSql = 1;
-	var newDiscriminatorSqlCore = requireNewDiscriminatorSql$1();
-
-	function newDiscriminatorSql(context, table, alias) {
-		var result = newDiscriminatorSqlCore(context,table,alias);
-		if (result)
-			return ' AND' + result;
-		return result;
-
-	}
-
-	newDiscriminatorSql_1 = newDiscriminatorSql;
-	return newDiscriminatorSql_1;
-}
-
-var newShallowJoinSqlCore;
-var hasRequiredNewShallowJoinSqlCore;
-
-function requireNewShallowJoinSqlCore () {
-	if (hasRequiredNewShallowJoinSqlCore) return newShallowJoinSqlCore;
-	hasRequiredNewShallowJoinSqlCore = 1;
-	const newDiscriminatorSql = requireNewDiscriminatorSql();
-	const newParameterized = requireNewParameterized();
-	const getSessionSingleton = requireGetSessionSingleton();
-
-	function _new(context, rightTable, leftColumns, rightColumns, leftAlias, rightAlias, filter) {
-		const quote = getSessionSingleton(context, 'quote');
-		const leftAliasRaw = leftAlias;
-		const rightAliasRaw = rightAlias;
-		leftAlias = quote(leftAliasRaw);
-		rightAlias = quote(rightAliasRaw);
-		var sql = '';
-		var delimiter = '';
-		for (var i = 0; i < leftColumns.length; i++) {
-			addColumn(i);
-			delimiter = ' AND ';
-		}
-
-		function addColumn(index) {
-			var leftColumn = leftColumns[index];
-			var rightColumn = rightColumns[index];
-			sql += delimiter + leftAlias + '.' + quote(leftColumn._dbName) + '=' + rightAlias + '.' + quote(rightColumn._dbName);
-		}
-
-		sql += newDiscriminatorSql(context, rightTable, rightAliasRaw);
-		var result = newParameterized(sql);
-		if (filter)
-			result = result.append(delimiter).append(filter);
-		return result;
-	}
-
-	newShallowJoinSqlCore = _new;
-	return newShallowJoinSqlCore;
 }
 
 var columnAggregateGroup$1;
@@ -6707,99 +9263,6 @@ function requireColumn () {
 	return column;
 }
 
-var newCollection_1;
-var hasRequiredNewCollection;
-
-function requireNewCollection () {
-	if (hasRequiredNewCollection) return newCollection_1;
-	hasRequiredNewCollection = 1;
-	function newCollection() {
-		var c = {};
-		var initialArgs = [];
-		for (var i = 0; i < arguments.length; i++) {
-			initialArgs.push(arguments[i]);
-		}
-		var ranges = [initialArgs];
-
-		c.addRange = function(otherCollection) {
-			ranges.push(otherCollection);
-		};
-
-		c.add = function(element) {
-			c.addRange([element]);
-		};
-
-		c.toArray = function() {
-			var result = [];
-			c.forEach(onEach);
-			return result;
-
-			function onEach(element) {
-				result.push(element);
-			}
-		};
-
-		c.forEach = function(callback) {
-			var index = 0;
-			for (var i = 0; i < ranges.length; i++) {
-				ranges[i].forEach(onEach);
-			}
-
-			function onEach(element) {
-				callback(element, index);
-				index++;
-			}
-
-		};
-
-		Object.defineProperty(c, 'length', {
-			enumerable: false,
-			get: function() {
-				var result = 0;
-				for (var i = 0; i < ranges.length; i++) {
-					result += ranges[i].length;
-				}
-				return result;
-			},
-		});
-
-
-		return c;
-	}
-
-	newCollection_1 = newCollection;
-	return newCollection_1;
-}
-
-var newQueryContext_1;
-var hasRequiredNewQueryContext;
-
-function requireNewQueryContext () {
-	if (hasRequiredNewQueryContext) return newQueryContext_1;
-	hasRequiredNewQueryContext = 1;
-	function newQueryContext() {
-		var rows = [];
-
-		var c = {};
-		c.rows = rows;
-
-		c.expand = function(relation) {
-			rows.forEach(function(row) {
-				relation.expand(row);
-			});
-		};
-
-		c.add = function(row) {
-			rows.push(row);
-		};
-
-		return c;
-	}
-
-	newQueryContext_1 = newQueryContext;
-	return newQueryContext_1;
-}
-
 var newJoinLeg;
 var hasRequiredNewJoinLeg;
 
@@ -6875,385 +9338,6 @@ function requireNewPrimaryKeyFilter () {
 	return newPrimaryKeyFilter;
 }
 
-var newShallowColumnSql;
-var hasRequiredNewShallowColumnSql;
-
-function requireNewShallowColumnSql () {
-	if (hasRequiredNewShallowColumnSql) return newShallowColumnSql;
-	hasRequiredNewShallowColumnSql = 1;
-	const getSessionSingleton = requireGetSessionSingleton();
-
-	function _new(context, table, alias, span, ignoreNulls) {
-		const quote = getSessionSingleton(context, 'quote');
-		const quotedAlias = quote(alias);
-		let columnsMap = span.columns;
-		var columns = table._columns;
-		var sql = '';
-		var separator = '';
-
-		for (let i = 0; i < columns.length; i++) {
-			var column = columns[i];
-			if (!columnsMap || (columnsMap.get(column))) {
-				sql = sql + separator + formatColumn(column) + ' as ' + quote('s' + alias + i);
-				separator = ',';
-			}
-			else if (!ignoreNulls) {
-				sql = sql + separator + 'null as ' + quote('s' + alias + i);
-				separator = ',';
-			}
-		}
-
-		for (let name in span.aggregates || {}) {
-			sql = sql + separator + span.aggregates[name].expression(name);
-			separator = ',';
-		}
-
-		return sql;
-
-		function formatColumn(column) {
-			const formatted = column.formatOut ? column.formatOut(context, quotedAlias) : quotedAlias + '.' + quote(column._dbName);
-			if (column.dbNull === null)
-				return formatted;
-			else {
-				const encoded = column.encode.unsafe(context, column.dbNull);
-				return `CASE WHEN ${formatted}=${encoded} THEN null ELSE ${formatted} END`;
-			}
-		}
-	}
-
-	newShallowColumnSql = _new;
-	return newShallowColumnSql;
-}
-
-var sharedJoinUtils;
-var hasRequiredSharedJoinUtils;
-
-function requireSharedJoinUtils () {
-	if (hasRequiredSharedJoinUtils) return sharedJoinUtils;
-	hasRequiredSharedJoinUtils = 1;
-	var newShallowColumnSql = requireNewShallowColumnSql();
-
-	function joinLegToColumnSql(context, leg, alias, ignoreNull) {
-		var span = leg.span;
-		var shallowColumnSql = newShallowColumnSql(context, span.table, alias, span, ignoreNull);
-		var joinedColumnSql = newJoinedColumnSql(context, span, alias, ignoreNull);
-		return ',' + shallowColumnSql + joinedColumnSql;
-	}
-
-	function newJoinedColumnSql(context, span, alias, ignoreNull) {
-		var c = {};
-		var sql = '';
-
-		c.visitJoin = function(leg) {
-			var joinSql = joinLegToColumnSql(context, leg, alias + leg.name, ignoreNull);
-			sql = sql + joinSql;
-		};
-
-		c.visitOne = function(leg) {
-			c.visitJoin(leg);
-		};
-
-		c.visitMany = function() {
-		};
-
-
-		span.legs.forEach(onEach);
-
-		function onEach(leg) {
-			leg.accept(c);
-		}
-
-		return sql;
-	}
-
-
-	sharedJoinUtils = { joinLegToColumnSql, newJoinedColumnSql };
-	return sharedJoinUtils;
-}
-
-var newJoinedColumnSql_1;
-var hasRequiredNewJoinedColumnSql;
-
-function requireNewJoinedColumnSql () {
-	if (hasRequiredNewJoinedColumnSql) return newJoinedColumnSql_1;
-	hasRequiredNewJoinedColumnSql = 1;
-	const { newJoinedColumnSql } = requireSharedJoinUtils();
-
-
-	newJoinedColumnSql_1 = newJoinedColumnSql;
-	return newJoinedColumnSql_1;
-}
-
-var newColumnSql;
-var hasRequiredNewColumnSql;
-
-function requireNewColumnSql () {
-	if (hasRequiredNewColumnSql) return newColumnSql;
-	hasRequiredNewColumnSql = 1;
-	var newShallowColumnSql = requireNewShallowColumnSql();
-	var newJoinedColumnSql = requireNewJoinedColumnSql();
-
-	newColumnSql = function(context,table,span,alias,ignoreNull) {
-		var shallowColumnSql = newShallowColumnSql(context,table,alias, span, ignoreNull);
-		var joinedColumnSql = newJoinedColumnSql(context, span,alias, ignoreNull);
-		return shallowColumnSql + joinedColumnSql;
-	};
-	return newColumnSql;
-}
-
-var lockSql;
-var hasRequiredLockSql;
-
-function requireLockSql () {
-	if (hasRequiredLockSql) return lockSql;
-	hasRequiredLockSql = 1;
-	const getSessionSingleton = requireGetSessionSingleton();
-
-	function selectLockSql(context, span, alias, exclusive) {
-		const lock = collectSelectLock(span, alias, exclusive);
-		if (!hasLock(lock))
-			return '';
-		const encode = getSessionSingleton(context, 'selectForUpdateSql');
-		if (!encode)
-			return '';
-		return encode(context, lock);
-	}
-
-	function tableHintSql(context, span, exclusive) {
-		const lock = spanToLock(span, exclusive);
-		if (!hasLock(lock))
-			return '';
-		const encode = getSessionSingleton(context, 'selectForUpdateSql');
-		if (!encode || !encode.tableHint)
-			return '';
-		return encode.tableHint(context, lock);
-	}
-
-	function collectSelectLock(span, alias, exclusive) {
-		const lock = {
-			aliases: [],
-			forUpdate: Boolean(exclusive),
-			skipLocked: false
-		};
-		collect(span, alias, lock);
-		if (exclusive && lock.aliases.indexOf(alias) === -1)
-			lock.aliases.unshift(alias);
-		return lock;
-	}
-
-	function collect(span, alias, lock) {
-		if (!span)
-			return;
-		if (span.forUpdate) {
-			lock.forUpdate = true;
-			lock.aliases.push(alias);
-		}
-		if (span.skipLocked)
-			lock.skipLocked = true;
-
-		if (!span.legs)
-			return;
-		const visitor = {};
-		visitor.visitJoin = visitJoinedLeg;
-		visitor.visitOne = visitJoinedLeg;
-		visitor.visitMany = function() {};
-
-		function visitJoinedLeg(leg) {
-			collect(leg.span, alias + leg.name, lock);
-		}
-
-		span.legs.forEach(leg => leg.accept(visitor));
-	}
-
-	function spanToLock(span, exclusive) {
-		return {
-			aliases: [],
-			forUpdate: Boolean(exclusive || span?.forUpdate),
-			skipLocked: Boolean(span?.skipLocked)
-		};
-	}
-
-	function hasLock(lock) {
-		return Boolean(lock.forUpdate || lock.skipLocked);
-	}
-
-	lockSql = {
-		selectLockSql,
-		tableHintSql
-	};
-	return lockSql;
-}
-
-var newShallowJoinSql;
-var hasRequiredNewShallowJoinSql;
-
-function requireNewShallowJoinSql () {
-	if (hasRequiredNewShallowJoinSql) return newShallowJoinSql;
-	hasRequiredNewShallowJoinSql = 1;
-	const newJoinCore = requireNewShallowJoinSqlCore();
-	const getSessionSingleton = requireGetSessionSingleton();
-	const lockSql = requireLockSql();
-
-	function _new(context, rightTable, leftColumns, rightColumns, leftAlias, rightAlias, filter, span) {
-		const quote = getSessionSingleton(context, 'quote');
-		const tableHint = lockSql.tableHintSql(context, span);
-		const sql = ' JOIN ' + quote(rightTable._dbName) + ' ' + quote(rightAlias) + tableHint + ' ON (';
-		const joinCore = newJoinCore(context, rightTable, leftColumns, rightColumns, leftAlias, rightAlias, filter);
-		return joinCore.prepend(sql).append(')');
-	}
-
-	newShallowJoinSql = _new;
-	return newShallowJoinSql;
-}
-
-var joinLegToShallowJoinSql;
-var hasRequiredJoinLegToShallowJoinSql;
-
-function requireJoinLegToShallowJoinSql () {
-	if (hasRequiredJoinLegToShallowJoinSql) return joinLegToShallowJoinSql;
-	hasRequiredJoinLegToShallowJoinSql = 1;
-	var newShallowJoinSql = requireNewShallowJoinSql();
-
-	function toJoinSql(context,leg,alias,childAlias) {
-		var columns = leg.columns;
-		var childTable = leg.span.table;
-		return newShallowJoinSql(context,childTable,columns,childTable._primaryColumns,alias,childAlias,leg.span.where,leg.span).prepend(' LEFT');
-	}
-
-	joinLegToShallowJoinSql = toJoinSql;
-	return joinLegToShallowJoinSql;
-}
-
-var joinLegToJoinSql;
-var hasRequiredJoinLegToJoinSql;
-
-function requireJoinLegToJoinSql () {
-	if (hasRequiredJoinLegToJoinSql) return joinLegToJoinSql;
-	hasRequiredJoinLegToJoinSql = 1;
-	var joinLegToShallowJoinSql = requireJoinLegToShallowJoinSql();
-
-	function toJoinSql(newJoinSql, context,leg,alias,childAlias) {
-		return joinLegToShallowJoinSql(context,leg,alias,childAlias).append(newJoinSql(context,leg.span,childAlias));
-	}
-
-
-	joinLegToJoinSql = toJoinSql;
-	return joinLegToJoinSql;
-}
-
-var oneLegToShallowJoinSql;
-var hasRequiredOneLegToShallowJoinSql;
-
-function requireOneLegToShallowJoinSql () {
-	if (hasRequiredOneLegToShallowJoinSql) return oneLegToShallowJoinSql;
-	hasRequiredOneLegToShallowJoinSql = 1;
-	var newShallowJoinSql = requireNewShallowJoinSql();
-
-	function toJoinSql(context,leg,alias,childAlias) {
-		var parentTable = leg.table;
-		var columns = leg.columns;
-		var childTable = leg.span.table;
-		return newShallowJoinSql(context,childTable,parentTable._primaryColumns,columns,alias,childAlias, leg.span.where,leg.span).prepend(' LEFT');
-	}
-
-	oneLegToShallowJoinSql = toJoinSql;
-	return oneLegToShallowJoinSql;
-}
-
-var oneLegToJoinSql;
-var hasRequiredOneLegToJoinSql;
-
-function requireOneLegToJoinSql () {
-	if (hasRequiredOneLegToJoinSql) return oneLegToJoinSql;
-	hasRequiredOneLegToJoinSql = 1;
-	var oneLegToShallowJoinSql = requireOneLegToShallowJoinSql();
-
-	function toJoinSql(newJoinSql, context,leg,alias,childAlias) {
-		return oneLegToShallowJoinSql(context,leg,alias,childAlias).append(newJoinSql(context,leg.span,childAlias));
-	}
-
-	oneLegToJoinSql = toJoinSql;
-	return oneLegToJoinSql;
-}
-
-var newJoinSql_1;
-var hasRequiredNewJoinSql;
-
-function requireNewJoinSql () {
-	if (hasRequiredNewJoinSql) return newJoinSql_1;
-	hasRequiredNewJoinSql = 1;
-	const joinLegToJoinSql = requireJoinLegToJoinSql();
-	const oneLegToJoinSql = requireOneLegToJoinSql();
-	const newParameterized = requireNewParameterized();
-
-	function newJoinSql(context,span,alias = '') {
-		var sql = newParameterized('');
-		var childAlias;
-
-		var c = {};
-		c.visitJoin = function(leg) {
-			sql = joinLegToJoinSql(newJoinSql, context,leg,alias,childAlias).prepend(sql);
-		};
-
-		c.visitOne = function(leg) {
-			sql = oneLegToJoinSql(newJoinSql, context,leg,alias,childAlias).prepend(sql);
-		};
-
-		c.visitMany = function() {};
-
-		function onEachLeg(leg) {
-			childAlias = alias + leg.name;
-			leg.accept(c);
-		}
-
-		span.legs.forEach(onEachLeg);
-
-		const set = new Set();
-		for(let key in span.aggregates) {
-			const agg = span.aggregates[key];
-			for(let join of agg.joins) {
-				if (!set.has(join)) {
-					sql = sql.append(join);
-					set.add(join);
-				}
-			}
-		}
-
-		return sql;
-	}
-
-	newJoinSql_1 = newJoinSql;
-	return newJoinSql_1;
-}
-
-var newWhereSql_1;
-var hasRequiredNewWhereSql;
-
-function requireNewWhereSql () {
-	if (hasRequiredNewWhereSql) return newWhereSql_1;
-	hasRequiredNewWhereSql = 1;
-	var newDiscriminatorSql = requireNewDiscriminatorSql$1();
-	var newParameterized = requireNewParameterized();
-
-	function newWhereSql(context, table, filter, alias) {
-		var separator = ' where';
-		var result = newParameterized('');
-		var sql = filter.sql();
-		var discriminator = newDiscriminatorSql(context, table, alias);
-		if (sql) {
-			result = filter.prepend(separator + ' ');
-			separator = ' AND';
-		}
-		if (discriminator)
-			result = result.append(separator + discriminator);
-
-		return result;
-	}
-
-	newWhereSql_1 = newWhereSql;
-	return newWhereSql_1;
-}
-
 var negotiateLimit_1;
 var hasRequiredNegotiateLimit;
 
@@ -7273,12 +9357,12 @@ function requireNegotiateLimit () {
 	return negotiateLimit_1;
 }
 
-var newSingleQuery$1;
-var hasRequiredNewSingleQuery$1;
+var newSingleQuery;
+var hasRequiredNewSingleQuery;
 
-function requireNewSingleQuery$1 () {
-	if (hasRequiredNewSingleQuery$1) return newSingleQuery$1;
-	hasRequiredNewSingleQuery$1 = 1;
+function requireNewSingleQuery () {
+	if (hasRequiredNewSingleQuery) return newSingleQuery;
+	hasRequiredNewSingleQuery = 1;
 	var newColumnSql = requireNewColumnSql();
 	var newJoinSql = requireNewJoinSql();
 	var newWhereSql = requireNewWhereSql();
@@ -7304,145 +9388,17 @@ function requireNewSingleQuery$1 () {
 			.append(orderBy + offset + lockClause);
 	}
 
-	newSingleQuery$1 = _new;
-	return newSingleQuery$1;
+	newSingleQuery = _new;
+	return newSingleQuery;
 }
 
-var extractFilter;
-var hasRequiredExtractFilter;
+var newQuery_1$1;
+var hasRequiredNewQuery$1;
 
-function requireExtractFilter () {
-	if (hasRequiredExtractFilter) return extractFilter;
-	hasRequiredExtractFilter = 1;
-	var emptyFilter = requireEmptyFilter();
-
-	function extract(filter) {
-		if (filter)
-			return filter;
-		return emptyFilter;
-	}
-
-	extractFilter = extract;
-	return extractFilter;
-}
-
-var extractOrderBy_1$1;
-var hasRequiredExtractOrderBy$1;
-
-function requireExtractOrderBy$1 () {
-	if (hasRequiredExtractOrderBy$1) return extractOrderBy_1$1;
-	hasRequiredExtractOrderBy$1 = 1;
-	const getSessionSingleton = requireGetSessionSingleton();
-
-	function extractOrderBy(context, table, alias, orderBy, originalOrderBy) {
-		const quote = getSessionSingleton(context, 'quote');
-		alias = quote(alias);
-		var dbNames = [];
-		var i;
-		if (orderBy) {
-			if (typeof orderBy === 'string')
-				orderBy = [orderBy];
-			for (i = 0; i < orderBy.length; i++) {
-				var nameAndDirection = extractNameAndDirection(orderBy[i]);
-				pushColumn(nameAndDirection.name, nameAndDirection.direction);
-			}
-		} else {
-			if(originalOrderBy)
-				return originalOrderBy;
-
-			for (i = 0; i < table._primaryColumns.length; i++) {
-				pushColumn(table._primaryColumns[i].alias);
-			}
-		}
-
-		function extractNameAndDirection(orderBy) {
-			var elements = orderBy.split(' ');
-			var direction = '';
-			if (elements.length > 1) {
-				direction = ' ' + elements[1];
-			}
-			return {
-				name: elements[0],
-				direction: direction
-			};
-		}
-		function pushColumn(property, direction) {
-			direction = direction || '';
-			var column = getTableColumn(property);
-			var jsonQuery = getJsonQuery(property, column.alias);
-
-			dbNames.push(alias + '.' + quote(column._dbName) + jsonQuery + direction);
-		}
-
-		function getTableColumn(property) {
-			var column = table[property] || table[property.split(/(-|#)>+/g)[0]];
-			if(!column){
-				throw new Error(`Unable to get column on orderBy '${property}'. If jsonb query, only #>, #>>, -> and ->> allowed. Only use ' ' to seperate between query and direction. Does currently not support casting.`);
-			}
-			return column;
-		}
-		function getJsonQuery(property, column) {
-			let containsJson = (/(-|#)>+/g).test(property);
-			if(!containsJson){
-				return '';
-			}
-			return property.replace(column, '');
-		}
-
-		return ' order by ' + dbNames.join(',');
-	}
-
-	extractOrderBy_1$1 = extractOrderBy;
-	return extractOrderBy_1$1;
-}
-
-var extractLimit_1;
-var hasRequiredExtractLimit;
-
-function requireExtractLimit () {
-	if (hasRequiredExtractLimit) return extractLimit_1;
-	hasRequiredExtractLimit = 1;
-	var getSessionContext = requireGetSessionContext();
-
-	function extractLimit(context, span) {
-		let limit = getSessionContext(context).limit;
-		if (limit)
-			return limit(span);
-		else
-			return '';
-	}
-
-	extractLimit_1 = extractLimit;
-	return extractLimit_1;
-}
-
-var extractOffset_1;
-var hasRequiredExtractOffset;
-
-function requireExtractOffset () {
-	if (hasRequiredExtractOffset) return extractOffset_1;
-	hasRequiredExtractOffset = 1;
-	var getSessionContext = requireGetSessionContext();
-
-	function extractOffset(context, span) {
-		let {limitAndOffset} = getSessionContext(context);
-		if (limitAndOffset)
-			return limitAndOffset(span);
-		else
-			return '';
-	}
-
-	extractOffset_1 = extractOffset;
-	return extractOffset_1;
-}
-
-var newQuery_1$2;
-var hasRequiredNewQuery$2;
-
-function requireNewQuery$2 () {
-	if (hasRequiredNewQuery$2) return newQuery_1$2;
-	hasRequiredNewQuery$2 = 1;
-	var newSingleQuery = requireNewSingleQuery$1();
+function requireNewQuery$1 () {
+	if (hasRequiredNewQuery$1) return newQuery_1$1;
+	hasRequiredNewQuery$1 = 1;
+	var newSingleQuery = requireNewSingleQuery();
 	var extractFilter = requireExtractFilter();
 	var extractOrderBy = requireExtractOrderBy$1();
 	var extractLimit = requireExtractLimit();
@@ -7459,8 +9415,8 @@ function requireNewQuery$2 () {
 		return queries;
 	}
 
-	newQuery_1$2 = newQuery;
-	return newQuery_1$2;
+	newQuery_1$1 = newQuery;
+	return newQuery_1$1;
 }
 
 var negotiateQueryContext_1;
@@ -8856,64 +10812,6 @@ function requireToDto () {
 	return toDto_1;
 }
 
-var purifyStrategy_1;
-var hasRequiredPurifyStrategy;
-
-function requirePurifyStrategy () {
-	if (hasRequiredPurifyStrategy) return purifyStrategy_1;
-	hasRequiredPurifyStrategy = 1;
-	function purifyStrategy(table, strategy, columns = new Map()) {
-		strategy = { ...strategy };
-		for (let p in strategy) {
-			if (strategy[p] === null)
-				strategy[p] = true;
-		}
-
-		let hasIncludedColumns;
-		for (let name in strategy) {
-			if (table._relations[name] && !strategy[name])
-				continue;
-			else if (table._relations[name])
-				strategy[name] = addLeg(table._relations[name], strategy[name], columns);
-			else if (table[name] && table[name].eq ) {
-				if (!columns.has(table[name]))
-					columns.set(table[name], strategy[name]);
-				hasIncludedColumns = hasIncludedColumns || strategy[name];
-			}
-		}
-		for (let i = 0; i < table._columns.length; i++) {
-			let column = table._columns[i];
-			strategy[column.alias] = !hasIncludedColumns;
-		}
-
-		table._primaryColumns.forEach(column => {
-			strategy[column.alias] = true;
-		});
-		columns.forEach((value, key) => strategy[key.alias] = value);
-
-		return strategy;
-
-	}
-
-	function addLeg(relation, strategy, columns) {
-		let nextColumns = new Map();
-		if (!relation.joinRelation)
-			for (let i = 0; i < relation.columns.length; i++) {
-				columns.set(relation.columns[i], true);
-			}
-		else {
-			relation.joinRelation.columns.forEach(column => {
-				nextColumns.set(column, true);
-			});
-		}
-		let childTable = relation.childTable;
-		return purifyStrategy(childTable, strategy, nextColumns);
-	}
-
-	purifyStrategy_1 = purifyStrategy;
-	return purifyStrategy_1;
-}
-
 var newDecodeDbRow_1;
 var hasRequiredNewDecodeDbRow;
 
@@ -9531,71 +11429,13 @@ function requireResultToRows () {
 	return resultToRows_1;
 }
 
-var strategyToSpan;
-var hasRequiredStrategyToSpan;
-
-function requireStrategyToSpan () {
-	if (hasRequiredStrategyToSpan) return strategyToSpan;
-	hasRequiredStrategyToSpan = 1;
-	var newCollection = requireNewCollection();
-	var newQueryContext = requireNewQueryContext();
-	var purifyStrategy = requirePurifyStrategy();
-
-	function toSpan(table, strategy) {
-		var span = {};
-		span.aggregates = {};
-		span.legs = newCollection();
-		span.table = table;
-		strategy = purifyStrategy(table, strategy);
-		applyStrategy(table,span,strategy);
-		span.queryContext = newQueryContext();
-		span.queryContext.strategy = strategy;
-		return span;
-
-		function applyStrategy(table,span,strategy) {
-			let columns = new Map();
-			var legs = span.legs;
-			if(!strategy)
-				return;
-			for (var name in strategy) {
-				if (table._relations[name] && !strategy[name])
-					continue;
-				if (table._relations[name])
-					addLeg(legs,table,strategy,name);
-				else if (strategy[name]?.expression && (strategy[name]?.joins || strategy[name]?.join || strategy[name]?.column))
-					span.aggregates[name] = strategy[name];
-				else if (table[name] && table[name].eq)
-					columns.set(table[name], strategy[name]);
-				else
-					span[name] = strategy[name];
-			}
-			span.columns = columns;
-		}
-
-		function addLeg(legs,table,strategy,name) {
-			var relation = table._relations[name];
-			var leg = relation.toLeg();
-			leg.span.queryContext.strategy = strategy;
-			leg.span.where = strategy[name].where;
-			leg.span.aggregates = {};
-			legs.add(leg);
-			var subStrategy = strategy[name];
-			var childTable = relation.childTable;
-			applyStrategy(childTable,leg.span,subStrategy);
-		}
-	}
-
-	strategyToSpan = toSpan;
-	return strategyToSpan;
-}
-
 var getMany_1;
 var hasRequiredGetMany;
 
 function requireGetMany () {
 	if (hasRequiredGetMany) return getMany_1;
 	hasRequiredGetMany = 1;
-	let newQuery = requireNewQuery$2();
+	let newQuery = requireNewQuery$1();
 	let executeQueries = requireExecuteQueries();
 	let resultToRows = requireResultToRows();
 	let strategyToSpan = requireStrategyToSpan();
@@ -11875,450 +13715,6 @@ function requireCount () {
 	return count_1;
 }
 
-var newSingleQuery;
-var hasRequiredNewSingleQuery;
-
-function requireNewSingleQuery () {
-	if (hasRequiredNewSingleQuery) return newSingleQuery;
-	hasRequiredNewSingleQuery = 1;
-	var newColumnSql = requireNewColumnSql();
-	var newWhereSql = requireNewWhereSql();
-	var newJoinSql = requireNewJoinSql();
-	var newParameterized = requireNewParameterized();
-	var getSessionSingleton = requireGetSessionSingleton();
-	var lockSql = requireLockSql();
-
-	function _new(context,table,filter,span, alias,orderBy,limit,offset,distinct = false) {
-		var quote = getSessionSingleton(context, 'quote');
-		var name = quote(table._dbName);
-		var quotedAlias = quote(alias);
-		var columnSql = newColumnSql(context,table,span,alias,true);
-		var joinSql = newJoinSql(context, span, alias);
-		var whereSql = newWhereSql(context,table,filter,alias);
-		if (limit)
-			limit = limit + ' ';
-		const selectClause = distinct ? 'select distinct ' : 'select ';
-		const lockClause = lockSql.selectLockSql(context, span, alias);
-		const tableHint = lockSql.tableHintSql(context, span);
-
-		return newParameterized(selectClause + limit + columnSql + ' from ' + name + ' ' + quotedAlias + tableHint).append(joinSql).append(whereSql).append(orderBy + offset + lockClause);
-
-	}
-
-	newSingleQuery = _new;
-	return newSingleQuery;
-}
-
-var newQuery_1$1;
-var hasRequiredNewQuery$1;
-
-function requireNewQuery$1 () {
-	if (hasRequiredNewQuery$1) return newQuery_1$1;
-	hasRequiredNewQuery$1 = 1;
-	var newSingleQuery = requireNewSingleQuery();
-	var extractFilter = requireExtractFilter();
-	var extractOrderBy = requireExtractOrderBy$1();
-	var extractLimit = requireExtractLimit();
-	var newParameterized = requireNewParameterized();
-	var extractOffset = requireExtractOffset();
-
-	function newQuery(context,table,filter,span,alias) {
-		filter = extractFilter(filter);
-		var orderBy = extractOrderBy(context,table,alias,span.orderBy);
-		var limit = extractLimit(context, span);
-		var offset = extractOffset(context, span);
-
-		var query = newSingleQuery(context,table,filter,span,alias,orderBy,limit,offset);
-		return newParameterized(query.sql(), query.parameters);
-	}
-
-	newQuery_1$1 = newQuery;
-	return newQuery_1$1;
-}
-
-var getManyDto_1$1;
-var hasRequiredGetManyDto$1;
-
-function requireGetManyDto$1 () {
-	if (hasRequiredGetManyDto$1) return getManyDto_1$1;
-	hasRequiredGetManyDto$1 = 1;
-	const emptyFilter = requireEmptyFilter();
-	const newQuery = requireNewQuery$1();
-	const negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
-	const strategyToSpan = requireStrategyToSpan();
-	const executeQueries = requireExecuteQueries();
-	const getSessionSingleton = requireGetSessionSingleton();
-
-	async function getManyDto(context, table, filter, strategy, spanFromParent, updateParent) {
-		filter = negotiateRawSqlFilter(context, filter, table);
-		if (strategy && strategy.where) {
-			let arg = typeof strategy.where === 'function' ? strategy.where(context, table) : strategy.where;
-			filter = filter.and(context, arg);
-		}
-
-		let span = spanFromParent || strategyToSpan(table, strategy);
-		let alias = table._dbName;
-
-		const query = newQuery(context, table, filter, span, alias);
-		const res = await executeQueries(context, [query]);
-		return decode(context, strategy, span, await res[0], undefined, updateParent);
-	}
-
-	function newCreateRow(span) {
-		let columnsMap = span.columns;
-		const columns = span.table._columns.filter(column => !columnsMap || columnsMap.get(column));
-		const protoRow = createProto(columns, span);
-		const manyNames = [];
-
-		const c = {};
-		c.visitJoin = () => { };
-		c.visitOne = () => { };
-		c.visitMany = function(leg) {
-			manyNames.push(leg.name);
-		};
-
-		span.legs.forEach(onEachLeg);
-		return createRow;
-
-		function onEachLeg(leg) {
-			leg.accept(c);
-		}
-
-		function createRow() {
-			const obj = Object.create(protoRow);
-			for (let i = 0; i < manyNames.length; i++) {
-				obj[manyNames[i]] = [];
-			}
-			return obj;
-		}
-	}
-
-	function createProto(columns, span) {
-		let obj = {};
-		for (let i = 0; i < columns.length; i++) {
-			obj[columns[i].alias] = null;
-		}
-		for (let key in span.aggregates) {
-			obj[key] = null;
-		}
-		const c = {};
-
-		c.visitJoin = function(leg) {
-			obj[leg.name] = null;
-		};
-		c.visitOne = c.visitJoin;
-		c.visitMany = function(leg) {
-			obj[leg.name] = null;
-		};
-
-		span.legs.forEach(onEachLeg);
-
-		function onEachLeg(leg) {
-			leg.accept(c);
-		}
-
-		return obj;
-	}
-
-	function hasManyRelations(span) {
-		let result;
-		const c = {};
-		c.visitJoin = () => { };
-		c.visitOne = c.visitJoin;
-		c.visitMany = function() {
-			result = true;
-		};
-
-		span.legs.forEach(onEachLeg);
-		return result;
-
-		function onEachLeg(leg) {
-			leg.accept(c);
-		}
-	}
-
-	async function decode(context, strategy, span, rows, keys = rows.length > 0 ? Object.keys(rows[0]) : [], updateParent) {
-		const table = span.table;
-		let columnsMap = span.columns;
-		const columns = table._columns.filter(column => !columnsMap || columnsMap.get(column));
-		const rowsLength = rows.length;
-		const columnsLength = columns.length;
-		const primaryColumns = table._primaryColumns;
-		const primaryColumnsLength = primaryColumns.length;
-		const rowsMap = new Map();
-		const fkIds = new Array(rows.length);
-		const getIds = createGetIds();
-		const aggregateKeys = Object.keys(span.aggregates);
-
-		const outRows = new Array(rowsLength);
-		const createRow = newCreateRow(span);
-		const shouldCreateMap = hasManyRelations(span);
-		for (let i = 0; i < rowsLength; i++) {
-			const row = rows[i];
-			let outRow = createRow();
-			let pkWithNullCount = 0;
-			for (let j = 0; j < columnsLength; j++) {
-				if (j < primaryColumnsLength) {
-					if (row[keys[j]] === null)
-						pkWithNullCount++;
-					if (pkWithNullCount === primaryColumnsLength) {
-						outRow = null;
-						break;
-					}
-				}
-				const column = columns[j];
-				outRow[column.alias] = column.decode(context, row[keys[j]]);
-			}
-
-			if (outRow) {
-				for (let j = 0; j < aggregateKeys.length; j++) {
-					const key = aggregateKeys[j];
-					const parse = span.aggregates[key].column?.decode || ((context, arg) => Number.parseFloat(arg));
-					outRow[key] = parse(context, row[keys[j + columnsLength]]);
-				}
-			}
-
-			outRows[i] = outRow;
-			if (updateParent)
-				updateParent(outRow, i);
-			if (shouldCreateMap && outRow) {
-				fkIds[i] = getIds(outRow);
-				addToMap(rowsMap, fkIds[i], outRow);
-			}
-		}
-		span._rowsMap = rowsMap;
-		span._ids = fkIds;
-
-		keys.splice(0, columnsLength + aggregateKeys.length);
-		if (span.legs.toArray().length === 0)
-			return outRows;
-
-		const all = [];
-
-		if (shouldCreateMap) {
-			all.push(decodeManyRelations(context, strategy, span));
-			all.push(decodeRelations2(context, strategy, span, rows, outRows, keys));
-		}
-		else
-			all.push(decodeRelations2(context, strategy, span, rows, outRows, keys));
-
-		await Promise.all(all);
-
-		return outRows;
-
-
-		function createGetIds() {
-			const primaryColumns = table._primaryColumns;
-			const length = primaryColumns.length;
-			if (length === 1) {
-				const alias = table._primaryColumns[0].alias;
-				return (row) => row[alias];
-			}
-			else
-				return (row) => {
-					const result = new Array(length);
-					for (let i = 0; i < length; i++) {
-						result[i] = row[primaryColumns[i].alias];
-					}
-					return result;
-				};
-		}
-
-	}
-
-	async function decodeManyRelations(context, strategy, span) {
-		const maxParameters = getSessionSingleton(context, 'maxParameters');
-
-		const promises = [];
-		const c = {};
-		c.visitJoin = () => { };
-		c.visitOne = c.visitJoin;
-
-		// Helper function to split an array into chunks
-		function chunk(array, size) {
-			const results = [];
-			for (let i = 0; i < array.length; i += size) {
-				results.push(array.slice(i, i + size));
-			}
-			return results;
-		}
-
-		c.visitMany = function(leg) {
-			const name = leg.name;
-			const table = span.table;
-			const relation = table._relations[name];
-			const parametersPerRow = relation.joinRelation.columns.length;
-			const maxRows = maxParameters
-				? Math.max(1, Math.floor((maxParameters - 1) / parametersPerRow))
-				: undefined;
-			const rowsMap = span._rowsMap;
-
-			const extractKey = createExtractKey(leg);
-			const extractFromMap = createExtractFromMap(rowsMap, table._primaryColumns);
-
-			if (span._ids.length === 0) {
-				return;
-			}
-
-			// If maxRows is defined, chunk the IDs before calling getManyDto
-			if (maxRows) {
-				const chunkedIds = chunk(span._ids, maxRows);
-				for (const idsChunk of chunkedIds) {
-					const filter = createOneFilter(context, relation, idsChunk);
-					const p = getManyDto(
-						context,
-						relation.childTable,
-						filter,
-						strategy[name],
-						leg.span,
-						updateParent
-					);
-					promises.push(p);
-				}
-			} else {
-				// Otherwise, do the entire set in one go
-				const filter = createOneFilter(context, relation, span._ids);
-				const p = getManyDto(
-					context,
-					relation.childTable,
-					filter,
-					strategy[name],
-					leg.span,
-					updateParent
-				);
-				promises.push(p);
-			}
-
-			function updateParent(subRow) {
-				const key = extractKey(subRow);
-				const parentRows = extractFromMap(key) || [];
-				parentRows.forEach(parentRow => {
-					parentRow[name].push(subRow);
-				});
-			}
-		};
-
-		function createExtractKey(leg) {
-			if (leg.columns.length === 1) {
-				const alias = leg.columns[0].alias;
-				return (row) => row[alias];
-			} else {
-				const aliases = leg.columns.map(column => column.alias);
-				return (row) => aliases.map(alias => row[alias]);
-			}
-		}
-
-		function createExtractFromMap(map, primaryColumns) {
-			if (primaryColumns.length === 1) {
-				return (key) => map.get(key);
-			} else {
-				return getFromMap.bind(null, map, primaryColumns);
-			}
-		}
-
-		// Visit all legs
-		span.legs.forEach(onEachLeg);
-
-		function onEachLeg(leg) {
-			leg.accept(c);
-		}
-
-		// Wait until all promises resolve
-		await Promise.all(promises);
-	}
-
-	async function decodeRelations2(context, strategy, span, rawRows, resultRows, keys) {
-		const c = {};
-		c.visitJoin = function(leg) {
-			const name = leg.name;
-			return decode(context, strategy[name], leg.span, rawRows, keys, updateParent);
-
-			function updateParent(subRow, i) {
-				if (resultRows[i])
-					resultRows[i][name] = subRow;
-			}
-		};
-
-		c.visitOne = c.visitJoin;
-		c.visitMany = () => { };
-
-		async function processLegsSequentially(legs) {
-			for (const leg of legs.toArray()) {
-				await leg.accept(c);
-			}
-		}
-
-		await processLegsSequentially(span.legs);
-	}
-
-	function createOneFilter(context, relation, ids) {
-		const columns = relation.joinRelation.columns;
-
-		if (columns.length === 1)
-			return columns[0].in(context, ids);
-
-		else
-			return createCompositeFilter();
-
-		function createCompositeFilter() {
-			let filter = emptyFilter;
-			for (let id of ids) {
-				let nextFilter;
-				for (let i = 0; i < columns.length; i++) {
-					if (nextFilter)
-						nextFilter = nextFilter.and(context, columns[i].eq(context, id[i]));
-					else
-						nextFilter = columns[i].eq(context, id[i]);
-				}
-				filter = filter.or(context, nextFilter);
-			}
-			return filter;
-		}
-	}
-
-	function addToMap(map, values, row) {
-		if (Array.isArray(values)) {
-			let m = map;
-			const lastIndex = values.length - 1;
-			for (let i = 0; i < lastIndex; i++) {
-				const id = values[i];
-				if (!m.has(id)) {
-					m.set(id, new Map());
-				}
-				m = m.get(id);
-			}
-			const leafKey = values[lastIndex];
-			if (!m.has(leafKey)) {
-				m.set(leafKey, [row]);
-			} else {
-				m.get(leafKey).push(row);
-			}
-		}
-		else {
-			if (!map.has(values)) {
-				map.set(values, [row]);
-			} else {
-				map.get(values).push(row);
-			}
-		}
-	}
-
-	function getFromMap(map, primaryColumns, values) {
-		if (Array.isArray(values)) {
-			const length = primaryColumns.length;
-			for (let i = 0; i < length; i++) {
-				map = map.get(values[i]);
-			}
-			return map;
-		}
-		else
-			return map.get(values);
-	}
-
-	getManyDto_1$1 = getManyDto;
-	return getManyDto_1$1;
-}
-
 var getManyDto_1;
 var hasRequiredGetManyDto;
 
@@ -12999,16 +14395,19 @@ function requireValidateDeleteAllowed () {
 		return {...parent,  ...(defaults[property] || {})};
 	}
 
-	function hasReadonlyTrue(options) {
+	function hasReadonlyTrue(options, visited = new WeakSet()) {
 		if (!options || options !== Object(options))
 			return false;
+		if (visited.has(options))
+			return false;
+		visited.add(options);
 		if (options.readonly === true)
 			return true;
 		for (let p in options) {
 			const value = options[p];
 			if (!value || value !== Object(value))
 				continue;
-			if (hasReadonlyTrue(value))
+			if (hasReadonlyTrue(value, visited))
 				return true;
 		}
 		return false;
@@ -13059,10 +14458,11 @@ function requirePatchTable () {
 		return result;
 	}
 
-	async function patchTableCore(context, table, patches, { strategy = undefined, deduceStrategy = false, ...options } = {}, dryrun) {
+	async function patchTableCore(context, table, patches, { strategy = undefined, deduceStrategy = false, adHocPlan, ...options } = {}, dryrun) {
 		const engine = getSessionSingleton(context, 'engine');
 		options = cleanOptions(options);
-		strategy = JSON.parse(JSON.stringify(strategy || {}));
+		const responseStrategy = JSON.parse(JSON.stringify(strategy || {}));
+		strategy = adHocPlan?.strategy || responseStrategy;
 		await lockTouchedRows();
 		let changed = new Set();
 		for (let i = 0; i < patches.length; i++) {
@@ -13085,13 +14485,13 @@ function requirePatchTable () {
 			return {
 				changed: [], strategy: stripLockingStrategy(strategy)
 			};
-		return { changed: await toDtos(changed), strategy: stripLockingStrategy(strategy) };
+		return { changed: await toDtos(changed), strategy: stripLockingStrategy(responseStrategy) };
 
 
 		async function toDtos(set) {
 			set = [...set];
-			const result = await table.getManyDto(context, set, stripLockingStrategy(strategy));
-			return result;
+			const rows = await table.getManyDto(context, set, stripLockingStrategy(strategy));
+			return adHocPlan ? adHocPlan.materialize(rows) : rows;
 		}
 
 		function stripLockingStrategy(strategy) {
@@ -13509,7 +14909,7 @@ function requirePatchTable () {
 		}
 
 		function cleanOptions(options) {
-			const { table, transaction, db, client, ..._options } = options;
+			const { table, tables, tableConfigs, transaction, db, client, ..._options } = options;
 			return _options;
 		}
 	}
@@ -13587,7 +14987,7 @@ var hasRequiredNewQuery;
 function requireNewQuery () {
 	if (hasRequiredNewQuery) return newQuery_1;
 	hasRequiredNewQuery = 1;
-	var newSingleQuery = requireNewSingleQuery();
+	var newSingleQuery = requireNewSingleQuery$1();
 	var extractFilter = requireExtractFilter();
 	var extractLimit = requireExtractLimit();
 	var newParameterized = requireNewParameterized();

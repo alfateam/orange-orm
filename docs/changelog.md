@@ -1,4 +1,7 @@
 ## Changelog
+__5.5.0__
+Add read-only ad-hoc `many()` and `one()` relations, allowing custom queries across relationships directly from fetch strategies.  
+Fix mapped `hasMany` fetch strategies so nested `limit` and `offset` work independently for each parent.  
 __5.4.2__  
 Support for limit and orderBy in `aggregate` and `distinct`  
 __5.4.1__  

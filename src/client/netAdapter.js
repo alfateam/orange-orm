@@ -178,7 +178,13 @@ function netAdapter(url, tableName, { http, tableOptions }) {
 			return httpAdapter(db, `?table=${tableName}`, http);
 		}
 		else if (db && db.transaction) {
-			return db.hostLocal({ ...tableOptions, db, table: url });
+			return db.hostLocal({
+				...tableOptions,
+				db,
+				table: url,
+				tables: tableOptions.tables,
+				tableConfigs: tableOptions.tableConfigs
+			});
 		}
 		else
 			throw new Error('Invalid arguments');

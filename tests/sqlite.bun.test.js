@@ -145,7 +145,7 @@ describe('wal mode', () => {
 		await db.query('INSERT INTO other.orderNote (id, orderId, note) VALUES (1, 2, \'WAL\')');
 
 		const rows = await db.orderNote.getAll({
-			where: (note) => note.note.eq('WAL'),
+			where: note => note.note.eq('WAL'),
 			order: true
 		});
 		for (let i = 0; i < rows.length; i++) {
@@ -230,4 +230,19 @@ describe('sqlite function in transaction', () => {
 			expect(rows).toEqual(expected);
 		});
 	}
+});
+
+describe('ad-hoc relations', () => {
+	test('resolves root scope through the Bun SQLite adapter', async () => {
+		const { db } = getDb('sqlite');
+		const rows = await db.order.getMany({
+			orderBy: 'id',
+			latestLine: (_, { db, root }) => db.orderLine.one({
+				where: line => line.orderId.eq(root.id),
+				orderBy: 'id desc'
+			})
+		});
+
+		expect(rows.map(row => row.latestLine?.id)).toEqual([2, 3]);
+	});
 });
