@@ -5,13 +5,15 @@ var extractLimit = require('../table/query/extractLimit');
 var newParameterized = require('../table/query/newParameterized');
 var extractOffset = require('../table/query/extractOffset');
 
-function newQuery(context,table,filter,span,alias) {
+function newQuery(context,table,filter,span,alias,options = {}) {
 	filter = extractFilter(filter);
-	var orderBy = extractOrderBy(context,table,alias,span.orderBy);
+	var orderBy = Object.prototype.hasOwnProperty.call(options, 'orderBy')
+		? options.orderBy
+		: extractOrderBy(context,table,alias,span.orderBy);
 	var limit = extractLimit(context, span);
 	var offset = extractOffset(context, span);
 
-	var query = newSingleQuery(context,table,filter,span,alias,orderBy,limit,offset);
+	var query = newSingleQuery(context,table,filter,span,alias,orderBy,limit,offset,false,options);
 	return newParameterized(query.sql(), query.parameters);
 }
 

@@ -17,12 +17,13 @@ async function patchTable() {
 	return result;
 }
 
-async function patchTableCore(context, table, patches, { strategy = undefined, deduceStrategy = false, ...options } = {}, dryrun) {
+async function patchTableCore(context, table, patches, { strategy = undefined, deduceStrategy = false, adHocPlan, ...options } = {}, dryrun) {
 	const engine = getSessionSingleton(context, 'engine');
 	const materializeSyncPrimaryKeys = !!getSessionSingleton(context, 'syncOutboxCapture');
 	const generatedPrimaryKeyMappings = [];
 	options = cleanOptions(options);
-	strategy = JSON.parse(JSON.stringify(strategy || {}));
+	const responseStrategy = JSON.parse(JSON.stringify(strategy || {}));
+	strategy = adHocPlan?.strategy || responseStrategy;
 	await lockTouchedRows();
 	const requiresGeneratedPrimaryKeys = materializeSyncPrimaryKeys
 		&& patches.some(patch => isRootAdd(patch) && hasMissingPrimaryKey(table, patch.value));
@@ -50,13 +51,13 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 		return {
 			changed: [], strategy: stripLockingStrategy(strategy)
 		};
-	return { changed: await toDtos(changed), strategy: stripLockingStrategy(strategy) };
+	return { changed: await toDtos(changed), strategy: stripLockingStrategy(responseStrategy) };
 
 
 	async function toDtos(set) {
 		set = [...set];
-		const result = await table.getManyDto(context, set, stripLockingStrategy(strategy));
-		return result;
+		const rows = await table.getManyDto(context, set, stripLockingStrategy(strategy));
+		return adHocPlan ? adHocPlan.materialize(rows) : rows;
 	}
 
 	function stripLockingStrategy(strategy) {
@@ -480,7 +481,7 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 	}
 
 	function cleanOptions(options) {
-		const { table, transaction, db, client, ..._options } = options;
+		const { table, tables, tableConfigs, transaction, db, client, ..._options } = options;
 		return _options;
 	}
 

@@ -1,6 +1,7 @@
 var newCollection = require('../newCollection');
 var newQueryContext = require('./query/singleQuery/newQueryContext');
 var purifyStrategy = require('./purifyStrategy');
+var validatePagination = require('./query/validatePagination');
 
 function toSpan(table, strategy) {
 	var span = {};
@@ -18,6 +19,7 @@ function toSpan(table, strategy) {
 		var legs = span.legs;
 		if(!strategy)
 			return;
+		validatePagination(strategy);
 		for (var name in strategy) {
 			if (table._relations[name] && !strategy[name])
 				continue;

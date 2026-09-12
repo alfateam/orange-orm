@@ -20,6 +20,9 @@ const {
 	serializeSyncPayload,
 	setSyncTransactionContext
 } = require('../sync/operationContext');
+const { isAdHocRelation, newAdHocRelation, ownerScopeMarker } = require('../adHocRelation');
+const adHocFactoryMarker = '__rdbAdHocFactory';
+const columnScopeMarker = '__rdbColumnScope';
 
 function rdbClient(options = {}) {
 	flags.useLazyDefaults = false;
@@ -131,7 +134,8 @@ function rdbClient(options = {}) {
 		}
 
 	};
-	return new Proxy(client, handler);
+	const clientProxy = new Proxy(client, handler);
+	return clientProxy;
 	// }
 
 	function getMetaData() {
@@ -364,6 +368,8 @@ function rdbClient(options = {}) {
 	function table(url, tableName, tableOptions) {
 		tableOptions = tableOptions || {};
 		tableOptions = { db: baseUrl, ...tableOptions, transaction, syncTableName: tableName };
+		Object.defineProperty(tableOptions, 'tables', { value: options.tables, enumerable: false });
+		Object.defineProperty(tableOptions, 'tableConfigs', { value: options, enumerable: false });
 		let meta;
 		let c = {
 			count,
@@ -386,6 +392,8 @@ function rdbClient(options = {}) {
 			rowsType,
 			tsType,
 			expand,
+			many: adHoc.bind(null, 'many'),
+			one: adHoc.bind(null, 'one'),
 		};
 
 
@@ -417,6 +425,37 @@ function rdbClient(options = {}) {
 			return undefined;
 		}
 
+		function adHoc(kind, strategy = {}) {
+			return newAdHocRelation(kind, tableName, serializeAdHocStrategy(strategy));
+		}
+
+		function serializeAdHocStrategy(_strategy, path = '') {
+			if (!_strategy || typeof _strategy !== 'object' || Array.isArray(_strategy))
+				return _strategy;
+			if (isAdHocRelation(_strategy)) {
+				if (!_strategy[adHocFactoryMarker])
+					throw new Error('Ad-hoc relations must be returned by a fetch strategy function');
+				return _strategy;
+			}
+
+			const strategy = { ..._strategy };
+			for (let name in strategy) {
+				if (isAdHocRelation(strategy[name])) {
+					if (!strategy[name][adHocFactoryMarker])
+						throw new Error('Ad-hoc relations must be returned by a fetch strategy function');
+					continue;
+				}
+				if (name === 'where' && typeof strategy[name] === 'function') {
+					strategy[name] = column(path + 'where')(strategy[name]);
+				}
+				else if (typeof strategy[name] === 'function')
+					strategy[name] = aggregate(path, strategy[name], adHocStrategyContext());
+				else
+					strategy[name] = serializeAdHocStrategy(strategy[name], path + name + '.');
+			}
+			return strategy;
+		}
+
 		async function getAll() {
 			let _getMany = getMany.bind(null, undefined);
 			return _getMany.apply(null, arguments);
@@ -433,6 +472,7 @@ function rdbClient(options = {}) {
 				}
 			}
 			strategy = extractFetchingStrategy({}, strategy);
+			strategy = negotiateWhereSingle(strategy);
 			let args = [_, strategy].concat(Array.prototype.slice.call(arguments).slice(2));
 			let rows = await getManyCore.apply(null, args);
 			await metaPromise;
@@ -485,7 +525,7 @@ function rdbClient(options = {}) {
 				return true;
 			for (let key in value) {
 				const v = value[key];
-				if (typeof v === 'boolean')
+				if (typeof v === 'boolean' || typeof v === 'function')
 					return true;
 				if (v && typeof v === 'object' && !Array.isArray(v))
 					return true;
@@ -509,6 +549,8 @@ function rdbClient(options = {}) {
 				if (!keyNames.includes(key))
 					return false;
 				const val = value[key];
+				if (typeof val === 'function')
+					return false;
 				if (val && typeof val === 'object' && !(val instanceof Date))
 					return false;
 			}
@@ -529,6 +571,7 @@ function rdbClient(options = {}) {
 			let normalized = normalizeGetOneArgs(meta, filter, strategy);
 			filter = normalized.filter;
 			strategy = extractFetchingStrategy({}, normalized.strategy);
+			strategy = negotiateWhereSingle(strategy);
 			let _strategy = { ...strategy, ...{ limit: 1 } };
 			let args = [filter, _strategy].concat(Array.prototype.slice.call(arguments).slice(2));
 			let rows = await getManyCore.apply(null, args);
@@ -553,7 +596,7 @@ function rdbClient(options = {}) {
 
 		async function getManyCore() {
 			await ensureLocalSchemaReady();
-			let args = negotiateWhere.apply(null, arguments);
+			let args = Array.prototype.slice.call(arguments);
 			let body = stringify({
 				path: 'getManyDto',
 				args
@@ -562,19 +605,14 @@ function rdbClient(options = {}) {
 			return adapter.post(body);
 		}
 
-		function negotiateWhere(_, strategy, ...rest) {
-			const args = Array.prototype.slice.call(arguments);
-			if (strategy)
-				return [_, negotiateWhereSingle(strategy), ...rest];
-			else
-				return args;
-
-
-		}
-
 		function negotiateWhereSingle(_strategy, path = '') {
 			if (typeof _strategy !== 'object' || _strategy === null)
 				return _strategy;
+			if (isAdHocRelation(_strategy)) {
+				if (!_strategy[adHocFactoryMarker])
+					throw new Error('Ad-hoc relations must be returned by a fetch strategy function');
+				return _strategy;
+			}
 
 			if (Array.isArray(_strategy)) {
 				return _strategy.map(item => negotiateWhereSingle(item, path));
@@ -585,12 +623,19 @@ function rdbClient(options = {}) {
 				if (name === 'where' && typeof strategy[name] === 'function')
 					strategy.where = column(path + 'where')(strategy.where); // Assuming `column` is defined elsewhere.
 				else if (typeof strategy[name] === 'function') {
-					strategy[name] = aggregate(path, strategy[name]);
+					strategy[name] = aggregate(path, strategy[name], adHocStrategyContext());
 				}
 				else
 					strategy[name] = negotiateWhereSingle(_strategy[name], path + name + '.');
 			}
 			return strategy;
+		}
+
+		function adHocStrategyContext() {
+			return {
+				db: clientProxy,
+				root: tableProxy('$root.')
+			};
 		}
 
 
@@ -879,6 +924,7 @@ function rdbClient(options = {}) {
 				return;
 			strategy = extractStrategy({ strategy }, array);
 			strategy = extractFetchingStrategy(array, strategy);
+			strategy = negotiateWhereSingle(strategy);
 
 			let meta = await getMeta();
 			const patch = createPatch(json, array, meta);
@@ -897,7 +943,11 @@ function rdbClient(options = {}) {
 			let insertedPositions = getInsertedRowsPosition(array);
 			let { changed, strategy: newStrategy } = await p;
 			copyIntoArray(changed, array, [...insertedPositions, ...updatedPositions]);
-			rootMap.set(array, { json: cloneFromDb(array), strategy: toStoredFetchStrategy(newStrategy), originalArray: [...array] });
+			rootMap.set(array, {
+				json: cloneFromDb(array),
+				strategy: toStoredFetchStrategy(newStrategy),
+				originalArray: [...array]
+			});
 		}
 
 		async function patch(patch, concurrencyOptions, strategy) {
@@ -905,7 +955,7 @@ function rdbClient(options = {}) {
 			if (patch.length === 0)
 				return;
 			await ensureLocalSchemaReady();
-			let body = stringify({ patch, options: { strategy, ...tableOptions, ...concurrencyOptions, deduceStrategy } });
+			let body = stringify({ patch, options: { strategy: stripAdHocStrategy(strategy), ...tableOptions, ...concurrencyOptions, deduceStrategy } });
 			let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 			await adapter.patch(body);
 			return;
@@ -1010,6 +1060,11 @@ function rdbClient(options = {}) {
 		function toStoredFetchStrategy(strategy) {
 			if (strategy === undefined || strategy === null || typeof strategy !== 'object')
 				return strategy;
+			if (isAdHocRelation(strategy))
+				return {
+					...strategy,
+					strategy: cloneAdHocStrategy(strategy.strategy)
+				};
 			if (Array.isArray(strategy))
 				return strategy.map(toStoredFetchStrategy);
 			const cleanStrategy = { ...strategy };
@@ -1021,6 +1076,48 @@ function rdbClient(options = {}) {
 					cleanStrategy[name] = toStoredFetchStrategy(cleanStrategy[name]);
 			}
 			return cleanStrategy;
+		}
+
+		function cloneAdHocStrategy(strategy) {
+			if (strategy === undefined || strategy === null || typeof strategy !== 'object')
+				return strategy;
+			const clean = clone(strategy);
+			stripLocking(clean);
+			return clean;
+
+			function stripLocking(value) {
+				if (!value || typeof value !== 'object')
+					return;
+				if (!Array.isArray(value)) {
+					if (!isPlainObject(value))
+						return;
+					delete value.forUpdate;
+					delete value.skipLocked;
+				}
+				for (let name in value)
+					stripLocking(value[name]);
+			}
+		}
+
+		function stripAdHocStrategy(strategy) {
+			if (!strategy || typeof strategy !== 'object')
+				return strategy;
+			if (Array.isArray(strategy))
+				return strategy.map(stripAdHocStrategy);
+			if (!isPlainObject(strategy))
+				return strategy;
+			const clean = {};
+			for (let name in strategy) {
+				if (isAdHocRelation(strategy[name]))
+					continue;
+				clean[name] = stripAdHocStrategy(strategy[name]);
+			}
+			return clean;
+		}
+
+		function isPlainObject(value) {
+			const prototype = Object.getPrototypeOf(value);
+			return prototype === Object.prototype || prototype === null;
 		}
 
 		function clearChangesArray(array) {
@@ -1078,6 +1175,7 @@ function rdbClient(options = {}) {
 			clearChangesArray(array);
 			strategy = extractStrategy({ strategy }, array);
 			strategy = extractFetchingStrategy(array, strategy);
+			strategy = negotiateWhereSingle(strategy);
 			if (array.length === 0)
 				return;
 			let meta = await getMeta();
@@ -1134,6 +1232,7 @@ function rdbClient(options = {}) {
 				deduceStrategy = false;
 			strategy = extractStrategy({ strategy }, row);
 			strategy = extractFetchingStrategy(row, strategy);
+			strategy = negotiateWhereSingle(strategy);
 
 			let json = rootMap.get(row)?.json;
 			if (!json)
@@ -1150,13 +1249,17 @@ function rdbClient(options = {}) {
 			let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 			let { changed, strategy: newStrategy } = await adapter.patch(body);
 			copyInto(changed, [row]);
-			rootMap.set(row, { json: cloneFromDb(row), strategy: toStoredFetchStrategy(newStrategy) });
+			rootMap.set(row, {
+				json: cloneFromDb(row),
+				strategy: toStoredFetchStrategy(newStrategy)
+			});
 		}
 
 		async function refreshRow(row, strategy) {
 			clearChangesRow(row);
 			strategy = extractStrategy({ strategy }, row);
 			strategy = extractFetchingStrategy(row, strategy);
+			strategy = negotiateWhereSingle(strategy);
 
 			let meta = await getMeta();
 			let keyFilter = client.filter;
@@ -1202,17 +1305,20 @@ function rdbClient(options = {}) {
 	}
 }
 
-function tableProxy() {
+function tableProxy(prefix = '') {
 	let handler = {
 		get(_target, property,) {
-			return column(property);
+			return column(prefix + String(property));
 		}
 
 	};
 	return new Proxy({}, handler);
 }
 
-function aggregate(path, arg) {
+let nextAdHocScopeId = 0;
+
+function aggregate(path, arg, strategyContext) {
+	const scopeId = `s${++nextAdHocScopeId}`;
 
 	const c = {
 		sum,
@@ -1228,7 +1334,7 @@ function aggregate(path, arg) {
 				return Reflect.get(...arguments);
 			else {
 				subColumn = column(path + '_aggregate');
-				return column(property);
+				return scopedColumn(String(property), scopeId);
 			}
 		}
 
@@ -1236,10 +1342,19 @@ function aggregate(path, arg) {
 	let subColumn;
 	const proxy = new Proxy(c, handler);
 
-	const result = arg(proxy);
+	const result = arg(proxy, strategyContext);
 
-	if (subColumn)
-		return subColumn(result.self());
+	if (isAdHocRelation(result)) {
+		result[ownerScopeMarker] = scopeId;
+		result[adHocFactoryMarker] = true;
+		materializeSelectorScopes(result, true);
+		return result;
+	}
+	else if (subColumn) {
+		const selection = result.self();
+		materializeSelectorScopes(selection, false);
+		return subColumn(selection);
+	}
 	else
 		return result;
 
@@ -1315,12 +1430,24 @@ const columnPathKey = '__columnPath';
 const columnRefKey = '__columnRef';
 
 function column(path, ...previous) {
+	return newColumn(path, previous);
+}
+
+function scopedColumn(path, scopeId) {
+	return newColumn(path, [], scopeId);
+}
+
+function newColumn(path, previous, scopeId) {
 	function c() {
 		let args = [];
 		for (let i = 0; i < arguments.length; i++) {
 			if (typeof arguments[i] === 'function') {
-				if (arguments[i][isColumnProxyKey])
+				if (arguments[i][isColumnProxyKey]) {
 					args[i] = { [columnRefKey]: arguments[i][columnPathKey] };
+					const argumentScopeId = arguments[i][columnScopeMarker];
+					if (argumentScopeId)
+						args[i][columnScopeMarker] = argumentScopeId;
+				}
 				else
 					args[i] = arguments[i](tableProxy());
 			}
@@ -1329,6 +1456,8 @@ function column(path, ...previous) {
 		}
 		args = previous.concat(Array.prototype.slice.call(args));
 		let result = { path, args };
+		if (scopeId)
+			result[columnScopeMarker] = scopeId;
 		let handler = {
 			get(_target, property) {
 				if (property === 'toJSON')
@@ -1350,19 +1479,44 @@ function column(path, ...previous) {
 				return true;
 			if (property === columnPathKey)
 				return path;
+			if (property === columnScopeMarker)
+				return scopeId;
 			if (property === 'toJSON')
 				return Reflect.get(...arguments);
 			else if (property === 'then')
 				return;
 			else {
 				const nextPath = path ? path + '.' : '';
-				return column(nextPath + property);
+				return newColumn(nextPath + property, [], scopeId);
 			}
 		}
 
 	};
 	return new Proxy(c, handler);
 
+}
+
+function materializeSelectorScopes(value, scoped, seen = new Set()) {
+	if (!value || typeof value !== 'object' || seen.has(value))
+		return;
+	const prototype = Object.getPrototypeOf(value);
+	if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null)
+		return;
+	seen.add(value);
+	const scopeId = Object.prototype.hasOwnProperty.call(value, columnScopeMarker)
+		? value[columnScopeMarker]
+		: undefined;
+	if (scopeId) {
+		if (scoped) {
+			if (typeof value.path === 'string')
+				value.path = `$scope.${scopeId}.${value.path}`;
+			if (typeof value[columnRefKey] === 'string')
+				value[columnRefKey] = `$scope.${scopeId}.${value[columnRefKey]}`;
+		}
+		delete value[columnScopeMarker];
+	}
+	for (const name of Object.keys(value))
+		materializeSelectorScopes(value[name], scoped, seen);
 }
 
 function onChange(target, onChange) {

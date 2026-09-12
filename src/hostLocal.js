@@ -56,29 +56,17 @@ function hostLocal() {
 		async function fn(context) {
 			setSessionSingleton(context, 'ignoreSerializable', true);
 			let patch = body.patch;
+			const options = { ..._options, ...body.options, isHttp };
 			await prepareSyncOutboxPatchCapture(context, patch);
-			result = await table.patch(context, patch, { ..._options, ...body.options, isHttp });
+			const adHocPlan = await executePath(context, {
+				...options,
+				request: _req,
+				response: _res,
+				prepareAdHoc: true,
+				sourceStrategy: options.strategy
+			});
+			result = await table.patch(context, patch, { ...options, adHocPlan });
 			await captureSyncOutboxPatch(context, patch, body.options);
-		}
-	}
-
-	async function syncCommand(body) {
-		body = typeof body === 'string' ? JSON.parse(body) : body;
-		if (!body || body !== Object(body))
-			throw new Error('Invalid sync command payload');
-		let result;
-
-		if (transaction)
-			await transaction(fn);
-		else {
-			const resolvedDb = await resolveDb();
-			await runSyncWrite(resolvedDb, undefined, () => resolvedDb.transaction(fn));
-		}
-		return result;
-
-		async function fn(context) {
-			await captureSyncOutboxCommand(context, body.name, body.args);
-			result = undefined;
 		}
 	}
 

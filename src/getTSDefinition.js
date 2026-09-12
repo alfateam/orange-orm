@@ -22,6 +22,7 @@ function getTSDefinition(tableConfigs, {isNamespace = false, isHttp = false} = {
 	if (isNamespace)
 		src += startNamespace(tables, isHttp);
 	src += defs;
+	src += getAdHocScopeTs(tables);
 	src += getRdbClientTs(tables, isHttp);
 	if (isNamespace)
 		src += '}';
@@ -41,12 +42,14 @@ function getTSDefinition(tableConfigs, {isNamespace = false, isHttp = false} = {
 		return `
 export interface ${Name}Table {
 	count(filter?: RawFilter): Promise<number>;
+	getMany<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<${Name}AdHocArray<Strategy>>;
 	getAll(): Promise<${Name}Array>;
 	getAll(fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
 	getMany(filter?: RawFilter): Promise<${Name}Array>;
 	getMany(filter: RawFilter, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
 	getMany(${name}s: Array<${Name}>): Promise<${Name}Array>;
 	getMany(${name}s: Array<${Name}>, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+	getOne<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<${Name}AdHocRow<Strategy>>;
 	getOne(filter?: RawFilter): Promise<${Name}Row>;
 	getOne(filter?: RawFilter, fetchingStrategy?: ${Name}Strategy): Promise<${Name}Row>;
 	getOne(${name}: ${Name}): Promise<${Name}Row>;
@@ -192,7 +195,7 @@ ${Concurrency(table, Name, true)}
 
 			otherConcurrency += `${Concurrency(relation.childTable, tableTypeName)}`;
 			concurrencyRelations += `${relationName}?: ${tableTypeName}Concurrency;${separator}`;
-			strategyRelations += `${relationName}?: ${tableTypeName}Strategy | boolean;${separator}`;
+			strategyRelations += `${relationName}?: ${tableTypeName}Strategy<Root> | boolean;${separator}`;
 			regularRelations += `${relationName}?: ${tableTypeName} | null;${separator}`;
 		};
 		visitor.visitOne = visitor.visitJoin;
@@ -200,7 +203,7 @@ ${Concurrency(table, Name, true)}
 			const tableTypeName = getTableName(relation, relationName);
 			otherConcurrency += `${Concurrency(relation.childTable, tableTypeName)}`;
 			concurrencyRelations += `${relationName}?: ${tableTypeName}Concurrency;${separator}`;
-			strategyRelations += `${relationName}?: ${tableTypeName}Strategy | boolean;${separator}`;
+			strategyRelations += `${relationName}?: ${tableTypeName}Strategy<Root> | boolean;${separator}`;
 			regularRelations += `${relationName}?: ${tableTypeName}[] | null;${separator}`;
 		};
 
@@ -210,7 +213,12 @@ ${Concurrency(table, Name, true)}
 		}
 
 		let row = '';
+		let adHocResultTypes = `
+export type ${name}AdHocRow<Strategy extends ${name}Strategy> = ${name}Row & AdHocProperties<Strategy>;
+export type ${name}AdHocArray<Strategy extends ${name}Strategy> = ${name}Array & Array<${name}AdHocRow<Strategy>>;
+`;
 		if (!isRoot) {
+			adHocResultTypes = '';
 			row = `export interface ${name}RelatedTable {
 	${columns(table)}
 	${tableRelations(table)}
@@ -240,7 +248,14 @@ export interface ${name}TableBase {
 }
 
 
-export interface ${name}Strategy {
+export interface ${name}AdHocTable<Root, Current> {
+	many(fetchingStrategy?: ${name}AdHocStrategy<Root, Current>): AdHocMany<${name}>;
+	one(fetchingStrategy?: ${name}AdHocStrategy<Root, Current>): AdHocOne<${name}>;
+}
+
+export interface ${name}Strategy<Root = ${name}TableBase> {
+	[property: string]: boolean | number | string | object | undefined
+		| ((table: ${name}TableBase, context: AdHocFactoryContext<Root, ${name}TableBase>) => unknown);
 	${strategyColumns(table)}
 	${strategyRelations}
 	limit?: number;
@@ -250,6 +265,14 @@ export interface ${name}Strategy {
 	forUpdate?: boolean;
 	skipLocked?: boolean;
 }
+
+export type ${name}AdHocStrategy<Root, Current> = Omit<${name}Strategy<Root>, 'where' | 'forUpdate' | 'skipLocked'> & {
+	where?: RawFilter | ((table: ${name}TableBase) => RawFilter);
+	forUpdate?: never;
+	skipLocked?: never;
+};
+
+${adHocResultTypes}
 
 ${otherConcurrency}
 
@@ -273,6 +296,21 @@ ${row}`;
 			return name;
 		}
 	}
+}
+
+function getAdHocScopeTs(tables) {
+	const dbProperties = Object.keys(tables)
+		.map(name => `\t${name}: ${pascalCase(name)}AdHocTable<Root, Current>;`)
+		.join('\n');
+	return `
+export interface AdHocDb<Root, Current> {
+${dbProperties}
+}
+export interface AdHocFactoryContext<Root, Current> {
+	db: AdHocDb<Root, Current>;
+	root: Root;
+}
+`;
 }
 
 function regularColumns(table) {
@@ -390,6 +428,23 @@ type HttpResponse<T = any> = {
 	headers: Record<string, string>;
 	config: HttpRequestConfig;
 };
+interface AdHocMany<T> {
+	readonly __rdbAdHocRelation: 'many';
+	readonly table: string;
+	readonly strategy: Record<string, unknown>;
+	readonly __result?: T[];
+}
+interface AdHocOne<T> {
+	readonly __rdbAdHocRelation: 'one';
+	readonly table: string;
+	readonly strategy: Record<string, unknown>;
+	readonly __result?: T | null;
+}
+type AdHocProperties<Strategy> = {
+	[Property in keyof Strategy as Strategy[Property] extends (...args: any[]) => AdHocMany<any> | AdHocOne<any> ? Property : never]:
+		Strategy[Property] extends (...args: any[]) => AdHocMany<infer Row> ? Row[] :
+		Strategy[Property] extends (...args: any[]) => AdHocOne<infer Row> ? Row | null : never;
+};
 `;
 
 	return `
@@ -415,6 +470,23 @@ type HttpResponse<T = any> = {
 	statusText: string;
 	headers: Record<string, string>;
 	config: HttpRequestConfig;
+};
+interface AdHocMany<T> {
+	readonly __rdbAdHocRelation: 'many';
+	readonly table: string;
+	readonly strategy: Record<string, unknown>;
+	readonly __result?: T[];
+}
+interface AdHocOne<T> {
+	readonly __rdbAdHocRelation: 'one';
+	readonly table: string;
+	readonly strategy: Record<string, unknown>;
+	readonly __result?: T | null;
+}
+type AdHocProperties<Strategy> = {
+	[Property in keyof Strategy as Strategy[Property] extends (...args: any[]) => AdHocMany<any> | AdHocOne<any> ? Property : never]:
+		Strategy[Property] extends (...args: any[]) => AdHocMany<infer Row> ? Row[] :
+		Strategy[Property] extends (...args: any[]) => AdHocOne<infer Row> ? Row | null : never;
 };
 export default schema as RdbClient;`;
 }

@@ -5,7 +5,7 @@ var newParameterized = require('../../table/query/newParameterized');
 var getSessionSingleton = require('../../table/getSessionSingleton');
 var lockSql = require('../../table/query/singleQuery/lockSql');
 
-function _new(context,table,filter,span, alias,orderBy,limit,offset,distinct = false) {
+function _new(context,table,filter,span, alias,orderBy,limit,offset,distinct = false, options = {}) {
 	var quote = getSessionSingleton(context, 'quote');
 	var name = quote(table._dbName);
 	var quotedAlias = quote(alias);
@@ -17,8 +17,14 @@ function _new(context,table,filter,span, alias,orderBy,limit,offset,distinct = f
 	const selectClause = distinct ? 'select distinct ' : 'select ';
 	const lockClause = lockSql.selectLockSql(context, span, alias);
 	const tableHint = lockSql.tableHintSql(context, span);
+	const extraSelect = options.extraSelect || '';
+	const fromSuffix = options.fromSuffix || '';
 
-	return newParameterized(selectClause + limit + columnSql + ' from ' + name + ' ' + quotedAlias + tableHint).append(joinSql).append(whereSql).append(orderBy + offset + lockClause);
+	return newParameterized(selectClause + limit + extraSelect + columnSql + ' from ' + name + ' ' + quotedAlias + tableHint)
+		.append(fromSuffix)
+		.append(joinSql)
+		.append(whereSql)
+		.append(orderBy + offset + lockClause);
 
 }
 

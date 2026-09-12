@@ -984,6 +984,12 @@ function requireCreatePatch () {
 			else if (object === Object(object)) {
 				let copy = {};
 				for (let name in object) {
+					// Query projections (aggregates and ad-hoc relations) are intentionally
+					// outside the mapped metadata and must never become write patches.
+					if (!isRoot && options?.columns
+						&& !(name in options.columns)
+						&& !(name in (options.relations || {})))
+						continue;
 					copy[name] = toCompareObject(object[name], isRoot ? options : options && options.relations && options.relations[name]);
 				}
 				return copy;
@@ -1288,8 +1294,14 @@ function requireNetAdapter () {
 			if (typeof db === 'string') {
 				return httpAdapter(db, tableName === undefined ? '' : `?table=${tableName}`, http);
 			}
-			else if (db && db.hostLocal) {
-				return db.hostLocal({ ...tableOptions, db, table: url });
+			else if (db && (db.hostLocal || db.transaction)) {
+				return db.hostLocal({
+					...tableOptions,
+					db,
+					table: url,
+					tables: tableOptions.tables,
+					tableConfigs: tableOptions.tableConfigs
+				});
 			}
 			else
 				throw new Error('Invalid arguments');
@@ -8450,6 +8462,38 @@ function requireSyncClient () {
 	return syncClient.exports;
 }
 
+var adHocRelation;
+var hasRequiredAdHocRelation;
+
+function requireAdHocRelation () {
+	if (hasRequiredAdHocRelation) return adHocRelation;
+	hasRequiredAdHocRelation = 1;
+	const marker = '__rdbAdHocRelation';
+	const ownerScopeMarker = '__rdbAdHocOwnerScope';
+
+	function isAdHocRelation(value) {
+		return !!value && typeof value === 'object'
+			&& (value[marker] === 'many' || value[marker] === 'one')
+			&& typeof value.table === 'string';
+	}
+
+	function newAdHocRelation(kind, table, strategy) {
+		return {
+			[marker]: kind,
+			table,
+			strategy: strategy || {}
+		};
+	}
+
+	adHocRelation = {
+		marker,
+		ownerScopeMarker,
+		isAdHocRelation,
+		newAdHocRelation
+	};
+	return adHocRelation;
+}
+
 var client;
 var hasRequiredClient;
 
@@ -8478,6 +8522,9 @@ function requireClient () {
 		serializeSyncPayload,
 		setSyncTransactionContext
 	} = requireOperationContext();
+	const { isAdHocRelation, newAdHocRelation, ownerScopeMarker } = requireAdHocRelation();
+	const adHocFactoryMarker = '__rdbAdHocFactory';
+	const columnScopeMarker = '__rdbColumnScope';
 
 	function rdbClient(options = {}) {
 		flags.useLazyDefaults = false;
@@ -8589,7 +8636,8 @@ function requireClient () {
 			}
 
 		};
-		return new Proxy(client, handler);
+		const clientProxy = new Proxy(client, handler);
+		return clientProxy;
 		// }
 
 		function getMetaData() {
@@ -8822,6 +8870,8 @@ function requireClient () {
 		function table(url, tableName, tableOptions) {
 			tableOptions = tableOptions || {};
 			tableOptions = { db: baseUrl, ...tableOptions, transaction, syncTableName: tableName };
+			Object.defineProperty(tableOptions, 'tables', { value: options.tables, enumerable: false });
+			Object.defineProperty(tableOptions, 'tableConfigs', { value: options, enumerable: false });
 			let meta;
 			let c = {
 				count,
@@ -8844,6 +8894,8 @@ function requireClient () {
 				rowsType,
 				tsType,
 				expand,
+				many: adHoc.bind(null, 'many'),
+				one: adHoc.bind(null, 'one'),
 			};
 
 
@@ -8875,6 +8927,37 @@ function requireClient () {
 				return undefined;
 			}
 
+			function adHoc(kind, strategy = {}) {
+				return newAdHocRelation(kind, tableName, serializeAdHocStrategy(strategy));
+			}
+
+			function serializeAdHocStrategy(_strategy, path = '') {
+				if (!_strategy || typeof _strategy !== 'object' || Array.isArray(_strategy))
+					return _strategy;
+				if (isAdHocRelation(_strategy)) {
+					if (!_strategy[adHocFactoryMarker])
+						throw new Error('Ad-hoc relations must be returned by a fetch strategy function');
+					return _strategy;
+				}
+
+				const strategy = { ..._strategy };
+				for (let name in strategy) {
+					if (isAdHocRelation(strategy[name])) {
+						if (!strategy[name][adHocFactoryMarker])
+							throw new Error('Ad-hoc relations must be returned by a fetch strategy function');
+						continue;
+					}
+					if (name === 'where' && typeof strategy[name] === 'function') {
+						strategy[name] = column(path + 'where')(strategy[name]);
+					}
+					else if (typeof strategy[name] === 'function')
+						strategy[name] = aggregate(path, strategy[name], adHocStrategyContext());
+					else
+						strategy[name] = serializeAdHocStrategy(strategy[name], path + name + '.');
+				}
+				return strategy;
+			}
+
 			async function getAll() {
 				let _getMany = getMany.bind(null, undefined);
 				return _getMany.apply(null, arguments);
@@ -8891,6 +8974,7 @@ function requireClient () {
 					}
 				}
 				strategy = extractFetchingStrategy({}, strategy);
+				strategy = negotiateWhereSingle(strategy);
 				let args = [_, strategy].concat(Array.prototype.slice.call(arguments).slice(2));
 				let rows = await getManyCore.apply(null, args);
 				await metaPromise;
@@ -8943,7 +9027,7 @@ function requireClient () {
 					return true;
 				for (let key in value) {
 					const v = value[key];
-					if (typeof v === 'boolean')
+					if (typeof v === 'boolean' || typeof v === 'function')
 						return true;
 					if (v && typeof v === 'object' && !Array.isArray(v))
 						return true;
@@ -8967,6 +9051,8 @@ function requireClient () {
 					if (!keyNames.includes(key))
 						return false;
 					const val = value[key];
+					if (typeof val === 'function')
+						return false;
 					if (val && typeof val === 'object' && !(val instanceof Date))
 						return false;
 				}
@@ -8987,6 +9073,7 @@ function requireClient () {
 				let normalized = normalizeGetOneArgs(meta, filter, strategy);
 				filter = normalized.filter;
 				strategy = extractFetchingStrategy({}, normalized.strategy);
+				strategy = negotiateWhereSingle(strategy);
 				let _strategy = { ...strategy, ...{ limit: 1 } };
 				let args = [filter, _strategy].concat(Array.prototype.slice.call(arguments).slice(2));
 				let rows = await getManyCore.apply(null, args);
@@ -9011,7 +9098,7 @@ function requireClient () {
 
 			async function getManyCore() {
 				await ensureLocalSchemaReady();
-				let args = negotiateWhere.apply(null, arguments);
+				let args = Array.prototype.slice.call(arguments);
 				let body = stringify({
 					path: 'getManyDto',
 					args
@@ -9020,19 +9107,14 @@ function requireClient () {
 				return adapter.post(body);
 			}
 
-			function negotiateWhere(_, strategy, ...rest) {
-				const args = Array.prototype.slice.call(arguments);
-				if (strategy)
-					return [_, negotiateWhereSingle(strategy), ...rest];
-				else
-					return args;
-
-
-			}
-
 			function negotiateWhereSingle(_strategy, path = '') {
 				if (typeof _strategy !== 'object' || _strategy === null)
 					return _strategy;
+				if (isAdHocRelation(_strategy)) {
+					if (!_strategy[adHocFactoryMarker])
+						throw new Error('Ad-hoc relations must be returned by a fetch strategy function');
+					return _strategy;
+				}
 
 				if (Array.isArray(_strategy)) {
 					return _strategy.map(item => negotiateWhereSingle(item, path));
@@ -9043,12 +9125,19 @@ function requireClient () {
 					if (name === 'where' && typeof strategy[name] === 'function')
 						strategy.where = column(path + 'where')(strategy.where); // Assuming `column` is defined elsewhere.
 					else if (typeof strategy[name] === 'function') {
-						strategy[name] = aggregate(path, strategy[name]);
+						strategy[name] = aggregate(path, strategy[name], adHocStrategyContext());
 					}
 					else
 						strategy[name] = negotiateWhereSingle(_strategy[name], path + name + '.');
 				}
 				return strategy;
+			}
+
+			function adHocStrategyContext() {
+				return {
+					db: clientProxy,
+					root: tableProxy('$root.')
+				};
 			}
 
 
@@ -9337,6 +9426,7 @@ function requireClient () {
 					return;
 				strategy = extractStrategy({ strategy }, array);
 				strategy = extractFetchingStrategy(array, strategy);
+				strategy = negotiateWhereSingle(strategy);
 
 				let meta = await getMeta();
 				const patch = createPatch(json, array, meta);
@@ -9355,7 +9445,11 @@ function requireClient () {
 				let insertedPositions = getInsertedRowsPosition(array);
 				let { changed, strategy: newStrategy } = await p;
 				copyIntoArray(changed, array, [...insertedPositions, ...updatedPositions]);
-				rootMap.set(array, { json: cloneFromDb(array), strategy: toStoredFetchStrategy(newStrategy), originalArray: [...array] });
+				rootMap.set(array, {
+					json: cloneFromDb(array),
+					strategy: toStoredFetchStrategy(newStrategy),
+					originalArray: [...array]
+				});
 			}
 
 			async function patch(patch, concurrencyOptions, strategy) {
@@ -9363,7 +9457,7 @@ function requireClient () {
 				if (patch.length === 0)
 					return;
 				await ensureLocalSchemaReady();
-				let body = stringify({ patch, options: { strategy, ...tableOptions, ...concurrencyOptions, deduceStrategy } });
+				let body = stringify({ patch, options: { strategy: stripAdHocStrategy(strategy), ...tableOptions, ...concurrencyOptions, deduceStrategy } });
 				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				await adapter.patch(body);
 				return;
@@ -9468,6 +9562,11 @@ function requireClient () {
 			function toStoredFetchStrategy(strategy) {
 				if (strategy === undefined || strategy === null || typeof strategy !== 'object')
 					return strategy;
+				if (isAdHocRelation(strategy))
+					return {
+						...strategy,
+						strategy: cloneAdHocStrategy(strategy.strategy)
+					};
 				if (Array.isArray(strategy))
 					return strategy.map(toStoredFetchStrategy);
 				const cleanStrategy = { ...strategy };
@@ -9479,6 +9578,48 @@ function requireClient () {
 						cleanStrategy[name] = toStoredFetchStrategy(cleanStrategy[name]);
 				}
 				return cleanStrategy;
+			}
+
+			function cloneAdHocStrategy(strategy) {
+				if (strategy === undefined || strategy === null || typeof strategy !== 'object')
+					return strategy;
+				const clean = clone(strategy);
+				stripLocking(clean);
+				return clean;
+
+				function stripLocking(value) {
+					if (!value || typeof value !== 'object')
+						return;
+					if (!Array.isArray(value)) {
+						if (!isPlainObject(value))
+							return;
+						delete value.forUpdate;
+						delete value.skipLocked;
+					}
+					for (let name in value)
+						stripLocking(value[name]);
+				}
+			}
+
+			function stripAdHocStrategy(strategy) {
+				if (!strategy || typeof strategy !== 'object')
+					return strategy;
+				if (Array.isArray(strategy))
+					return strategy.map(stripAdHocStrategy);
+				if (!isPlainObject(strategy))
+					return strategy;
+				const clean = {};
+				for (let name in strategy) {
+					if (isAdHocRelation(strategy[name]))
+						continue;
+					clean[name] = stripAdHocStrategy(strategy[name]);
+				}
+				return clean;
+			}
+
+			function isPlainObject(value) {
+				const prototype = Object.getPrototypeOf(value);
+				return prototype === Object.prototype || prototype === null;
 			}
 
 			function clearChangesArray(array) {
@@ -9536,6 +9677,7 @@ function requireClient () {
 				clearChangesArray(array);
 				strategy = extractStrategy({ strategy }, array);
 				strategy = extractFetchingStrategy(array, strategy);
+				strategy = negotiateWhereSingle(strategy);
 				if (array.length === 0)
 					return;
 				let meta = await getMeta();
@@ -9592,6 +9734,7 @@ function requireClient () {
 					deduceStrategy = false;
 				strategy = extractStrategy({ strategy }, row);
 				strategy = extractFetchingStrategy(row, strategy);
+				strategy = negotiateWhereSingle(strategy);
 
 				let json = rootMap.get(row)?.json;
 				if (!json)
@@ -9608,13 +9751,17 @@ function requireClient () {
 				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				let { changed, strategy: newStrategy } = await adapter.patch(body);
 				copyInto(changed, [row]);
-				rootMap.set(row, { json: cloneFromDb(row), strategy: toStoredFetchStrategy(newStrategy) });
+				rootMap.set(row, {
+					json: cloneFromDb(row),
+					strategy: toStoredFetchStrategy(newStrategy)
+				});
 			}
 
 			async function refreshRow(row, strategy) {
 				clearChangesRow(row);
 				strategy = extractStrategy({ strategy }, row);
 				strategy = extractFetchingStrategy(row, strategy);
+				strategy = negotiateWhereSingle(strategy);
 
 				let meta = await getMeta();
 				let keyFilter = client.filter;
@@ -9660,17 +9807,20 @@ function requireClient () {
 		}
 	}
 
-	function tableProxy() {
+	function tableProxy(prefix = '') {
 		let handler = {
 			get(_target, property,) {
-				return column(property);
+				return column(prefix + String(property));
 			}
 
 		};
 		return new Proxy({}, handler);
 	}
 
-	function aggregate(path, arg) {
+	let nextAdHocScopeId = 0;
+
+	function aggregate(path, arg, strategyContext) {
+		const scopeId = `s${++nextAdHocScopeId}`;
 
 		const c = {
 			sum,
@@ -9686,7 +9836,7 @@ function requireClient () {
 					return Reflect.get(...arguments);
 				else {
 					subColumn = column(path + '_aggregate');
-					return column(property);
+					return scopedColumn(String(property), scopeId);
 				}
 			}
 
@@ -9694,10 +9844,19 @@ function requireClient () {
 		let subColumn;
 		const proxy = new Proxy(c, handler);
 
-		const result = arg(proxy);
+		const result = arg(proxy, strategyContext);
 
-		if (subColumn)
-			return subColumn(result.self());
+		if (isAdHocRelation(result)) {
+			result[ownerScopeMarker] = scopeId;
+			result[adHocFactoryMarker] = true;
+			materializeSelectorScopes(result, true);
+			return result;
+		}
+		else if (subColumn) {
+			const selection = result.self();
+			materializeSelectorScopes(selection, false);
+			return subColumn(selection);
+		}
 		else
 			return result;
 
@@ -9773,12 +9932,24 @@ function requireClient () {
 	const columnRefKey = '__columnRef';
 
 	function column(path, ...previous) {
+		return newColumn(path, previous);
+	}
+
+	function scopedColumn(path, scopeId) {
+		return newColumn(path, [], scopeId);
+	}
+
+	function newColumn(path, previous, scopeId) {
 		function c() {
 			let args = [];
 			for (let i = 0; i < arguments.length; i++) {
 				if (typeof arguments[i] === 'function') {
-					if (arguments[i][isColumnProxyKey])
+					if (arguments[i][isColumnProxyKey]) {
 						args[i] = { [columnRefKey]: arguments[i][columnPathKey] };
+						const argumentScopeId = arguments[i][columnScopeMarker];
+						if (argumentScopeId)
+							args[i][columnScopeMarker] = argumentScopeId;
+					}
 					else
 						args[i] = arguments[i](tableProxy());
 				}
@@ -9787,6 +9958,8 @@ function requireClient () {
 			}
 			args = previous.concat(Array.prototype.slice.call(args));
 			let result = { path, args };
+			if (scopeId)
+				result[columnScopeMarker] = scopeId;
 			let handler = {
 				get(_target, property) {
 					if (property === 'toJSON')
@@ -9808,19 +9981,44 @@ function requireClient () {
 					return true;
 				if (property === columnPathKey)
 					return path;
+				if (property === columnScopeMarker)
+					return scopeId;
 				if (property === 'toJSON')
 					return Reflect.get(...arguments);
 				else if (property === 'then')
 					return;
 				else {
 					const nextPath = path ? path + '.' : '';
-					return column(nextPath + property);
+					return newColumn(nextPath + property, [], scopeId);
 				}
 			}
 
 		};
 		return new Proxy(c, handler);
 
+	}
+
+	function materializeSelectorScopes(value, scoped, seen = new Set()) {
+		if (!value || typeof value !== 'object' || seen.has(value))
+			return;
+		const prototype = Object.getPrototypeOf(value);
+		if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null)
+			return;
+		seen.add(value);
+		const scopeId = Object.prototype.hasOwnProperty.call(value, columnScopeMarker)
+			? value[columnScopeMarker]
+			: undefined;
+		if (scopeId) {
+			if (scoped) {
+				if (typeof value.path === 'string')
+					value.path = `$scope.${scopeId}.${value.path}`;
+				if (typeof value[columnRefKey] === 'string')
+					value[columnRefKey] = `$scope.${scopeId}.${value[columnRefKey]}`;
+			}
+			delete value[columnScopeMarker];
+		}
+		for (const name of Object.keys(value))
+			materializeSelectorScopes(value[name], scoped, seen);
 	}
 
 	function onChange(target, onChange) {
@@ -21301,6 +21499,10 @@ function requireExtractOrderBy$1 () {
 		if (orderBy) {
 			if (typeof orderBy === 'string')
 				orderBy = [orderBy];
+			else if (!Array.isArray(orderBy))
+				throwInvalidOrderBy(orderBy);
+			if (orderBy.length === 0)
+				throwInvalidOrderBy(orderBy);
 			for (i = 0; i < orderBy.length; i++) {
 				var nameAndDirection = extractNameAndDirection(orderBy[i]);
 				pushColumn(nameAndDirection.name, nameAndDirection.direction);
@@ -21315,37 +21517,57 @@ function requireExtractOrderBy$1 () {
 		}
 
 		function extractNameAndDirection(orderBy) {
-			var elements = orderBy.split(' ');
-			var direction = '';
-			if (elements.length > 1) {
-				direction = ' ' + elements[1];
-			}
+			if (typeof orderBy !== 'string')
+				throwInvalidOrderBy(orderBy);
+			var value = orderBy.trim();
+			var match = /^(.*?)(?:\s+(asc|desc))?$/i.exec(value);
 			return {
-				name: elements[0],
-				direction: direction
+				name: match[1],
+				direction: match[2] ? ' ' + match[2].toLowerCase() : ''
 			};
 		}
 		function pushColumn(property, direction) {
 			direction = direction || '';
-			var column = getTableColumn(property);
-			var jsonQuery = getJsonQuery(property, column.alias);
+			var result = getTableColumn(property);
+			var column = result.column;
+			var jsonQuery = result.jsonQuery;
 
 			dbNames.push(alias + '.' + quote(column._dbName) + jsonQuery + direction);
 		}
 
 		function getTableColumn(property) {
-			var column = table[property] || table[property.split(/(-|#)>+/g)[0]];
-			if(!column){
-				throw new Error(`Unable to get column on orderBy '${property}'. If jsonb query, only #>, #>>, -> and ->> allowed. Only use ' ' to seperate between query and direction. Does currently not support casting.`);
-			}
-			return column;
+			var directColumn = table[property];
+			if (isColumn(directColumn))
+				return { column: directColumn, jsonQuery: '' };
+
+			var operator = /#>>|#>|->>|->/.exec(property);
+			var columnName = operator ? property.slice(0, operator.index) : property;
+			var column = table[columnName];
+			var jsonQuery = operator ? property.slice(operator.index) : '';
+			if (!isColumn(column) || !isSafeJsonQuery(jsonQuery))
+				throwInvalidOrderBy(property);
+			return { column, jsonQuery };
 		}
-		function getJsonQuery(property, column) {
-			let containsJson = (/(-|#)>+/g).test(property);
-			if(!containsJson){
-				return '';
+
+		function isColumn(value) {
+			return !!value && typeof value._toFilterArg === 'function';
+		}
+
+		function isSafeJsonQuery(value) {
+			if (!value)
+				return true;
+			for (let i = 0; i < value.length; i++) {
+				const code = value.charCodeAt(i);
+				if (code < 32 || code === 127)
+					return false;
 			}
-			return property.replace(column, '');
+			return /^(?:(?:#>>|#>|->>|->)(?:-?[0-9]+|'(?:[^'\\]|'')*'))+$/.test(value);
+		}
+
+		function throwInvalidOrderBy(value) {
+			const error = new Error(`Unable to get column on orderBy '${String(value)}'. If jsonb query, only #>, #>>, -> and ->> allowed. Only use ' ' to seperate between query and direction. Does currently not support casting.`);
+			error.status = 400;
+			throw error;
 		}
 
 		return ' order by ' + dbNames.join(',');
@@ -21355,6 +21577,42 @@ function requireExtractOrderBy$1 () {
 	return extractOrderBy_1$1;
 }
 
+var validatePagination_1;
+var hasRequiredValidatePagination;
+
+function requireValidatePagination () {
+	if (hasRequiredValidatePagination) return validatePagination_1;
+	hasRequiredValidatePagination = 1;
+	function validatePagination(value) {
+		validateValue(value, 'limit');
+		validateValue(value, 'offset');
+		if (value?.limit !== undefined && value?.offset !== undefined
+			&& !Number.isSafeInteger(value.limit + value.offset))
+			throwInvalid('pagination range', `${value.offset} + ${value.limit}`);
+	}
+
+	function validateValue(value, name) {
+		if (!value || value[name] === undefined)
+			return;
+		if (Number.isSafeInteger(value[name]) && value[name] >= 0)
+			return;
+
+		throwInvalid(name, String(value[name]));
+	}
+
+	function throwInvalid(name, value) {
+		const error = new Error(`Invalid ${name}: ${value}`);
+		error.status = 400;
+		throw error;
+	}
+
+	validatePagination.limit = value => validateValue(value, 'limit');
+	validatePagination.offset = value => validateValue(value, 'offset');
+
+	validatePagination_1 = validatePagination;
+	return validatePagination_1;
+}
+
 var extractLimit_1;
 var hasRequiredExtractLimit;
 
@@ -21362,8 +21620,10 @@ function requireExtractLimit () {
 	if (hasRequiredExtractLimit) return extractLimit_1;
 	hasRequiredExtractLimit = 1;
 	var getSessionContext = requireGetSessionContext();
+	var validatePagination = requireValidatePagination();
 
 	function extractLimit(context, span) {
+		validatePagination.limit(span);
 		let limit = getSessionContext(context).limit;
 		if (limit)
 			return limit(span);
@@ -21382,8 +21642,10 @@ function requireExtractOffset () {
 	if (hasRequiredExtractOffset) return extractOffset_1;
 	hasRequiredExtractOffset = 1;
 	var getSessionContext = requireGetSessionContext();
+	var validatePagination = requireValidatePagination();
 
 	function extractOffset(context, span) {
+		validatePagination.offset(span);
 		let {limitAndOffset} = getSessionContext(context);
 		if (limitAndOffset)
 			return limitAndOffset(span);
@@ -23517,6 +23779,7 @@ function requireStrategyToSpan () {
 	var newCollection = requireNewCollection();
 	var newQueryContext = requireNewQueryContext();
 	var purifyStrategy = requirePurifyStrategy();
+	var validatePagination = requireValidatePagination();
 
 	function toSpan(table, strategy) {
 		var span = {};
@@ -23534,6 +23797,7 @@ function requireStrategyToSpan () {
 			var legs = span.legs;
 			if(!strategy)
 				return;
+			validatePagination(strategy);
 			for (var name in strategy) {
 				if (table._relations[name] && !strategy[name])
 					continue;
@@ -25852,6 +26116,8 @@ function requireCount () {
 	return count_1;
 }
 
+var getManyDto = {exports: {}};
+
 var newSingleQuery;
 var hasRequiredNewSingleQuery;
 
@@ -25865,7 +26131,7 @@ function requireNewSingleQuery () {
 	var getSessionSingleton = requireGetSessionSingleton();
 	var lockSql = requireLockSql();
 
-	function _new(context,table,filter,span, alias,orderBy,limit,offset,distinct = false) {
+	function _new(context,table,filter,span, alias,orderBy,limit,offset,distinct = false, options = {}) {
 		var quote = getSessionSingleton(context, 'quote');
 		var name = quote(table._dbName);
 		var quotedAlias = quote(alias);
@@ -25877,8 +26143,14 @@ function requireNewSingleQuery () {
 		const selectClause = distinct ? 'select distinct ' : 'select ';
 		const lockClause = lockSql.selectLockSql(context, span, alias);
 		const tableHint = lockSql.tableHintSql(context, span);
+		const extraSelect = options.extraSelect || '';
+		const fromSuffix = options.fromSuffix || '';
 
-		return newParameterized(selectClause + limit + columnSql + ' from ' + name + ' ' + quotedAlias + tableHint).append(joinSql).append(whereSql).append(orderBy + offset + lockClause);
+		return newParameterized(selectClause + limit + extraSelect + columnSql + ' from ' + name + ' ' + quotedAlias + tableHint)
+			.append(fromSuffix)
+			.append(joinSql)
+			.append(whereSql)
+			.append(orderBy + offset + lockClause);
 
 	}
 
@@ -25899,13 +26171,15 @@ function requireNewQuery$1 () {
 	var newParameterized = requireNewParameterized();
 	var extractOffset = requireExtractOffset();
 
-	function newQuery(context,table,filter,span,alias) {
+	function newQuery(context,table,filter,span,alias,options = {}) {
 		filter = extractFilter(filter);
-		var orderBy = extractOrderBy(context,table,alias,span.orderBy);
+		var orderBy = Object.prototype.hasOwnProperty.call(options, 'orderBy')
+			? options.orderBy
+			: extractOrderBy(context,table,alias,span.orderBy);
 		var limit = extractLimit(context, span);
 		var offset = extractOffset(context, span);
 
-		var query = newSingleQuery(context,table,filter,span,alias,orderBy,limit,offset);
+		var query = newSingleQuery(context,table,filter,span,alias,orderBy,limit,offset,false,options);
 		return newParameterized(query.sql(), query.parameters);
 	}
 
@@ -25913,11 +26187,175 @@ function requireNewQuery$1 () {
 	return newQuery_1$1;
 }
 
-var getManyDto_1$1;
+var getManyDtoScoped = {exports: {}};
+
+var hasRequiredGetManyDtoScoped;
+
+function requireGetManyDtoScoped () {
+	if (hasRequiredGetManyDtoScoped) return getManyDtoScoped.exports;
+	hasRequiredGetManyDtoScoped = 1;
+	const newQuery = requireNewQuery$1();
+	const strategyToSpan = requireStrategyToSpan();
+	const executeQueries = requireExecuteQueries();
+	const getSessionSingleton = requireGetSessionSingleton();
+	const newParameterized = requireNewParameterized();
+	const extractOrderBy = requireExtractOrderBy$1();
+	const validatePagination = requireValidatePagination();
+
+	const scopeAlias = '__rdb_s';
+	const ownerColumnAlias = '__rdb_o';
+	const resultOwnerAlias = '__rdb_owner';
+	const rowNumberAlias = '__rdb_rn';
+	const pagedRowsAlias = '__rdb_paged';
+
+	getManyDtoScoped.exports = async function getManyDtoScoped({
+		context,
+		table,
+		filter,
+		scopeFilter,
+		strategy,
+		scopeColumns,
+		scopeTables = [],
+		scopeRows,
+		offset,
+		limit
+	}) {
+		validatePagination({ offset, limit });
+		if (scopeRows.length === 0)
+			return [];
+
+		const quote = getSessionSingleton(context, 'quote');
+		const span = strategyToSpan(table, strategy);
+		const alias = table._dbName;
+		const scopeSource = newScopeSource(context, scopeColumns, scopeRows);
+		const scopeJoin = scopeSource
+			.prepend(' INNER JOIN ')
+			.append(' ON 1=1')
+			.append(newScopeTableJoins(context, scopeTables, scopeColumns));
+		const scopedFilter = filter.and(context, scopeFilter);
+		const ownerSelect = `${quote(scopeAlias)}.${quote(ownerColumnAlias)} as ${quote(resultOwnerAlias)},`;
+		const useWindowPagination = shouldUseWindowPagination(getSessionSingleton(context, 'engine'), offset, limit);
+		const orderBy = extractOrderBy(context, table, alias, span.orderBy);
+		const rowNumberSelect = useWindowPagination
+			? `ROW_NUMBER() OVER (PARTITION BY ${quote(scopeAlias)}.${quote(ownerColumnAlias)}${orderBy}) as ${quote(rowNumberAlias)},`
+			: '';
+		let query = newQuery(context, table, scopedFilter, span, alias, {
+			extraSelect: ownerSelect + rowNumberSelect,
+			fromSuffix: scopeJoin,
+			...(useWindowPagination ? { orderBy: '' } : {})
+		});
+		if (useWindowPagination)
+			query = applyWindowPagination(query, quote, offset, limit);
+		const resultSets = await executeQueries(context, [query]);
+		const rawRows = await resultSets[0];
+		const ownerIds = new Array(rawRows.length);
+		const resultKeys = rawRows.length > 0 ? Object.keys(rawRows[0]) : [];
+		const ownerKey = resultKeys[0];
+		const rowNumberKey = useWindowPagination ? resultKeys[1] : undefined;
+		for (let i = 0; i < rawRows.length; i++) {
+			ownerIds[i] = Number(rawRows[i][ownerKey]);
+			delete rawRows[i][ownerKey];
+			if (useWindowPagination)
+				delete rawRows[i][rowNumberKey];
+		}
+		// Resolve lazily because the mapped-relation loader in getManyDto also uses
+		// this helper. Requiring it at module initialization would leave the decoder
+		// pointing at a partial circular export.
+		const rows = await requireGetManyDto$1().decode(context, strategy, span, rawRows);
+		return rows.map((row, index) => ({ ownerId: ownerIds[index], row }));
+	};
+
+	getManyDtoScoped.exports.newScopeColumnRef = function newScopeColumnRef(context, alias) {
+		const quote = getSessionSingleton(context, 'quote');
+		return {
+			_toFilterArg() {
+				return newParameterized(`${quote(scopeAlias)}.${quote(alias)}`);
+			}
+		};
+	};
+
+	function newScopeTableJoins(context, scopeTables, scopeColumns) {
+		const quote = getSessionSingleton(context, 'quote');
+		let result = newParameterized('');
+		for (const { scopeName, table, alias } of scopeTables) {
+			result = result.append(` INNER JOIN ${quote(table._dbName)} ${quote(alias)} ON `);
+			for (let index = 0; index < table._primaryColumns.length; index++) {
+				if (index > 0)
+					result = result.append(' AND ');
+				const column = table._primaryColumns[index];
+				const scopeColumn = scopeColumns.find(candidate =>
+					candidate.scopeName === scopeName && candidate.name === column.alias);
+				if (!scopeColumn)
+					throw new Error(`Missing ${scopeName} scope key '${column.alias}'`);
+				result = result.append(
+					`${quote(alias)}.${quote(column._dbName)}=${quote(scopeAlias)}.${quote(scopeColumn.alias)}`
+				);
+			}
+		}
+		return result;
+	}
+
+	function newScopeSource(context, scopeColumns, scopeRows) {
+		const quote = getSessionSingleton(context, 'quote');
+		const engine = getSessionSingleton(context, 'engine');
+		let result = newParameterized('(');
+		for (let rowIndex = 0; rowIndex < scopeRows.length; rowIndex++) {
+			if (rowIndex > 0)
+				result = result.append(' UNION ALL ');
+			result = result.append('SELECT ' + scopeRows[rowIndex].ownerId);
+			if (rowIndex === 0)
+				result = result.append(' as ' + quote(ownerColumnAlias));
+			for (let columnIndex = 0; columnIndex < scopeColumns.length; columnIndex++) {
+				const scopeColumn = scopeColumns[columnIndex];
+				let encoded = scopeColumn.column.encode(context, scopeColumn.value(scopeRows[rowIndex]));
+				encoded = castScopeValue(engine, scopeColumn.column, encoded);
+				result = result.append(',').append(encoded);
+				if (rowIndex === 0)
+					result = result.append(' as ' + quote(scopeColumn.alias));
+			}
+			if (engine === 'oracle')
+				result = result.append(' FROM DUAL');
+		}
+		return result.append(') ' + quote(scopeAlias));
+	}
+
+	function castScopeValue(engine, column, encoded) {
+		if (engine !== 'pg')
+			return encoded;
+		const type = {
+			BigintColumn: 'bigint',
+			BinaryColumn: 'bytea',
+			BooleanColumn: 'boolean',
+			DateColumn: 'timestamp',
+			JSONColumn: 'jsonb',
+			StringColumn: 'text',
+			UUIDColumn: 'uuid'
+		}[column.tsType];
+		if (!type)
+			return encoded;
+		return encoded.prepend('CAST(').append(` AS ${type})`);
+	}
+
+	function shouldUseWindowPagination(engine, offset, limit) {
+		return engine !== 'sap' && ((offset || 0) > 0 || limit !== undefined);
+	}
+
+	function applyWindowPagination(query, quote, offset = 0, limit) {
+		let result = query
+			.prepend('SELECT * FROM (')
+			.append(') ' + quote(pagedRowsAlias))
+			.append(` WHERE ${quote(pagedRowsAlias)}.${quote(rowNumberAlias)} > ${offset}`);
+		if (limit !== undefined)
+			result = result.append(` AND ${quote(pagedRowsAlias)}.${quote(rowNumberAlias)} <= ${offset + limit}`);
+		return result.append(` ORDER BY ${quote(pagedRowsAlias)}.${quote(resultOwnerAlias)},${quote(pagedRowsAlias)}.${quote(rowNumberAlias)}`);
+	}
+	return getManyDtoScoped.exports;
+}
+
 var hasRequiredGetManyDto$1;
 
 function requireGetManyDto$1 () {
-	if (hasRequiredGetManyDto$1) return getManyDto_1$1;
+	if (hasRequiredGetManyDto$1) return getManyDto.exports;
 	hasRequiredGetManyDto$1 = 1;
 	const emptyFilter = requireEmptyFilter();
 	const newQuery = requireNewQuery$1();
@@ -25925,8 +26363,9 @@ function requireGetManyDto$1 () {
 	const strategyToSpan = requireStrategyToSpan();
 	const executeQueries = requireExecuteQueries();
 	const getSessionSingleton = requireGetSessionSingleton();
+	const getManyDtoScoped = requireGetManyDtoScoped();
 
-	async function getManyDto(context, table, filter, strategy, spanFromParent, updateParent) {
+	async function getManyDto$1(context, table, filter, strategy, spanFromParent, updateParent) {
 		filter = negotiateRawSqlFilter(context, filter, table);
 		if (strategy && strategy.where) {
 			let arg = typeof strategy.where === 'function' ? strategy.where(context, table) : strategy.where;
@@ -26065,6 +26504,7 @@ function requireGetManyDto$1 () {
 		}
 		span._rowsMap = rowsMap;
 		span._ids = fkIds;
+		span._rows = outRows;
 
 		keys.splice(0, columnsLength + aggregateKeys.length);
 		if (span.legs.toArray().length === 0)
@@ -26124,6 +26564,11 @@ function requireGetManyDto$1 () {
 			const name = leg.name;
 			const table = span.table;
 			const relation = table._relations[name];
+			const relationStrategy = strategy[name];
+			if (hasPagination(leg.span)) {
+				promises.push(fetchPagedRelation(leg, relation, relationStrategy));
+				return;
+			}
 			const parametersPerRow = relation.joinRelation.columns.length;
 			const maxRows = maxParameters
 				? Math.max(1, Math.floor((maxParameters - 1) / parametersPerRow))
@@ -26142,7 +26587,7 @@ function requireGetManyDto$1 () {
 				const chunkedIds = chunk(span._ids, maxRows);
 				for (const idsChunk of chunkedIds) {
 					const filter = createOneFilter(context, relation, idsChunk);
-					const p = getManyDto(
+					const p = getManyDto$1(
 						context,
 						relation.childTable,
 						filter,
@@ -26155,7 +26600,7 @@ function requireGetManyDto$1 () {
 			} else {
 				// Otherwise, do the entire set in one go
 				const filter = createOneFilter(context, relation, span._ids);
-				const p = getManyDto(
+				const p = getManyDto$1(
 					context,
 					relation.childTable,
 					filter,
@@ -26174,6 +26619,100 @@ function requireGetManyDto$1 () {
 				});
 			}
 		};
+
+		async function fetchPagedRelation(leg, relation, relationStrategy) {
+			const columns = relation.joinRelation.columns;
+			const childTable = relation.childTable;
+			// Build a fresh span through getManyDtoScoped so strategyToSpan keeps
+			// omitted primary keys and relation foreign keys in the internal projection.
+			// The public Selection type still follows the caller's original strategy.
+			const executionStrategy = withoutPagination(relationStrategy);
+			const filter = strategyFilter(childTable, relationStrategy);
+			const scopeColumns = columns.map((column, index) => ({
+				column,
+				alias: `__rdb_m${index}`,
+				value: scopeRow => scopeRow.key[index]
+			}));
+			let scopeFilter = emptyFilter;
+			for (let i = 0; i < columns.length; i++) {
+				const scopeRef = getManyDtoScoped.newScopeColumnRef(context, scopeColumns[i].alias);
+				const columnFilter = columns[i].eq(context, scopeRef);
+				scopeFilter = scopeFilter === emptyFilter
+					? columnFilter
+					: scopeFilter.and(context, columnFilter);
+			}
+
+			const scopeRows = [];
+			for (let ownerId = 0; ownerId < span._rows.length; ownerId++) {
+				if (!span._rows[ownerId])
+					continue;
+				const id = span._ids[ownerId];
+				scopeRows.push({
+					ownerId,
+					key: columns.length === 1 ? [id] : id
+				});
+			}
+			if (scopeRows.length === 0)
+				return;
+
+			const fixedParameters = filter?.parameters?.length || 0;
+			const maxRows = maxParameters
+				? Math.max(1, Math.floor((maxParameters - fixedParameters) / columns.length))
+				: 200;
+			const chunkSize = Math.min(200, maxRows);
+			const rowsByOwner = new Map();
+			for (const scopeRowsChunk of chunk(scopeRows, chunkSize)) {
+				const rows = await getManyDtoScoped({
+					context,
+					table: childTable,
+					filter,
+					scopeFilter,
+					strategy: executionStrategy,
+					scopeColumns,
+					scopeRows: scopeRowsChunk,
+					offset: leg.span.offset || 0,
+					limit: leg.span.limit
+				});
+				for (const { ownerId, row } of rows) {
+					if (!row)
+						continue;
+					if (!rowsByOwner.has(ownerId))
+						rowsByOwner.set(ownerId, []);
+					rowsByOwner.get(ownerId).push(row);
+				}
+			}
+
+			const paginateInMemory = getSessionSingleton(context, 'engine') === 'sap';
+			const start = leg.span.offset || 0;
+			const end = leg.span.limit === undefined ? undefined : start + leg.span.limit;
+			for (const scopeRow of scopeRows) {
+				const parentRow = span._rows[scopeRow.ownerId];
+				let rows = rowsByOwner.get(scopeRow.ownerId) || [];
+				if (paginateInMemory)
+					rows = rows.slice(start, end);
+				parentRow[leg.name].push(...rows);
+			}
+		}
+
+		function strategyFilter(table, relationStrategy) {
+			if (!relationStrategy?.where)
+				return emptyFilter;
+			const where = typeof relationStrategy.where === 'function'
+				? relationStrategy.where(context, table)
+				: relationStrategy.where;
+			return emptyFilter.and(context, where);
+		}
+
+		function withoutPagination(relationStrategy) {
+			const result = { ...relationStrategy };
+			delete result.limit;
+			delete result.offset;
+			return result;
+		}
+
+		function hasPagination(relationSpan) {
+			return relationSpan.limit !== undefined || (relationSpan.offset || 0) > 0;
+		}
 
 		function createExtractKey(leg) {
 			if (leg.columns.length === 1) {
@@ -26292,8 +26831,9 @@ function requireGetManyDto$1 () {
 			return map.get(values);
 	}
 
-	getManyDto_1$1 = getManyDto;
-	return getManyDto_1$1;
+	getManyDto.exports = getManyDto$1;
+	getManyDto.exports.decode = decode;
+	return getManyDto.exports;
 }
 
 var getManyDto_1;
@@ -27080,16 +27620,19 @@ function requireValidateDeleteAllowed () {
 		return {...parent,  ...(defaults[property] || {})};
 	}
 
-	function hasReadonlyTrue(options) {
+	function hasReadonlyTrue(options, visited = new WeakSet()) {
 		if (!options || options !== Object(options))
 			return false;
+		if (visited.has(options))
+			return false;
+		visited.add(options);
 		if (options.readonly === true)
 			return true;
 		for (let p in options) {
 			const value = options[p];
 			if (!value || value !== Object(value))
 				continue;
-			if (hasReadonlyTrue(value))
+			if (hasReadonlyTrue(value, visited))
 				return true;
 		}
 		return false;
@@ -27141,12 +27684,13 @@ function requirePatchTable () {
 		return result;
 	}
 
-	async function patchTableCore(context, table, patches, { strategy = undefined, deduceStrategy = false, ...options } = {}, dryrun) {
+	async function patchTableCore(context, table, patches, { strategy = undefined, deduceStrategy = false, adHocPlan, ...options } = {}, dryrun) {
 		const engine = getSessionSingleton(context, 'engine');
 		const materializeSyncPrimaryKeys = !!getSessionSingleton(context, 'syncOutboxCapture');
 		const generatedPrimaryKeyMappings = [];
 		options = cleanOptions(options);
-		strategy = JSON.parse(JSON.stringify(strategy || {}));
+		const responseStrategy = JSON.parse(JSON.stringify(strategy || {}));
+		strategy = adHocPlan?.strategy || responseStrategy;
 		await lockTouchedRows();
 		const requiresGeneratedPrimaryKeys = materializeSyncPrimaryKeys
 			&& patches.some(patch => isRootAdd(patch) && hasMissingPrimaryKey(table, patch.value));
@@ -27174,13 +27718,13 @@ function requirePatchTable () {
 			return {
 				changed: [], strategy: stripLockingStrategy(strategy)
 			};
-		return { changed: await toDtos(changed), strategy: stripLockingStrategy(strategy) };
+		return { changed: await toDtos(changed), strategy: stripLockingStrategy(responseStrategy) };
 
 
 		async function toDtos(set) {
 			set = [...set];
-			const result = await table.getManyDto(context, set, stripLockingStrategy(strategy));
-			return result;
+			const rows = await table.getManyDto(context, set, stripLockingStrategy(strategy));
+			return adHocPlan ? adHocPlan.materialize(rows) : rows;
 		}
 
 		function stripLockingStrategy(strategy) {
@@ -27604,7 +28148,7 @@ function requirePatchTable () {
 		}
 
 		function cleanOptions(options) {
-			const { table, transaction, db, client, ..._options } = options;
+			const { table, tables, tableConfigs, transaction, db, client, ..._options } = options;
 			return _options;
 		}
 
@@ -27781,6 +28325,634 @@ function requireParseOrderBy () {
 	return parseOrderBy_1;
 }
 
+var newAdHocPlan;
+var hasRequiredNewAdHocPlan;
+
+function requireNewAdHocPlan () {
+	if (hasRequiredNewAdHocPlan) return newAdHocPlan;
+	hasRequiredNewAdHocPlan = 1;
+	const emptyFilter = requireEmptyFilter();
+	const { isAdHocRelation, ownerScopeMarker } = requireAdHocRelation();
+	const clone = require_default();
+	const getSessionSingleton = requireGetSessionSingleton();
+	const getManyDtoScoped = requireGetManyDtoScoped();
+	const validatePagination = requireValidatePagination();
+
+	newAdHocPlan = function newAdHocPlan({
+		context,
+		rootTable,
+		sourceStrategy,
+		tables,
+		parseFilter,
+		negotiateStrategy,
+		resolveBaseFilter
+	}) {
+		const strategy = JSON.parse(JSON.stringify(sourceStrategy || {}));
+		const hiddenColumns = new Map();
+		const selectionModes = new Map();
+		const scopeDefinitions = new Map([
+			['root', { table: rootTable, strategy }]
+		]);
+		registerScopes(rootTable, strategy);
+		prepare(rootTable, strategy);
+
+		return {
+			strategy: stripAdHocRelations(rootTable, strategy),
+			materialize
+		};
+
+		async function materialize(rows) {
+			await populateAdHocRelations(
+				rows.map(row => ({ row, root: row, scopes: Object.create(null) })),
+				rootTable,
+				strategy
+			);
+			stripHiddenColumns(rows, rootTable, strategy);
+			return rows;
+		}
+
+		function registerScopes(currentTable, currentStrategy) {
+			if (!currentStrategy || typeof currentStrategy !== 'object')
+				return;
+			for (let name in currentStrategy) {
+				const value = currentStrategy[name];
+				if (isAdHocRelation(value)) {
+					const scopeName = value[ownerScopeMarker];
+					if (typeof scopeName !== 'string' || !/^s[1-9][0-9]*$/.test(scopeName))
+						throwBadRequest('Ad-hoc relation is missing its lexical owner scope');
+					const existing = scopeDefinitions.get(scopeName);
+					if (existing && (existing.table !== currentTable || existing.strategy !== currentStrategy))
+						throwBadRequest(`Ad-hoc lexical scope '${scopeName}' is ambiguous`);
+					scopeDefinitions.set(scopeName, { table: currentTable, strategy: currentStrategy });
+					registerScopes(resolveAdHocTable(value.table), value.strategy || {});
+				}
+				else if (currentTable._relations[name] && value && typeof value === 'object')
+					registerScopes(currentTable._relations[name].childTable, value);
+			}
+		}
+
+		function prepare(currentTable, currentStrategy) {
+			if (!currentStrategy || typeof currentStrategy !== 'object')
+				return;
+			validatePagination(currentStrategy);
+			for (let name in currentStrategy) {
+				const value = currentStrategy[name];
+				if (isAdHocRelation(value)) {
+					const targetTable = resolveAdHocTable(value.table);
+					const refs = collectOwnedScopeRefs(value.strategy);
+					addScopeTableKeys(refs);
+					for (const [scopeName, columns] of refs.columns) {
+						const definition = getScopeDefinition(scopeName);
+						for (const column of columns)
+							includeColumn(definition.table, definition.strategy, column);
+					}
+					prepare(targetTable, value.strategy || {});
+				}
+				else if (currentTable._relations[name] && value && typeof value === 'object')
+					prepare(currentTable._relations[name].childTable, value);
+			}
+		}
+
+		function collectOwnedScopeRefs(value, result = { columns: new Map(), tables: new Set() }) {
+			if (!value || typeof value !== 'object' || isAdHocRelation(value))
+				return result;
+			if (Array.isArray(value)) {
+				for (const item of value)
+					collectOwnedScopeRefs(item, result);
+				return result;
+			}
+			if (typeof value.__columnRef === 'string') {
+				const scopePath = parseScopePath(value.__columnRef);
+				if (scopePath) {
+					if (scopePath.path.includes('.'))
+						result.tables.add(scopePath.scopeName);
+					else
+						getScopeColumns(result, scopePath.scopeName).add(scopePath.path);
+				}
+			}
+			if (typeof value.path === 'string') {
+				const scopePath = parseScopePath(value.path);
+				if (scopePath)
+					result.tables.add(scopePath.scopeName);
+			}
+			for (let name in value)
+				collectOwnedScopeRefs(value[name], result);
+			return result;
+		}
+
+		function hasOwnedScopeRefs(value) {
+			const refs = collectOwnedScopeRefs(value);
+			return refs.columns.size > 0 || refs.tables.size > 0;
+		}
+
+		function addScopeTableKeys(refs) {
+			for (const scopeName of refs.tables) {
+				const definition = getScopeDefinition(scopeName);
+				for (const column of definition.table._primaryColumns)
+					getScopeColumns(refs, scopeName).add(column.alias);
+			}
+		}
+
+		function getScopeColumns(refs, scopeName) {
+			let columns = refs.columns.get(scopeName);
+			if (!columns) {
+				columns = new Set();
+				refs.columns.set(scopeName, columns);
+			}
+			return columns;
+		}
+
+		function getScopeDefinition(scopeName) {
+			const definition = scopeDefinitions.get(scopeName);
+			if (!definition)
+				throwBadRequest(`Ad-hoc lexical scope '${scopeName}' is invalid`);
+			return definition;
+		}
+
+		function parseScopePath(path) {
+			const rootMatch = /^\$root\.(.+)$/.exec(path);
+			if (rootMatch)
+				return { scopeName: 'root', path: rootMatch[1] };
+			const lexicalMatch = /^\$scope\.([^.]+)\.(.+)$/.exec(path);
+			return lexicalMatch
+				? { scopeName: lexicalMatch[1], path: lexicalMatch[2] }
+				: undefined;
+		}
+
+		function resolveAdHocTable(name) {
+			const target = tables?.[name];
+			if (!target || !target._primaryColumns)
+				throwBadRequest(`Ad-hoc relation target '${name}' is not mapped or exposed`);
+			return target;
+		}
+
+		function stripAdHocRelations(currentTable, currentStrategy) {
+			if (!currentStrategy || typeof currentStrategy !== 'object')
+				return currentStrategy;
+			const result = {};
+			for (let name in currentStrategy) {
+				const value = currentStrategy[name];
+				if (isAdHocRelation(value))
+					continue;
+				if (currentTable._relations[name] && value && typeof value === 'object')
+					result[name] = stripAdHocRelations(currentTable._relations[name].childTable, value);
+				else
+					result[name] = value;
+			}
+			return result;
+		}
+
+		async function populateAdHocRelations(pairs, currentTable, currentStrategy) {
+			if (!currentStrategy || pairs.length === 0)
+				return;
+
+			for (let name in currentStrategy) {
+				const value = currentStrategy[name];
+				if (isAdHocRelation(value))
+					await populateDescriptor(name, value);
+				else if (currentTable._relations[name] && value && typeof value === 'object') {
+					const childPairs = [];
+					for (const pair of pairs) {
+						const child = pair.row?.[name];
+						if (Array.isArray(child)) {
+							for (const row of child)
+								if (row)
+									childPairs.push(inheritScopes(row, pair));
+						}
+						else if (child)
+							childPairs.push(inheritScopes(child, pair));
+					}
+					await populateAdHocRelations(childPairs, currentTable._relations[name].childTable, value);
+				}
+			}
+
+			async function populateDescriptor(name, descriptor) {
+				const targetTable = resolveAdHocTable(descriptor.table);
+				const ownerScopeName = descriptor[ownerScopeMarker];
+				const ownerPairs = pairs.map(pair => bindOwnerScope(pair, ownerScopeName));
+				const childPairs = [];
+				if (!hasOwnedScopeRefs(descriptor.strategy)) {
+					const rows = await fetchDescriptorRows(descriptor, targetTable);
+					for (const pair of ownerPairs) {
+						const attached = descriptor.__rdbAdHocRelation === 'many'
+							? clone(rows)
+							: (rows.length ? clone(rows[0]) : null);
+						pair.row[name] = attached;
+						addChildPairs(attached, pair);
+					}
+					await populateChildren();
+					return;
+				}
+
+				if (canUseScopedBatch(descriptor)) {
+					const attachedRows = await fetchDescriptorRowsScoped(
+						descriptor,
+						targetTable,
+						ownerPairs
+					);
+					for (let i = 0; i < ownerPairs.length; i++) {
+						const pair = ownerPairs[i];
+						const rows = attachedRows[i];
+						const attached = descriptor.__rdbAdHocRelation === 'many' ? rows : (rows[0] || null);
+						pair.row[name] = attached;
+						addChildPairs(attached, pair);
+					}
+					await populateChildren();
+					return;
+				}
+
+				for (const pair of ownerPairs) {
+					const scope = createScope(pair);
+					const rows = await fetchDescriptorRows(descriptor, targetTable, scope);
+					pair.row[name] = descriptor.__rdbAdHocRelation === 'many'
+						? rows
+						: (rows[0] || null);
+					addChildPairs(pair.row[name], pair);
+				}
+				await populateChildren();
+
+				function addChildPairs(value, ownerPair) {
+					const rows = Array.isArray(value) ? value : value ? [value] : [];
+					for (const row of rows)
+						childPairs.push(inheritScopes(row, ownerPair));
+				}
+
+				async function populateChildren() {
+					await populateAdHocRelations(childPairs, targetTable, descriptor.strategy || {});
+				}
+			}
+		}
+
+		function bindOwnerScope(pair, scopeName) {
+			getScopeDefinition(scopeName);
+			return {
+				row: pair.row,
+				root: pair.root,
+				scopes: { ...pair.scopes, [scopeName]: pair.row }
+			};
+		}
+
+		function inheritScopes(row, pair) {
+			return {
+				row,
+				root: pair.root,
+				scopes: { ...pair.scopes }
+			};
+		}
+
+		function canUseScopedBatch(descriptor) {
+			const descriptorStrategy = descriptor.strategy || {};
+			const outsideWhere = { ...descriptorStrategy };
+			delete outsideWhere.where;
+			return !!descriptorStrategy.where && hasOwnedScopeRefs(descriptorStrategy.where)
+				&& !hasOwnedScopeRefs(outsideWhere);
+		}
+
+		async function fetchDescriptorRowsScoped(descriptor, targetTable, pairs) {
+			const result = pairs.map(() => []);
+			const refs = collectOwnedScopeRefs(descriptor.strategy.where);
+			addScopeTableKeys(refs);
+			const { scope, scopeColumns, scopeTables } = createVirtualScope(refs);
+			const scopeGroups = createScopeGroups(pairs, scopeColumns);
+			const rowsByGroup = scopeGroups.map(() => []);
+			const targetBaseFilter = await resolveBaseFilter(descriptor.table, targetTable);
+			const queryStrategy = JSON.parse(JSON.stringify(descriptor.strategy || {}));
+			const jsonWhere = queryStrategy.where;
+			delete queryStrategy.where;
+			delete queryStrategy.limit;
+			delete queryStrategy.offset;
+			const executionStrategy = stripAdHocRelations(targetTable, queryStrategy);
+			await negotiateStrategy(executionStrategy, targetTable, scope);
+			const scopeFilter = await parseFilter(jsonWhere, targetTable, scope);
+			const filter = targetBaseFilter || emptyFilter;
+
+			const maxParameters = getSessionSingleton(context, 'maxParameters');
+			const parametersPerPair = Math.max(1, scopeColumns.length);
+			const fixedParameters = (filter?.parameters?.length || 0)
+				+ (scopeFilter?.parameters?.length || 0);
+			const chunkSize = maxParameters
+				? Math.max(1, Math.min(200, Math.floor((maxParameters - fixedParameters) / parametersPerPair)))
+				: 200;
+			const start = descriptor.strategy?.offset || 0;
+			const limit = descriptor.__rdbAdHocRelation === 'one' ? 1 : descriptor.strategy?.limit;
+			const databasePaginates = getSessionSingleton(context, 'engine') !== 'sap'
+				&& (start > 0 || limit !== undefined);
+			for (let offset = 0; offset < scopeGroups.length; offset += chunkSize) {
+				const scopeRows = scopeGroups.slice(offset, offset + chunkSize).map(group =>
+					({ ownerId: group.groupId, ...group.scopeRows }));
+				const rows = await getManyDtoScoped({
+					context,
+					table: targetTable,
+					filter,
+					scopeFilter,
+					strategy: executionStrategy,
+					scopeColumns,
+					scopeTables,
+					scopeRows,
+					offset: start,
+					limit
+				});
+				for (const { ownerId, row } of rows)
+					if (row)
+						rowsByGroup[ownerId].push(row);
+			}
+
+			const end = limit === undefined ? undefined : start + limit;
+			for (const group of scopeGroups) {
+				const rows = databasePaginates
+					? rowsByGroup[group.groupId]
+					: rowsByGroup[group.groupId].slice(start, end);
+				for (const pairIndex of group.pairIndexes)
+					result[pairIndex] = clone(rows);
+			}
+			return result;
+		}
+
+		function createScopeGroups(pairs, scopeColumns) {
+			const groups = [];
+			const groupsByKey = new Map();
+			for (let pairIndex = 0; pairIndex < pairs.length; pairIndex++) {
+				const pair = pairs[pairIndex];
+				const scopeRow = createScopeRows(pair);
+				const key = createScopeKey(scopeColumns, scopeRow);
+				let group = key === undefined ? undefined : groupsByKey.get(key);
+				if (!group) {
+					group = {
+						groupId: groups.length,
+						scopeRows: scopeRow,
+						pairIndexes: []
+					};
+					groups.push(group);
+					if (key !== undefined)
+						groupsByKey.set(key, group);
+				}
+				group.pairIndexes.push(pairIndex);
+			}
+			return groups;
+		}
+
+		function createScopeKey(scopeColumns, scopeRow) {
+			try {
+				const values = new Array(scopeColumns.length);
+				for (let index = 0; index < scopeColumns.length; index++) {
+					const scopeColumn = scopeColumns[index];
+					let value = scopeColumn.value(scopeRow);
+					if (value !== null && value !== undefined
+						&& typeof scopeColumn.column.encode?.direct === 'function')
+						value = scopeColumn.column.encode.direct(context, value);
+					const canonical = canonicalizeScopeValue(value);
+					if (canonical === undefined)
+						return;
+					values[index] = [index, canonical];
+				}
+				return JSON.stringify(values);
+			}
+			catch (_error) {
+				return;
+			}
+		}
+
+		function createVirtualScope(refs) {
+			const scope = Object.create(null);
+			const scopeColumns = [];
+			for (const [scopeName, columns] of refs.columns) {
+				const definition = getScopeDefinition(scopeName);
+				scope[scopeName] = {
+					row: {},
+					table: definition.table,
+					alias: refs.tables.has(scopeName) ? `__rdb_scope_${scopeName}` : undefined
+				};
+				for (const name of columns) {
+					const alias = `c${scopeColumns.length}`;
+					const column = scope[scopeName].table[name];
+					scope[scopeName].row[name] = getManyDtoScoped.newScopeColumnRef(context, alias);
+					scopeColumns.push({
+						alias,
+						scopeName,
+						name,
+						column,
+						value: row => row[scopeName][name]
+					});
+				}
+			}
+			const scopeTables = [...refs.tables].map(scopeName => ({
+				scopeName,
+				table: scope[scopeName].table,
+				alias: scope[scopeName].alias
+			}));
+			return { scope, scopeColumns, scopeTables };
+		}
+
+		function createScope(pair) {
+			const scope = {
+				root: { row: pair.root, table: rootTable }
+			};
+			for (const [scopeName, row] of Object.entries(pair.scopes))
+				scope[scopeName] = { row, table: getScopeDefinition(scopeName).table };
+			return scope;
+		}
+
+		function createScopeRows(pair) {
+			return {
+				root: pair.root,
+				...pair.scopes
+			};
+		}
+
+		function includeColumn(targetTable, targetStrategy, name) {
+			const column = targetTable[name];
+			if (!column || typeof column._toFilterArg !== 'function')
+				throwBadRequest(`Unknown scope column '${name}' on table '${targetTable._dbName}'`);
+
+			let mode = selectionModes.get(targetStrategy);
+			if (!mode) {
+				mode = { hasIncludes: targetTable._columns.some(col => targetStrategy[col.alias] === true) };
+				selectionModes.set(targetStrategy, mode);
+			}
+			const isPrimaryColumn = targetTable._primaryColumns.includes(column);
+			const wasVisible = targetStrategy[name] !== false
+				&& (isPrimaryColumn || !mode.hasIncludes || targetStrategy[name] === true);
+			if (!wasVisible) {
+				let hidden = hiddenColumns.get(targetStrategy);
+				if (!hidden) {
+					hidden = new Set();
+					hiddenColumns.set(targetStrategy, hidden);
+				}
+				hidden.add(name);
+				targetStrategy[name] = true;
+			}
+		}
+
+		async function fetchDescriptorRows(descriptor, targetTable, scope) {
+			const queryStrategy = JSON.parse(JSON.stringify(descriptor.strategy || {}));
+			if (descriptor.__rdbAdHocRelation === 'one')
+				queryStrategy.limit = 1;
+			const executionStrategy = stripAdHocRelations(targetTable, queryStrategy);
+			await negotiateStrategy(executionStrategy, targetTable, scope);
+			let filter = emptyFilter;
+			const targetBaseFilter = await resolveBaseFilter(descriptor.table, targetTable);
+			if (targetBaseFilter)
+				filter = filter.and(context, targetBaseFilter);
+			return targetTable.getManyDto(context, filter, executionStrategy);
+		}
+
+		function stripHiddenColumns(rows, currentTable, currentStrategy) {
+			if (!currentStrategy || !Array.isArray(rows))
+				return;
+			const hidden = hiddenColumns.get(currentStrategy);
+			for (const row of rows) {
+				if (!row)
+					continue;
+				if (hidden)
+					for (const name of hidden) {
+						delete row[name];
+						const prototype = Object.getPrototypeOf(row);
+						if (prototype && Object.prototype.hasOwnProperty.call(prototype, name))
+							delete prototype[name];
+					}
+				for (let name in currentStrategy) {
+					const value = currentStrategy[name];
+					if (isAdHocRelation(value)) {
+						const child = row[name];
+						const childRows = Array.isArray(child) ? child : child ? [child] : [];
+						stripHiddenColumns(childRows, resolveAdHocTable(value.table), value.strategy || {});
+					}
+					else if (currentTable._relations[name] && value && typeof value === 'object') {
+						const child = row[name];
+						const childRows = Array.isArray(child) ? child : child ? [child] : [];
+						stripHiddenColumns(childRows, currentTable._relations[name].childTable, value);
+					}
+				}
+			}
+		}
+	};
+
+	function canonicalizeScopeValue(value, seen = new Set()) {
+		if (value === undefined)
+			return ['undefined'];
+		if (value === null)
+			return ['null'];
+
+		const type = typeof value;
+		if (type === 'string')
+			return ['string', value];
+		if (type === 'boolean')
+			return ['boolean', value];
+		if (type === 'bigint')
+			return ['bigint', value.toString()];
+		if (type === 'number') {
+			if (Number.isNaN(value))
+				return ['number', 'NaN'];
+			if (value === Infinity)
+				return ['number', 'Infinity'];
+			if (value === -Infinity)
+				return ['number', '-Infinity'];
+			if (Object.is(value, -0))
+				return ['number', '-0'];
+			return ['number', String(value)];
+		}
+		if (type !== 'object')
+			return;
+
+		const bytes = getBinaryBytes(value);
+		if (bytes)
+			return ['binary', binaryToBase64(bytes)];
+		if (value instanceof Date) {
+			const timestamp = Date.prototype.getTime.call(value);
+			return Number.isNaN(timestamp)
+				? undefined
+				: ['date', Date.prototype.toISOString.call(value)];
+		}
+		if (seen.has(value))
+			return;
+
+		seen.add(value);
+		try {
+			if (Array.isArray(value)) {
+				const ownKeys = Reflect.ownKeys(value);
+				for (const key of ownKeys)
+					if (key !== 'length' && !isArrayIndex(key, value.length))
+						return;
+
+				const items = new Array(value.length);
+				for (let index = 0; index < value.length; index++) {
+					const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+					if (!descriptor) {
+						items[index] = ['hole'];
+						continue;
+					}
+					if (!Object.prototype.hasOwnProperty.call(descriptor, 'value'))
+						return;
+					const item = canonicalizeScopeValue(descriptor.value, seen);
+					if (item === undefined)
+						return;
+					items[index] = item;
+				}
+				return ['array', items];
+			}
+
+			const prototype = Object.getPrototypeOf(value);
+			if (prototype !== Object.prototype && prototype !== null)
+				return;
+			const ownKeys = Reflect.ownKeys(value);
+			if (ownKeys.some(key => typeof key !== 'string'))
+				return;
+			const keys = ownKeys.sort();
+			const entries = new Array(keys.length);
+			for (let index = 0; index < keys.length; index++) {
+				const key = keys[index];
+				const descriptor = Object.getOwnPropertyDescriptor(value, key);
+				if (!descriptor?.enumerable
+					|| !Object.prototype.hasOwnProperty.call(descriptor, 'value'))
+					return;
+				const item = canonicalizeScopeValue(descriptor.value, seen);
+				if (item === undefined)
+					return;
+				entries[index] = [key, item];
+			}
+			return ['object', entries];
+		}
+		finally {
+			seen.delete(value);
+		}
+	}
+
+	function getBinaryBytes(value) {
+		if (typeof Buffer !== 'undefined' && Buffer.isBuffer(value))
+			return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+		if (typeof Uint8Array !== 'undefined' && value instanceof Uint8Array)
+			return value;
+		if (typeof ArrayBuffer !== 'undefined' && value instanceof ArrayBuffer)
+			return new Uint8Array(value);
+	}
+
+	function binaryToBase64(bytes) {
+		if (typeof Buffer !== 'undefined')
+			return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString('base64');
+		if (typeof btoa !== 'undefined') {
+			let binary = '';
+			for (const byte of bytes)
+				binary += String.fromCharCode(byte);
+			return btoa(binary);
+		}
+		throw new Error('No base64 encoder is available');
+	}
+
+	function isArrayIndex(key, length) {
+		if (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/.test(key))
+			return false;
+		const index = Number(key);
+		return Number.isSafeInteger(index) && index < length;
+	}
+
+	function throwBadRequest(message) {
+		const error = new Error(message);
+		error.status = 400;
+		throw error;
+	}
+	return newAdHocPlan;
+}
+
 var getMeta_1;
 var hasRequiredGetMeta;
 
@@ -27842,6 +29014,9 @@ function requireExecutePath () {
 	const emptyFilter = requireEmptyFilter();
 	const negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
 	const parseAggregateOrderBy = requireParseOrderBy();
+	const { isAdHocRelation } = requireAdHocRelation();
+	const newAdHocPlan = requireNewAdHocPlan();
+	const validatePagination = requireValidatePagination();
 	let getMeta = requireGetMeta();
 	let isSafe = Symbol();
 
@@ -27915,9 +29090,12 @@ function requireExecutePath () {
 
 		return executePath(...rest);
 
-		async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client }) {
+		async function executePath({ table, tables, tableConfigs, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client, prepareAdHoc, sourceStrategy }) {
+			tables = tables || client?.tables || {};
 			let allowedOps = { ..._allowedOps, insert: !readonly, ...extractRelations(getMeta(table)) };
 			let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, aggregate, distinct, count, delete: _delete, cascadeDelete, update, replace };
+			if (prepareAdHoc)
+				return prepareAdHocPlan(sourceStrategy);
 
 			let res = await parseFilter(JSONFilter, table);
 			if (res === undefined)
@@ -27925,8 +29103,17 @@ function requireExecutePath () {
 			else
 				return res;
 
-			function parseFilter(json, table) {
+			function parseFilter(json, table, scope) {
 				if (isFilter(json)) {
+					const scopePath = parseScopePath(json.path);
+					if (scopePath) {
+						const selectedScope = getScope(scopePath.scopeName, scope);
+						return withScopeAlias(selectedScope, () => parseFilter(
+							{ ...json, path: scopePath.path },
+							selectedScope.table,
+							scope
+						));
+					}
 					let subFilters = [];
 
 					let anyAllNone = tryGetAnyAllNone(json.path, table);
@@ -27936,14 +29123,14 @@ function requireExecutePath () {
 							validateArgs(arg0);
 						const f = arg0 === undefined
 							? anyAllNone(context)
-							: anyAllNone(context, x => parseFilter(arg0, x));
+							: anyAllNone(context, x => parseFilter(arg0, x, scope));
 						if(!('isSafe' in f))
 							f.isSafe = isSafe;
 						return f;
 					}
 					else {
 						for (let i = 0; i < json.args.length; i++) {
-							subFilters.push(parseFilter(json.args[i], nextTable(json.path, table)));
+							subFilters.push(parseFilter(json.args[i], nextTable(json.path, table), scope));
 						}
 					}
 					return executePath(json.path, subFilters);
@@ -27951,14 +29138,91 @@ function requireExecutePath () {
 				else if (Array.isArray(json)) {
 					const result = [];
 					for (let i = 0; i < json.length; i++) {
-						result.push(parseFilter(json[i], table));
+						result.push(parseFilter(json[i], table, scope));
 					}
 					return result;
+				}
+				else if (isScopeRef(json)) {
+					return resolveScopeRef(json.__columnRef, scope);
 				}
 				else if (isColumnRef(json)) {
 					return resolveColumnRef(table, json.__columnRef);
 				}
 				return json;
+
+				function resolveScopeRef(path, scope) {
+					const scopePath = parseScopePath(path);
+					const selectedScope = scopePath && getScope(scopePath.scopeName, scope);
+					if (!selectedScope) {
+						const e = new Error(`Scope column reference '${path}' is invalid`);
+						// @ts-ignore
+						e.status = 400;
+						throw e;
+					}
+					if (!scopePath.path.includes('.')) {
+						const column = selectedScope.table?.[scopePath.path];
+						if (!column || typeof column._toFilterArg !== 'function')
+							throwInvalidScopeRef(path);
+						return selectedScope.row[scopePath.path];
+					}
+					const column = withScopeAlias(selectedScope, () =>
+						resolveColumnRef(selectedScope.table, scopePath.path));
+					const filterArg = withScopeAlias(selectedScope, () => column._toFilterArg(context));
+					return {
+						_toFilterArg() {
+							return filterArg;
+						}
+					};
+
+					function throwInvalidScopeRef(invalidPath) {
+						const e = new Error(`Scope column reference '${invalidPath}' is invalid`);
+						// @ts-ignore
+						e.status = 400;
+						throw e;
+					}
+				}
+
+				function parseScopePath(path) {
+					const rootMatch = /^\$root\.(.+)$/.exec(path);
+					if (rootMatch)
+						return { scopeName: 'root', path: rootMatch[1] };
+					const lexicalMatch = /^\$scope\.([^.]+)\.(.+)$/.exec(path);
+					return lexicalMatch
+						? { scopeName: lexicalMatch[1], path: lexicalMatch[2] }
+						: undefined;
+				}
+
+				function getScope(scopeName, scope) {
+					const selectedScope = scope?.[scopeName];
+					if (!selectedScope?.table) {
+						const e = new Error(`Scope table reference '${scopeName}' is invalid`);
+						// @ts-ignore
+						e.status = 400;
+						throw e;
+					}
+					return selectedScope;
+				}
+
+				function withScopeAlias(selectedScope, fn) {
+					if (!selectedScope.alias) {
+						const e = new Error('Scope table reference is unavailable outside a scoped query');
+						// @ts-ignore
+						e.status = 400;
+						throw e;
+					}
+					const table = selectedScope.table;
+					const previousAlias = table._rootAlias;
+					table._rootAlias = selectedScope.alias;
+					try {
+						return fn();
+					}
+					finally {
+						if (previousAlias === undefined)
+							delete table._rootAlias;
+						else
+							table._rootAlias = previousAlias;
+					}
+				}
 
 				function tryGetAnyAllNone(path, table) {
 					const parts = path.split('.');
@@ -28025,16 +29289,17 @@ function requireExecutePath () {
 			}
 
 			async function invokeBaseFilter() {
+				let res;
 				if (typeof baseFilter === 'function') {
-					const res = await baseFilter.apply(null, [bindDb(client), request, response]);
-					if (!res)
-						return;
-					const JSONFilter = JSON.parse(JSON.stringify(res));
-					//@ts-ignore
-					return executePath({ table, JSONFilter, request, response });
+					res = await baseFilter.apply(null, [bindDb(client), request, response]);
 				}
 				else
+					res = baseFilter;
+				if (!res)
 					return;
+				const JSONFilter = JSON.parse(JSON.stringify(res));
+				//@ts-ignore
+				return executePath({ table, JSONFilter, request, response });
 			}
 
 			function getCustomFilterPaths(customFilters) {
@@ -28122,7 +29387,7 @@ function requireExecutePath () {
 			}
 
 			async function count(filter, strategy) {
-				validateStrategy(table, strategy);
+				validateStrategy(table, strategy, tables);
 				filter = negotiateFilter(filter);
 				const _baseFilter = await invokeBaseFilter();
 				if (_baseFilter)
@@ -28132,24 +29397,50 @@ function requireExecutePath () {
 			}
 
 			async function getManyDto(filter, strategy) {
-				validateStrategy(table, strategy);
 				filter = negotiateFilter(filter);
 				const _baseFilter = await invokeBaseFilter();
 				if (_baseFilter)
 					filter = filter.and(context, _baseFilter);
-				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
-				await negotiateWhereAndAggregate(strategy);
-				return table.getManyDto.apply(null, args);
+
+				const adHocPlan = await prepareAdHocPlan(strategy);
+				const rows = await table.getManyDto(context, filter, adHocPlan.strategy);
+				return adHocPlan.materialize(rows);
+			}
+
+			async function prepareAdHocPlan(strategy) {
+				validateStrategy(table, strategy, tables);
+				const adHocPlan = newAdHocPlan({
+					context,
+					rootTable: table,
+					sourceStrategy: strategy,
+					tables,
+					parseFilter,
+					negotiateStrategy: negotiateWhereAndAggregate,
+					resolveBaseFilter: invokeAdHocBaseFilter
+				});
+				await negotiateWhereAndAggregate(adHocPlan.strategy, table);
+				return adHocPlan;
+			}
+
+			async function invokeAdHocBaseFilter(tableName, targetTable) {
+				const configured = tableConfigs?.[tableName]?.baseFilter;
+				const res = typeof configured === 'function'
+					? await configured.apply(null, [bindDb(client), request, response])
+					: configured;
+				if (!res)
+					return;
+				const json = JSON.parse(JSON.stringify(res));
+				return parseFilter(json, targetTable);
 			}
 
 			async function replace(subject, strategy = { insertAndForget: true }) {
-				validateStrategy(table, strategy);
+				validateStrategy(table, strategy, tables);
 				const refinedStrategy = withLockingStrategy(objectToStrategy(subject, {}, table), strategy);
 				const JSONFilter2 = {
 					path: 'getManyDto',
 					args: [subject, refinedStrategy]
 				};
-				const originals = await executePath({ table, JSONFilter: JSONFilter2, baseFilter, customFilters, request, response, readonly, disableBulkDeletes, isHttp, client });
+				const originals = await executePath({ table, tables, tableConfigs, JSONFilter: JSONFilter2, baseFilter, customFilters, request, response, readonly, disableBulkDeletes, isHttp, client });
 				const meta = getMeta(table);
 				const patch = createPatch(originals, Array.isArray(subject) ? subject : [subject], meta);
 				const { changed } = await table.patch(context, patch, { strategy });
@@ -28160,13 +29451,13 @@ function requireExecutePath () {
 			}
 
 			async function update(subject, whereStrategy, strategy = { insertAndForget: true }) {
-				validateStrategy(table, strategy);
+				validateStrategy(table, strategy, tables);
 				const refinedWhereStrategy = withLockingStrategy(objectToStrategy(subject, whereStrategy, table), strategy);
 				const JSONFilter2 = {
 					path: 'getManyDto',
 					args: [null, refinedWhereStrategy]
 				};
-				const rows = await executePath({ table, JSONFilter: JSONFilter2, baseFilter, customFilters, request, response, readonly, disableBulkDeletes, isHttp, client });
+				const rows = await executePath({ table, tables, tableConfigs, JSONFilter: JSONFilter2, baseFilter, customFilters, request, response, readonly, disableBulkDeletes, isHttp, client });
 				const originals = new Array(rows.length);
 				for (let i = 0; i < rows.length; i++) {
 					const row = rows[i];
@@ -28263,22 +29554,24 @@ function requireExecutePath () {
 
 
 
-			async function negotiateWhereAndAggregate(strategy) {
+			async function negotiateWhereAndAggregate(strategy, filterTable = table, scope) {
 				if (typeof strategy !== 'object')
 					return;
 
 				for (let name in strategy) {
 					const target = strategy[name];
+					if (isAdHocRelation(target))
+						continue;
 					if (isFilter(target))
-						strategy[name] = await parseFilter(strategy[name], table);
+						strategy[name] = await parseFilter(strategy[name], filterTable, scope);
 					else
-						await negotiateWhereAndAggregate(strategy[name]);
+						await negotiateWhereAndAggregate(strategy[name], filterTable, scope);
 				}
 
 			}
 
 			async function getMany(filter, strategy) {
-				validateStrategy(table, strategy);
+				validateStrategy(table, strategy, tables);
 				filter = negotiateFilter(filter);
 				const _baseFilter = await invokeBaseFilter();
 				if (_baseFilter)
@@ -28290,7 +29583,7 @@ function requireExecutePath () {
 
 		}
 
-		function validateStrategy(table, strategy) {
+		function validateStrategy(table, strategy, tables) {
 			if (!strategy || !table)
 				return;
 
@@ -28298,7 +29591,34 @@ function requireExecutePath () {
 				validateOffset(strategy);
 				validateLimit(strategy);
 				validateOrderBy(table, strategy);
-				validateStrategy(table[p], strategy[p]);
+				if (isAdHocRelation(strategy[p])) {
+					const isMappedName = table._columns?.some(column => column.alias === p) || table._relations?.[p];
+					const reservedNames = new Set(['where', 'orderBy', 'limit', 'offset', 'forUpdate', 'skipLocked']);
+					const isReservedName = reservedNames.has(p);
+					if (isMappedName || isReservedName) {
+						const e = new Error(`Ad-hoc relation property '${p}' conflicts with a mapped or reserved property`);
+						// @ts-ignore
+						e.status = 400;
+						throw e;
+					}
+					const descriptor = strategy[p];
+					const target = tables?.[descriptor.table];
+					if (!target) {
+						const e = new Error(`Ad-hoc relation target '${descriptor.table}' is not mapped or exposed`);
+						// @ts-ignore
+						e.status = 400;
+						throw e;
+					}
+					if (descriptor.strategy?.forUpdate || descriptor.strategy?.skipLocked) {
+						const e = new Error('Ad-hoc relations are read-only and cannot use row locking');
+						// @ts-ignore
+						e.status = 400;
+						throw e;
+					}
+					validateStrategy(target, descriptor.strategy, tables);
+				}
+				else
+					validateStrategy(table[p], strategy[p], tables);
 			}
 		}
 
@@ -28319,20 +29639,11 @@ function requireExecutePath () {
 		}
 
 		function validateLimit(strategy) {
-			if (!('limit' in strategy) || Number.isInteger(strategy.limit))
-				return;
-			const e = new Error('Invalid limit: ' + strategy.limit);
-			// @ts-ignore
-			e.status = 400;
+			validatePagination.limit(strategy);
 		}
 
 		function validateOffset(strategy) {
-			if (!('offset' in strategy) || Number.isInteger(strategy.offset))
-				return;
-			const e = new Error('Invalid offset: ' + strategy.offset);
-			// @ts-ignore
-			e.status = 400;
-			throw e;
+			validatePagination.offset(strategy);
 		}
 
 		function validateOrderBy(table, strategy) {
@@ -28388,6 +29699,11 @@ function requireExecutePath () {
 
 		function isColumnRef(json) {
 			return json instanceof Object && typeof json.__columnRef === 'string';
+		}
+
+		function isScopeRef(json) {
+			return isColumnRef(json) && (/^\$root\./.test(json.__columnRef)
+				|| /^\$scope\.[^.]+\./.test(json.__columnRef));
 		}
 
 		function resolveColumnRef(table, path) {
@@ -28510,6 +29826,7 @@ function requireGetTSDefinition () {
 		if (isNamespace)
 			src += startNamespace(tables, isHttp);
 		src += defs;
+		src += getAdHocScopeTs(tables);
 		src += getRdbClientTs(tables, isHttp);
 		if (isNamespace)
 			src += '}';
@@ -28529,12 +29846,14 @@ function requireGetTSDefinition () {
 			return `
 export interface ${Name}Table {
 	count(filter?: RawFilter): Promise<number>;
+	getMany<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<${Name}AdHocArray<Strategy>>;
 	getAll(): Promise<${Name}Array>;
 	getAll(fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
 	getMany(filter?: RawFilter): Promise<${Name}Array>;
 	getMany(filter: RawFilter, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
 	getMany(${name}s: Array<${Name}>): Promise<${Name}Array>;
 	getMany(${name}s: Array<${Name}>, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+	getOne<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<${Name}AdHocRow<Strategy>>;
 	getOne(filter?: RawFilter): Promise<${Name}Row>;
 	getOne(filter?: RawFilter, fetchingStrategy?: ${Name}Strategy): Promise<${Name}Row>;
 	getOne(${name}: ${Name}): Promise<${Name}Row>;
@@ -28680,7 +29999,7 @@ ${Concurrency(table, Name, true)}
 
 				otherConcurrency += `${Concurrency(relation.childTable, tableTypeName)}`;
 				concurrencyRelations += `${relationName}?: ${tableTypeName}Concurrency;${separator}`;
-				strategyRelations += `${relationName}?: ${tableTypeName}Strategy | boolean;${separator}`;
+				strategyRelations += `${relationName}?: ${tableTypeName}Strategy<Root> | boolean;${separator}`;
 				regularRelations += `${relationName}?: ${tableTypeName} | null;${separator}`;
 			};
 			visitor.visitOne = visitor.visitJoin;
@@ -28688,7 +30007,7 @@ ${Concurrency(table, Name, true)}
 				const tableTypeName = getTableName(relation, relationName);
 				otherConcurrency += `${Concurrency(relation.childTable, tableTypeName)}`;
 				concurrencyRelations += `${relationName}?: ${tableTypeName}Concurrency;${separator}`;
-				strategyRelations += `${relationName}?: ${tableTypeName}Strategy | boolean;${separator}`;
+				strategyRelations += `${relationName}?: ${tableTypeName}Strategy<Root> | boolean;${separator}`;
 				regularRelations += `${relationName}?: ${tableTypeName}[] | null;${separator}`;
 			};
 
@@ -28698,7 +30017,12 @@ ${Concurrency(table, Name, true)}
 			}
 
 			let row = '';
+			let adHocResultTypes = `
+export type ${name}AdHocRow<Strategy extends ${name}Strategy> = ${name}Row & AdHocProperties<Strategy>;
+export type ${name}AdHocArray<Strategy extends ${name}Strategy> = ${name}Array & Array<${name}AdHocRow<Strategy>>;
+`;
 			if (!isRoot) {
+				adHocResultTypes = '';
 				row = `export interface ${name}RelatedTable {
 	${columns(table)}
 	${tableRelations(table)}
@@ -28728,7 +30052,14 @@ export interface ${name}TableBase {
 }
 
 
-export interface ${name}Strategy {
+export interface ${name}AdHocTable<Root, Current> {
+	many(fetchingStrategy?: ${name}AdHocStrategy<Root, Current>): AdHocMany<${name}>;
+	one(fetchingStrategy?: ${name}AdHocStrategy<Root, Current>): AdHocOne<${name}>;
+}
+
+export interface ${name}Strategy<Root = ${name}TableBase> {
+	[property: string]: boolean | number | string | object | undefined
+		| ((table: ${name}TableBase, context: AdHocFactoryContext<Root, ${name}TableBase>) => unknown);
 	${strategyColumns(table)}
 	${strategyRelations}
 	limit?: number;
@@ -28738,6 +30069,14 @@ export interface ${name}Strategy {
 	forUpdate?: boolean;
 	skipLocked?: boolean;
 }
+
+export type ${name}AdHocStrategy<Root, Current> = Omit<${name}Strategy<Root>, 'where' | 'forUpdate' | 'skipLocked'> & {
+	where?: RawFilter | ((table: ${name}TableBase) => RawFilter);
+	forUpdate?: never;
+	skipLocked?: never;
+};
+
+${adHocResultTypes}
 
 ${otherConcurrency}
 
@@ -28761,6 +30100,21 @@ ${row}`;
 				return name;
 			}
 		}
+	}
+
+	function getAdHocScopeTs(tables) {
+		const dbProperties = Object.keys(tables)
+			.map(name => `\t${name}: ${pascalCase(name)}AdHocTable<Root, Current>;`)
+			.join('\n');
+		return `
+export interface AdHocDb<Root, Current> {
+${dbProperties}
+}
+export interface AdHocFactoryContext<Root, Current> {
+	db: AdHocDb<Root, Current>;
+	root: Root;
+}
+`;
 	}
 
 	function regularColumns(table) {
@@ -28878,6 +30232,23 @@ type HttpResponse<T = any> = {
 	headers: Record<string, string>;
 	config: HttpRequestConfig;
 };
+interface AdHocMany<T> {
+	readonly __rdbAdHocRelation: 'many';
+	readonly table: string;
+	readonly strategy: Record<string, unknown>;
+	readonly __result?: T[];
+}
+interface AdHocOne<T> {
+	readonly __rdbAdHocRelation: 'one';
+	readonly table: string;
+	readonly strategy: Record<string, unknown>;
+	readonly __result?: T | null;
+}
+type AdHocProperties<Strategy> = {
+	[Property in keyof Strategy as Strategy[Property] extends (...args: any[]) => AdHocMany<any> | AdHocOne<any> ? Property : never]:
+		Strategy[Property] extends (...args: any[]) => AdHocMany<infer Row> ? Row[] :
+		Strategy[Property] extends (...args: any[]) => AdHocOne<infer Row> ? Row | null : never;
+};
 `;
 
 		return `
@@ -28903,6 +30274,23 @@ type HttpResponse<T = any> = {
 	statusText: string;
 	headers: Record<string, string>;
 	config: HttpRequestConfig;
+};
+interface AdHocMany<T> {
+	readonly __rdbAdHocRelation: 'many';
+	readonly table: string;
+	readonly strategy: Record<string, unknown>;
+	readonly __result?: T[];
+}
+interface AdHocOne<T> {
+	readonly __rdbAdHocRelation: 'one';
+	readonly table: string;
+	readonly strategy: Record<string, unknown>;
+	readonly __result?: T | null;
+}
+type AdHocProperties<Strategy> = {
+	[Property in keyof Strategy as Strategy[Property] extends (...args: any[]) => AdHocMany<any> | AdHocOne<any> ? Property : never]:
+		Strategy[Property] extends (...args: any[]) => AdHocMany<infer Row> ? Row[] :
+		Strategy[Property] extends (...args: any[]) => AdHocOne<infer Row> ? Row | null : never;
 };
 export default schema as RdbClient;`;
 	}
@@ -30128,6 +31516,8 @@ function requireHostExpress () {
 				...readonly,
 				...tableOptions,
 				table: client.tables[tableName],
+				tables: client.tables,
+				tableConfigs: options,
 				isHttp: true,
 				client,
 				hooks
@@ -30313,6 +31703,8 @@ function requireHostHono () {
 				...readonly,
 				...tableOptions,
 				table: client.tables[tableName],
+				tables: client.tables,
+				tableConfigs: options,
 				isHttp: true,
 				client,
 				hooks
@@ -30519,29 +31911,17 @@ function requireHostLocal () {
 			async function fn(context) {
 				setSessionSingleton(context, 'ignoreSerializable', true);
 				let patch = body.patch;
+				const options = { ..._options, ...body.options, isHttp };
 				await prepareSyncOutboxPatchCapture(context, patch);
-				result = await table.patch(context, patch, { ..._options, ...body.options, isHttp });
+				const adHocPlan = await executePath(context, {
+					...options,
+					request: _req,
+					response: _res,
+					prepareAdHoc: true,
+					sourceStrategy: options.strategy
+				});
+				result = await table.patch(context, patch, { ...options, adHocPlan });
 				await captureSyncOutboxPatch(context, patch, body.options);
-			}
-		}
-
-		async function syncCommand(body) {
-			body = typeof body === 'string' ? JSON.parse(body) : body;
-			if (!body || body !== Object(body))
-				throw new Error('Invalid sync command payload');
-			let result;
-
-			if (transaction)
-				await transaction(fn);
-			else {
-				const resolvedDb = await resolveDb();
-				await runSyncWrite(resolvedDb, undefined, () => resolvedDb.transaction(fn));
-			}
-			return result;
-
-			async function fn(context) {
-				await captureSyncOutboxCommand(context, body.name, body.args);
-				result = undefined;
 			}
 		}
 
@@ -30697,17 +32077,6 @@ function requireHostLocal () {
 			await getSyncOutboxCaptureState(context);
 		}
 
-		async function captureSyncOutboxCommand(context, name, args) {
-			if (typeof name !== 'string' || name.length === 0)
-				throw new Error('Sync command requires a command name');
-			const normalizedArgs = normalizeSyncCommandArgs(args);
-			let state = await getSyncOutboxCaptureState(context);
-			if (!state)
-				return;
-			state.commands.push({ name, args: normalizedArgs });
-			await updateSyncOutboxCaptureState(context, state);
-		}
-
 		async function getSyncOutboxCaptureState(context) {
 			if (getSessionSingleton(context, 'suppressSyncOutbox'))
 				return null;
@@ -30773,12 +32142,6 @@ function requireHostLocal () {
 				patches: state.patches,
 				commands: state.commands
 			};
-		}
-
-		function normalizeSyncCommandArgs(args) {
-			if (args === undefined)
-				return null;
-			return JSON.parse(JSON.stringify(args));
 		}
 
 		async function ensureSyncOutboxTable(context) {
