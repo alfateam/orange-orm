@@ -25,6 +25,9 @@ describe('hostLocal sync outbox', () => {
 			}
 		};
 		const table = {
+			_primaryColumns: [],
+			_columns: [],
+			_relations: {},
 			patch: async () => ({ changed: [] })
 		};
 		const adapter = hostLocal({
@@ -72,6 +75,9 @@ describe('hostLocal sync outbox', () => {
 		};
 		const transaction = async (fn) => fn(context);
 		const table = {
+			_primaryColumns: [],
+			_columns: [],
+			_relations: {},
 			patch: async () => ({ changed: [] })
 		};
 		const adapter = hostLocal({
@@ -108,6 +114,9 @@ describe('hostLocal sync outbox', () => {
 		};
 		const transaction = async (fn) => fn(context);
 		const table = {
+			_primaryColumns: [],
+			_columns: [],
+			_relations: {},
 			patch: async (_context, patch) => {
 				patch[0].path = '/["db-generated-id"]';
 				patch[0].value.id = 'db-generated-id';
