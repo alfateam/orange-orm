@@ -7262,6 +7262,26 @@ function requireHostLocal () {
 			}
 		}
 
+		async function syncCommand(body) {
+			body = typeof body === 'string' ? JSON.parse(body) : body;
+			if (!body || body !== Object(body))
+				throw new Error('Invalid sync command payload');
+			let result;
+
+			if (transaction)
+				await transaction(fn);
+			else {
+				const resolvedDb = await resolveDb();
+				await runSyncWrite(resolvedDb, undefined, () => resolvedDb.transaction(fn));
+			}
+			return result;
+
+			async function fn(context) {
+				await captureSyncOutboxCommand(context, body.name, body.args);
+				result = undefined;
+			}
+		}
+
 		async function post(body, request, response) {
 			body = typeof body === 'string' ? JSON.parse(body) : body;
 			let result;
@@ -7414,6 +7434,17 @@ function requireHostLocal () {
 			await getSyncOutboxCaptureState(context);
 		}
 
+		async function captureSyncOutboxCommand(context, name, args) {
+			if (typeof name !== 'string' || name.length === 0)
+				throw new Error('Sync command requires a command name');
+			const normalizedArgs = normalizeSyncCommandArgs(args);
+			let state = await getSyncOutboxCaptureState(context);
+			if (!state)
+				return;
+			state.commands.push({ name, args: normalizedArgs });
+			await updateSyncOutboxCaptureState(context, state);
+		}
+
 		async function getSyncOutboxCaptureState(context) {
 			if (getSessionSingleton(context, 'suppressSyncOutbox'))
 				return null;
@@ -7479,6 +7510,12 @@ function requireHostLocal () {
 				patches: state.patches,
 				commands: state.commands
 			};
+		}
+
+		function normalizeSyncCommandArgs(args) {
+			if (args === undefined)
+				return null;
+			return JSON.parse(JSON.stringify(args));
 		}
 
 		async function ensureSyncOutboxTable(context) {

@@ -70,6 +70,26 @@ function hostLocal() {
 		}
 	}
 
+	async function syncCommand(body) {
+		body = typeof body === 'string' ? JSON.parse(body) : body;
+		if (!body || body !== Object(body))
+			throw new Error('Invalid sync command payload');
+		let result;
+
+		if (transaction)
+			await transaction(fn);
+		else {
+			const resolvedDb = await resolveDb();
+			await runSyncWrite(resolvedDb, undefined, () => resolvedDb.transaction(fn));
+		}
+		return result;
+
+		async function fn(context) {
+			await captureSyncOutboxCommand(context, body.name, body.args);
+			result = undefined;
+		}
+	}
+
 	async function post(body, request, response) {
 		body = typeof body === 'string' ? JSON.parse(body) : body;
 		let result;
