@@ -68,7 +68,7 @@ function connectDatabase(db) {
 }
 
 function normalizeWorkerConfig(value) {
-	if (value === true)
+	if (value === undefined || value === true)
 		return {};
 	if (!value || value !== Object(value) || Array.isArray(value))
 		throw new Error('sync.worker must be true or a worker configuration object.');
@@ -84,9 +84,8 @@ function toManagedSqliteOptions(poolOptions) {
 	delete options.workerUrl;
 	delete options.inlineWorker;
 	delete options.closeDbOnClose;
-	options.singleWorker = true;
 	if (options.sync && options.sync === Object(options.sync) && !Array.isArray(options.sync))
-		delete options.sync.worker;
+		options.sync.worker = false;
 	return options;
 }
 

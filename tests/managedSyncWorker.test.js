@@ -6,6 +6,72 @@ const mapFromSyncSchema = require('../src/client/mapFromSyncSchema');
 const { buildSyncSchema } = require('../src/client/syncSchema');
 
 describe('managed sync worker', () => {
+	test('uses a managed worker by default when sync.worker is omitted', () => {
+		const messages = [];
+		let createdWorker;
+		const worker = {
+			postMessage(message) {
+				messages.push(message);
+			},
+			addEventListener() {},
+			removeEventListener() {},
+			terminate() {}
+		};
+		const workerDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'Worker');
+		const workerUrlDescriptor = Object.getOwnPropertyDescriptor(globalThis, '__orangeOrmManagedSyncWorkerUrl');
+		let client;
+		try {
+			Object.defineProperty(globalThis, 'Worker', {
+				configurable: true,
+				writable: true,
+				value: class {
+					constructor(url, options) {
+						createdWorker = { url, options };
+						return worker;
+					}
+				}
+			});
+			Object.defineProperty(globalThis, '__orangeOrmManagedSyncWorkerUrl', {
+				configurable: true,
+				writable: true,
+				value: '/managed-sync-worker.mjs'
+			});
+			const source = createMappedTables();
+			const ports = [{ id: 'a' }, { id: 'b' }, { id: 'delta' }];
+			client = createManagedSyncWorkerClient({
+				client: { tables: { parent: source.parent, child: source.child } },
+				connectionString: 'app.sqlite3',
+				poolOptions: {
+					vfs: 'opfs-sahpool',
+					sync: { url: '/sync' }
+				},
+				syncConfig: { url: '/sync' },
+				databases: ports.map((port, index) => ({
+					connectionString: ['app.sqlite3', 'app.__orange_sync_b.sqlite3', 'app.__orange_sync_delta.sqlite3'][index],
+					db: { poolFactory: { __orangeConnectWorkerPort: () => port } }
+				}))
+			});
+
+			expect(createdWorker).toEqual({
+				url: '/managed-sync-worker.mjs',
+				options: { type: 'module', name: 'orange-orm-sync' }
+			});
+			expect(messages[0].sqliteOptions.sync).toEqual({ url: '/sync', worker: false });
+		}
+		finally {
+			if (client)
+				client.close();
+			if (workerDescriptor)
+				Object.defineProperty(globalThis, 'Worker', workerDescriptor);
+			else
+				delete globalThis.Worker;
+			if (workerUrlDescriptor)
+				Object.defineProperty(globalThis, '__orangeOrmManagedSyncWorkerUrl', workerUrlDescriptor);
+			else
+				delete globalThis.__orangeOrmManagedSyncWorkerUrl;
+		}
+	});
+
 	test('serializes and reconstructs mapped sync tables', () => {
 		const source = createMappedTables();
 		const schema = buildSyncSchema(source, ['parent', 'child']);
@@ -57,9 +123,9 @@ describe('managed sync worker', () => {
 			connectionString: 'app.sqlite3',
 			sqliteOptions: {
 				vfs: 'opfs-sahpool',
-				singleWorker: true,
 				sync: {
-					url: '/sync'
+					url: '/sync',
+					worker: false
 				}
 			}
 		});

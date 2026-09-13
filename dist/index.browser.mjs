@@ -30106,7 +30106,7 @@ function requireManagedSyncWorkerClient () {
 	}
 
 	function normalizeWorkerConfig(value) {
-		if (value === true)
+		if (value === undefined || value === true)
 			return {};
 		if (!value || value !== Object(value) || Array.isArray(value))
 			throw new Error('sync.worker must be true or a worker configuration object.');
@@ -30122,9 +30122,8 @@ function requireManagedSyncWorkerClient () {
 		delete options.workerUrl;
 		delete options.inlineWorker;
 		delete options.closeDbOnClose;
-		options.singleWorker = true;
 		if (options.sync && options.sync === Object(options.sync) && !Array.isArray(options.sync))
-			delete options.sync.worker;
+			options.sync.worker = false;
 		return options;
 	}
 
@@ -32803,8 +32802,6 @@ function requireDualSyncDatabase () {
 			...poolOptions,
 			sync: stripRouterSyncOptions(poolOptions.sync)
 		};
-		if (isManagedSyncWorkerEnabled(poolOptions.sync))
-			options.singleWorker = true;
 		if (!options.vfs)
 			options.vfs = 'opfs-wl';
 		return options;
@@ -32872,7 +32869,7 @@ function requireDualSyncDatabase () {
 	}
 
 	function isManagedSyncWorkerEnabled(sync) {
-		return !!sync && sync === Object(sync) && !Array.isArray(sync) && !!sync.worker;
+		return !!sync && sync === Object(sync) && !Array.isArray(sync) && sync.worker !== false;
 	}
 
 	function appendRoleSuffix(connectionString, suffix) {
@@ -32978,6 +32975,7 @@ function requireDualSyncDatabase () {
 
 	dualSyncDatabase.exports = newDualSyncDatabase;
 	dualSyncDatabase.exports.dualSyncFaultInjectorSymbol = dualSyncFaultInjectorSymbol;
+	dualSyncDatabase.exports.isManagedSyncWorkerEnabled = isManagedSyncWorkerEnabled;
 	return dualSyncDatabase.exports;
 }
 

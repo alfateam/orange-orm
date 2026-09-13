@@ -33,8 +33,7 @@ function initialize(message) {
 					throw new Error(`Managed sync worker has no SQLite connection for "${connectionString}".`);
 				return port;
 			},
-			closeDbOnClose: false,
-			singleWorker: true
+			closeDbOnClose: false
 		})
 	});
 	handler = rdb.createSyncWorkerHandler(db.syncClient);

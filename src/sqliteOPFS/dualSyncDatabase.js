@@ -2647,8 +2647,6 @@ function toDataPoolOptions(poolOptions = {}) {
 		...poolOptions,
 		sync: stripRouterSyncOptions(poolOptions.sync)
 	};
-	if (isManagedSyncWorkerEnabled(poolOptions.sync))
-		options.singleWorker = true;
 	if (!options.vfs)
 		options.vfs = 'opfs-wl';
 	return options;
@@ -2716,7 +2714,7 @@ function stripRouterSyncOptions(sync) {
 }
 
 function isManagedSyncWorkerEnabled(sync) {
-	return !!sync && sync === Object(sync) && !Array.isArray(sync) && !!sync.worker;
+	return !!sync && sync === Object(sync) && !Array.isArray(sync) && sync.worker !== false;
 }
 
 function appendRoleSuffix(connectionString, suffix) {
@@ -2822,3 +2820,4 @@ function sqlNullableJsonLiteral(value) {
 
 module.exports = newDualSyncDatabase;
 module.exports.dualSyncFaultInjectorSymbol = dualSyncFaultInjectorSymbol;
+module.exports.isManagedSyncWorkerEnabled = isManagedSyncWorkerEnabled;

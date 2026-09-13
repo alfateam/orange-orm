@@ -335,6 +335,7 @@ describe('sqliteOPFS dual sync integration', () => {
 		const sync = {
 			url: `http://127.0.0.1:${server.address().port}/rdb`,
 			auto: false,
+			worker: false,
 			// Exercise child-before-parent delivery; validation is deferred until the complete snapshot exists.
 			tables: ['compositeOrderLine', 'compositeOrder'],
 			pull: {
@@ -410,6 +411,7 @@ describe('sqliteOPFS dual sync integration', () => {
 		const sync = {
 			url: `http://127.0.0.1:${server.address().port}/rdb`,
 			auto: false,
+			worker: false,
 			tables: ['compositeOrderLine', 'compositeOrder'],
 			pull: {
 				maxKeysPerBatch: 1,
@@ -460,6 +462,7 @@ describe('sqliteOPFS dual sync integration', () => {
 		const sync = {
 			url: `http://127.0.0.1:${server.address().port}/rdb`,
 			auto: { enabled: false, intervalMs: 5000 },
+			worker: false,
 			tables: ['project'],
 			pull: {
 				maxKeysPerBatch: 100,
@@ -769,6 +772,7 @@ describe('sqliteOPFS dual sync integration', () => {
 		const sync = {
 			url: `http://127.0.0.1:${server.address().port}/rdb`,
 			auto: false,
+			worker: false,
 			tables: ['project']
 		};
 		const dualDb = newDualSyncDatabase(connectionString, { sync }, (roleConnectionString, options) =>
@@ -1045,6 +1049,7 @@ async function createDualIntegrationFixture(name, rows, syncOverrides = {}) {
 	const sync = {
 		url: `http://127.0.0.1:${server.address().port}/rdb`,
 		auto: false,
+		worker: false,
 		tables: ['project'],
 		...syncOverrides
 	};

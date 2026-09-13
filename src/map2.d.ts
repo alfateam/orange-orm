@@ -1223,7 +1223,7 @@ export interface SyncPushOverrideConfig extends Omit<SyncPushConfig, 'url'> {
 export interface SyncConfig<M extends Record<string, any> = any> extends Partial<SyncEndpointConfig> {
   tables?: SyncTableName<M>[];
   initialReadyMaxAgeMs?: number;
-  /** Runs sync orchestration in an Orange ORM managed worker. */
+  /** Runs sync orchestration in an Orange ORM managed worker. Defaults to true; set false to keep sync on the calling context. */
   worker?: boolean | {
     url?: string | URL;
     requestTimeoutMs?: number;
@@ -1366,15 +1366,6 @@ export interface SqliteOPFSPoolOptions<M extends Record<string, any> = any> exte
   sync?: string | SyncConfig<M>;
   vfs?: 'opfs-sahpool' | 'opfs-wl';
   opfsSahPool?: OpfsSahPoolOptions;
-  singleWorker?: boolean;
-  inlineWorker?: boolean;
-  worker?: Worker | MessagePort;
-  createWorker?: (connectionString: string, options: SqliteOPFSPoolOptions<M>) => Worker | MessagePort;
-  readWorker?: Worker | MessagePort;
-  createReadWorker?: (connectionString: string, options: SqliteOPFSPoolOptions<M>) => Worker | MessagePort;
-  workerUrl?: string | URL;
-  closeDbOnClose?: boolean;
-  prewarmRead?: boolean;
   busyTimeoutMs?: number;
   opfsAccessTimeoutMs?: number;
 }

@@ -8,6 +8,12 @@ const { ensureLocalSchemaReadySymbol } = require('../src/client/syncClient');
 const { runSyncSwap } = require('../src/sync/writeGate');
 
 describe('sqliteOPFS dual sync database', () => {
+	test('uses a managed sync worker by default and supports an explicit main-thread opt-out', () => {
+		expect(newDualSyncDatabase.isManagedSyncWorkerEnabled({ url: '/rdb' })).toBe(true);
+		expect(newDualSyncDatabase.isManagedSyncWorkerEnabled({ url: '/rdb', worker: true })).toBe(true);
+		expect(newDualSyncDatabase.isManagedSyncWorkerEnabled({ url: '/rdb', worker: false })).toBe(false);
+	});
+
 	test('enables dual routing for sqliteOPFS sync by default', async () => {
 		const db = newDatabase('app.sqlite3', {
 			sync: { url: '/rdb' }
