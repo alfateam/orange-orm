@@ -78,16 +78,18 @@ jobs:
           - 5000:5000
 
       oracle:
-        image: gvenzl/oracle-xe
+        image: gvenzl/oracle-xe:21.3.0
         env:
           ORACLE_PASSWORD: P@assword123
         ports:
           - 1521:1521
+        # Verify the tests' SYSDBA login and make SQL*Plus fail on login/SQL errors.
         options: >-
-          --health-cmd="echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/P@assword123@localhost:1521/XE"
+          --health-cmd="printf 'WHENEVER SQLERROR EXIT FAILURE\nWHENEVER OSERROR EXIT FAILURE\nSELECT 1 FROM DUAL;\nEXIT SUCCESS;\n' | sqlplus -L -s 'sys/\"P@assword123\"@localhost:1521/XE as sysdba'"
           --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
+          --health-timeout=10s
+          --health-start-period=60s
+          --health-retries=30
 
     steps:
       - uses: actions/checkout@v4
@@ -205,16 +207,18 @@ jobs:
           --health-retries=3
 
       oracle:
-        image: gvenzl/oracle-xe
+        image: gvenzl/oracle-xe:21.3.0
         env:
           ORACLE_PASSWORD: P@assword123
         ports:
           - 1521:1521
+        # Verify the tests' SYSDBA login and make SQL*Plus fail on login/SQL errors.
         options: >-
-          --health-cmd="echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/P@assword123@localhost:1521/XE"
+          --health-cmd="printf 'WHENEVER SQLERROR EXIT FAILURE\nWHENEVER OSERROR EXIT FAILURE\nSELECT 1 FROM DUAL;\nEXIT SUCCESS;\n' | sqlplus -L -s 'sys/\"P@assword123\"@localhost:1521/XE as sysdba'"
           --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
+          --health-timeout=10s
+          --health-start-period=60s
+          --health-retries=30
 
     steps:
       - uses: actions/checkout@v4
@@ -285,16 +289,18 @@ jobs:
           --health-retries=3
 
       oracle:
-        image: gvenzl/oracle-xe
+        image: gvenzl/oracle-xe:21.3.0
         env:
           ORACLE_PASSWORD: P@assword123
         ports:
           - 1521:1521
+        # Verify the tests' SYSDBA login and make SQL*Plus fail on login/SQL errors.
         options: >-
-          --health-cmd="echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/P@assword123@localhost:1521/XE"
+          --health-cmd="printf 'WHENEVER SQLERROR EXIT FAILURE\nWHENEVER OSERROR EXIT FAILURE\nSELECT 1 FROM DUAL;\nEXIT SUCCESS;\n' | sqlplus -L -s 'sys/\"P@assword123\"@localhost:1521/XE as sysdba'"
           --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
+          --health-timeout=10s
+          --health-start-period=60s
+          --health-retries=30
 
     steps:
       - uses: actions/checkout@v4

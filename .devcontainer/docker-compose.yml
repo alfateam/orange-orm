@@ -86,7 +86,7 @@ services:
       - 50000:5000
     # restart: always
   oracle:
-    image: gvenzl/oracle-xe
+    image: gvenzl/oracle-xe:21.3.0
     environment:
       - ORACLE_PASSWORD=P@assword123   
     hostname: oracle
@@ -95,9 +95,13 @@ services:
     ports:
       - 1521:1521
     healthcheck:
-      test: ["CMD-SHELL", "echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/P@assword123@localhost:1521/XE"]
+      # Match the tests' SYSDBA login; -L and WHENEVER turn failures into unhealthy.
+      test:
+        - CMD-SHELL
+        - >-
+          printf 'WHENEVER SQLERROR EXIT FAILURE\nWHENEVER OSERROR EXIT FAILURE\nSELECT 1 FROM DUAL;\nEXIT SUCCESS;\n' | sqlplus -L -s 'sys/"P@assword123"@localhost:1521/XE as sysdba'
       interval: 10s
-      timeout: 5s
+      timeout: 10s
       retries: 30
       start_period: 60s
 volumes:
