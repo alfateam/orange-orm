@@ -2,8 +2,9 @@ const getTSDefinition = require('./getTSDefinition');
 // let hostLocal = _hostLocal;
 const getMeta = require('./hostExpress/getMeta');
 const newSyncHandler = require('./hostExpress/sync');
+const getExposedTables = require('./hostExpress/getExposedTables');
 
-function hostExpress(hostLocal, client, options = {}) {
+function hostExpress(hostLocal, client, options = {}, exposureOptions = options) {
 	if ('db' in options && (options.db ?? undefined) === undefined || !client.db)
 		throw new Error('No db specified');
 	const dbOptions = { db: options.db || client.db };
@@ -12,18 +13,19 @@ function hostExpress(hostLocal, client, options = {}) {
 		client.__commands,
 		options.commandHandlers
 	);
-	let c = {};
+	const tables = getExposedTables(client.tables, exposureOptions);
+	const c = Object.create(null);
 	const readonly = { readonly: options.readonly};
 	const sharedHooks = options.hooks;
-	for (let tableName in client.tables) {
+	for (let tableName in tables) {
 		const tableOptions = options[tableName] || {};
 		const hooks = tableOptions.hooks || sharedHooks;
 		c[tableName] = hostLocal({
 			...dbOptions,
 			...readonly,
 			...tableOptions,
-			table: client.tables[tableName],
-			tables: client.tables,
+			table: tables[tableName],
+			tables,
 			tableConfigs: options,
 			isHttp: true,
 			client,
@@ -33,11 +35,11 @@ function hostExpress(hostLocal, client, options = {}) {
 	}
 	const syncHandler = newSyncHandler(client, {
 		...options,
-		sync: options.sync && {
+		sync: options.sync === false ? false : {
 			...options.sync,
-			commands: mergeCommandHandlers(commandHandlers, options.sync.commands)
+			commands: mergeCommandHandlers(commandHandlers, options.sync?.commands)
 		}
-	});
+	}, tables);
 
 	async function handler(req, res) {
 		if (req.method === 'POST')
@@ -66,14 +68,14 @@ function hostExpress(hostLocal, client, options = {}) {
 					throw e;
 				}
 
-				const result = getMeta(client.tables[request.query.table]);
+				const result = getMeta(tables[request.query.table]);
 				response.setHeader('content-type', 'text/plain');
 				response.status(200).send(result);
 			}
 			else {
 				const isNamespace = request.query.isNamespace === 'true';
 				let tsArg = Object.keys(c).map(x => {
-					return { table: client.tables[x], customFilters: options?.tables?.[x].customFilters, name: x };
+					return { table: tables[x], customFilters: options[x]?.customFilters, name: x };
 				});
 				response.setHeader('content-type', 'text/plain');
 				response.status(200).send(getTSDefinition(tsArg, { isNamespace, isHttp: true }));
@@ -89,6 +91,11 @@ function hostExpress(hostLocal, client, options = {}) {
 
 	async function patch(request, response) {
 		try {
+			if (!(request.query.table in c)) {
+				const e = new Error('Table is not exposed or does not exist');
+				e.status = 400;
+				throw e;
+			}
 			response.json(await c[request.query.table].patch(request.body, request, response));
 		}
 		catch (e) {

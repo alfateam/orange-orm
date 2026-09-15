@@ -1490,7 +1490,8 @@ type ExpressConfig<M extends Record<string, TableDefinition<M>>> = {
   db?: Pool | ((connectors: Connectors) => Pool | Promise<Pool>);
   commands?: AnyServerCommandHandlers<M>;
   hooks?: ExpressHooks<M>;
-  sync?: SyncServerConfig<M>;
+  /** Sync is enabled by default and uses the same exposed tables as Express. */
+  sync?: boolean | SyncServerConfig<M>;
 }
 
 type HonoConfig<M extends Record<string, TableDefinition<M>>> = {

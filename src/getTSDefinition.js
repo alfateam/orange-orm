@@ -553,13 +553,26 @@ export interface MetaData {
     concurrency?: Concurrency;${getConcurrencyTables()}
 }
 
-export interface ExpressConfig {
+export interface ExpressConfig extends ExpressTables {
 	db?: Pool | (() => Pool);
-	tables?: ExpressTables;
 	concurrency?: Concurrency;
 	readonly?: boolean;
 	disableBulkDeletes?: boolean;
 	hooks?: ExpressHooks;
+	sync?: boolean | SyncServerConfig;
+}
+
+export interface SyncServerConfig {
+	enabled?: boolean;
+	changeTable?: string;
+	appliedMutationsTable?: string;
+	queue?: { concurrency?: number; maxPending?: number };
+	limits?: {
+		maxKeysPerBatch?: number;
+		maxRowsPerBatch?: number;
+		maxMutationsPerBatch?: number;
+		maxChangeWindow?: number;
+	};
 }
 
 export interface HonoConfig {

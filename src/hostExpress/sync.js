@@ -1,11 +1,12 @@
 const stringify = require('../client/stringify');
+const getExposedTables = require('./getExposedTables');
 
-function newSyncHandler(client, options = {}) {
+function newSyncHandler(client, options = {}, tables = getExposedTables(client.tables, options)) {
 	const syncOptions = normalizeSyncOptions(options.sync);
 	if (!syncOptions || syncOptions.enabled === false)
 		return null;
 
-	const tableMeta = createTableMeta(client, syncOptions);
+	const tableMeta = createTableMeta(tables, syncOptions);
 	const queue = createQueue(syncOptions.queue);
 	const hooks = options.hooks;
 	const transactionHooks = hooks && hooks.transaction;
@@ -97,11 +98,20 @@ function newSyncHandler(client, options = {}) {
 		const results = [];
 		let applied = 0;
 		let duplicates = 0;
+		// Check every table before claiming mutations, including duplicate replays.
+		for (const mutation of mutations) {
+			for (const entry of getMutationPatches(mutation))
+				assertExposedTable(entry.table);
+		}
 		await runHookedTransaction(async (tx) => {
 			for (let i = 0; i < mutations.length; i++) {
 				const mutation = mutations[i];
 				const claim = await claimAppliedMutation(tx, clientId, mutation.id);
 				if (!claim.claimed) {
+					if (claim.result?.table)
+						assertExposedTable(claim.result.table);
+					for (const entry of claim.result?.result?.results || [])
+						assertExposedTable(entry.table);
 					duplicates += 1;
 					results.push({ id: mutation.id, table: mutation.table, ...(claim.result || {}), duplicate: true });
 					continue;
@@ -130,10 +140,24 @@ function newSyncHandler(client, options = {}) {
 		};
 	}
 
-	async function applyMutationPatches(tx, mutation) {
-		const entries = Array.isArray(mutation.patches)
+	function assertExposedTable(name) {
+		if (!tableMeta.byName.has(name)) {
+			const error = new Error(`Table "${name}" is not exposed or does not exist`);
+			error.status = 400;
+			throw error;
+		}
+	}
+
+	function getMutationPatches(mutation) {
+		return Array.isArray(mutation.patches)
 			? mutation.patches
-			: [{ table: mutation.table, patch: mutation.patch, options: mutation.options }];
+			: Array.isArray(mutation.patch)
+				? [{ table: mutation.table, patch: mutation.patch, options: mutation.options }]
+				: [];
+	}
+
+	async function applyMutationPatches(tx, mutation) {
+		const entries = getMutationPatches(mutation);
 		let changed = 0;
 		const results = [];
 		for (let i = 0; i < entries.length; i++) {
@@ -281,7 +305,7 @@ function newSyncHandler(client, options = {}) {
 			};
 		}
 		const whereTables = token.tables.length === 0
-			? ''
+			? ' AND 1 = 0'
 			: ` AND table_name IN (${token.tables.map((name) => sqlStringLiteral(tableMeta.byName.get(name).dbName)).join(',')})`;
 		const sql = [
 			'SELECT id, table_name, op, pk_json',
@@ -551,9 +575,10 @@ const DEFAULT_SYNC_MUTATIONS_LIMIT = 200;
 const DEFAULT_SYNC_CHANGE_WINDOW = 100000;
 const MAX_SYNC_BATCH_LIMIT = 10000;
 
-function normalizeSyncOptions(sync) {
-	if (!sync)
+function normalizeSyncOptions(sync = {}) {
+	if (sync === false)
 		return null;
+	sync = sync || {};
 	const queueOptions = sync.queue || {};
 	const limits = sync.limits || {};
 	const explicitLimits = {
@@ -585,11 +610,11 @@ function normalizeCommands(commands) {
 	return commands;
 }
 
-function createTableMeta(client, syncOptions) {
+function createTableMeta(tables, syncOptions) {
 	const byName = new Map();
 	const byDbName = new Map();
-	for (let tableName in client.tables) {
-		const table = client.tables[tableName];
+	for (let tableName in tables) {
+		const table = tables[tableName];
 		const pkColumns = Array.isArray(table?._primaryColumns) ? table._primaryColumns : [];
 		if (pkColumns.length === 0)
 			continue;

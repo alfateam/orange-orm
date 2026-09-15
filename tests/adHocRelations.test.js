@@ -47,6 +47,9 @@ beforeAll(async () => {
 	]);
 
 	const app = express().use(json()).use('/rdb', db.express({
+		order: {},
+		customer: {},
+		package: {},
 		orderLine: {
 			baseFilter: db.orderLine.amount.lt(250)
 		}

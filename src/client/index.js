@@ -247,7 +247,7 @@ function rdbClient(options = {}) {
 
 	function express(arg) {
 		if (providers.express) {
-			return providers.express(client, { ...options, ...arg });
+			return providers.express(client, { ...options, ...arg }, arg || {});
 		}
 		else
 			throw new Error('Cannot host express clientside');
@@ -474,8 +474,7 @@ function rdbClient(options = {}) {
 			strategy = extractFetchingStrategy({}, strategy);
 			strategy = negotiateWhereSingle(strategy);
 			let args = [_, strategy].concat(Array.prototype.slice.call(arguments).slice(2));
-			let rows = await getManyCore.apply(null, args);
-			await metaPromise;
+			const [rows] = await Promise.all([getManyCore.apply(null, args), metaPromise]);
 			return proxify(rows, strategy, true);
 		}
 

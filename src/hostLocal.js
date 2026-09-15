@@ -56,7 +56,8 @@ function hostLocal() {
 		async function fn(context) {
 			setSessionSingleton(context, 'ignoreSerializable', true);
 			let patch = body.patch;
-			const options = { ..._options, ...body.options, isHttp };
+			const options = { ..._options, ...body.options,
+				table, tables: _options.tables, tableConfigs: _options.tableConfigs, client, isHttp };
 			await prepareSyncOutboxPatchCapture(context, patch);
 			const adHocPlan = await executePath(context, {
 				...options,
@@ -138,7 +139,9 @@ function hostLocal() {
 
 		async function fn(context) {
 			setSessionSingleton(context, 'ignoreSerializable', true);
-			const options = { ..._options, ...body.options, JSONFilter: body, request, response, isHttp };
+			const options = { ..._options, ...body.options,
+				table, tables: _options.tables, tableConfigs: _options.tableConfigs, client,
+				JSONFilter: body, request, response, isHttp };
 			result = await executePath(context, options);
 		}
 	}
@@ -198,8 +201,8 @@ function hostLocal() {
 
 	}
 
-	function express(client, options) {
-		return hostExpress(hostLocal, client, options);
+	function express(client, options, exposureOptions) {
+		return hostExpress(hostLocal, client, options, exposureOptions);
 	}
 
 	function hono(client, options) {

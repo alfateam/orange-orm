@@ -576,13 +576,26 @@ export interface MetaData {
     concurrency?: Concurrency;${getConcurrencyTables()}
 }
 
-export interface ExpressConfig {
+export interface ExpressConfig extends ExpressTables {
 	db?: Pool | (() => Pool);
-	tables?: ExpressTables;
 	concurrency?: Concurrency;
 	readonly?: boolean;
 	disableBulkDeletes?: boolean;
 	hooks?: ExpressHooks;
+	sync?: boolean | SyncServerConfig;
+}
+
+export interface SyncServerConfig {
+	enabled?: boolean;
+	changeTable?: string;
+	appliedMutationsTable?: string;
+	queue?: { concurrency?: number; maxPending?: number };
+	limits?: {
+		maxKeysPerBatch?: number;
+		maxRowsPerBatch?: number;
+		maxMutationsPerBatch?: number;
+		maxChangeWindow?: number;
+	};
 }
 
 export interface HonoConfig {
@@ -845,6 +858,25 @@ function requireStringify () {
 	return stringify_1;
 }
 
+var getExposedTables_1;
+var hasRequiredGetExposedTables;
+
+function requireGetExposedTables () {
+	if (hasRequiredGetExposedTables) return getExposedTables_1;
+	hasRequiredGetExposedTables = 1;
+	function getExposedTables(tables = {}, options = {}) {
+		const names = Object.keys(tables);
+		const configured = names.filter(name => Object.prototype.hasOwnProperty.call(options, name));
+		const exposed = Object.create(null);
+		for (const name of configured.length > 0 ? configured : names)
+			exposed[name] = tables[name];
+		return exposed;
+	}
+
+	getExposedTables_1 = getExposedTables;
+	return getExposedTables_1;
+}
+
 var sync;
 var hasRequiredSync;
 
@@ -852,13 +884,14 @@ function requireSync () {
 	if (hasRequiredSync) return sync;
 	hasRequiredSync = 1;
 	const stringify = requireStringify();
+	const getExposedTables = requireGetExposedTables();
 
-	function newSyncHandler(client, options = {}) {
+	function newSyncHandler(client, options = {}, tables = getExposedTables(client.tables, options)) {
 		const syncOptions = normalizeSyncOptions(options.sync);
 		if (!syncOptions || syncOptions.enabled === false)
 			return null;
 
-		const tableMeta = createTableMeta(client, syncOptions);
+		const tableMeta = createTableMeta(tables, syncOptions);
 		const queue = createQueue(syncOptions.queue);
 		const hooks = options.hooks;
 		const transactionHooks = hooks && hooks.transaction;
@@ -950,11 +983,20 @@ function requireSync () {
 			const results = [];
 			let applied = 0;
 			let duplicates = 0;
+			// Check every table before claiming mutations, including duplicate replays.
+			for (const mutation of mutations) {
+				for (const entry of getMutationPatches(mutation))
+					assertExposedTable(entry.table);
+			}
 			await runHookedTransaction(async (tx) => {
 				for (let i = 0; i < mutations.length; i++) {
 					const mutation = mutations[i];
 					const claim = await claimAppliedMutation(tx, clientId, mutation.id);
 					if (!claim.claimed) {
+						if (claim.result?.table)
+							assertExposedTable(claim.result.table);
+						for (const entry of claim.result?.result?.results || [])
+							assertExposedTable(entry.table);
 						duplicates += 1;
 						results.push({ id: mutation.id, table: mutation.table, ...(claim.result || {}), duplicate: true });
 						continue;
@@ -983,10 +1025,24 @@ function requireSync () {
 			};
 		}
 
-		async function applyMutationPatches(tx, mutation) {
-			const entries = Array.isArray(mutation.patches)
+		function assertExposedTable(name) {
+			if (!tableMeta.byName.has(name)) {
+				const error = new Error(`Table "${name}" is not exposed or does not exist`);
+				error.status = 400;
+				throw error;
+			}
+		}
+
+		function getMutationPatches(mutation) {
+			return Array.isArray(mutation.patches)
 				? mutation.patches
-				: [{ table: mutation.table, patch: mutation.patch, options: mutation.options }];
+				: Array.isArray(mutation.patch)
+					? [{ table: mutation.table, patch: mutation.patch, options: mutation.options }]
+					: [];
+		}
+
+		async function applyMutationPatches(tx, mutation) {
+			const entries = getMutationPatches(mutation);
 			let changed = 0;
 			const results = [];
 			for (let i = 0; i < entries.length; i++) {
@@ -1134,7 +1190,7 @@ function requireSync () {
 				};
 			}
 			const whereTables = token.tables.length === 0
-				? ''
+				? ' AND 1 = 0'
 				: ` AND table_name IN (${token.tables.map((name) => sqlStringLiteral(tableMeta.byName.get(name).dbName)).join(',')})`;
 			const sql = [
 				'SELECT id, table_name, op, pk_json',
@@ -1404,9 +1460,10 @@ function requireSync () {
 	const DEFAULT_SYNC_CHANGE_WINDOW = 100000;
 	const MAX_SYNC_BATCH_LIMIT = 10000;
 
-	function normalizeSyncOptions(sync) {
-		if (!sync)
+	function normalizeSyncOptions(sync = {}) {
+		if (sync === false)
 			return null;
+		sync = sync || {};
 		const queueOptions = sync.queue || {};
 		const limits = sync.limits || {};
 		const explicitLimits = {
@@ -1438,11 +1495,11 @@ function requireSync () {
 		return commands;
 	}
 
-	function createTableMeta(client, syncOptions) {
+	function createTableMeta(tables, syncOptions) {
 		const byName = new Map();
 		const byDbName = new Map();
-		for (let tableName in client.tables) {
-			const table = client.tables[tableName];
+		for (let tableName in tables) {
+			const table = tables[tableName];
 			const pkColumns = Array.isArray(table?._primaryColumns) ? table._primaryColumns : [];
 			if (pkColumns.length === 0)
 				continue;
@@ -1825,8 +1882,9 @@ function requireHostExpress () {
 	// let hostLocal = _hostLocal;
 	const getMeta = requireGetMeta();
 	const newSyncHandler = requireSync();
+	const getExposedTables = requireGetExposedTables();
 
-	function hostExpress(hostLocal, client, options = {}) {
+	function hostExpress(hostLocal, client, options = {}, exposureOptions = options) {
 		if ('db' in options && (options.db ?? undefined) === undefined || !client.db)
 			throw new Error('No db specified');
 		const dbOptions = { db: options.db || client.db };
@@ -1835,18 +1893,19 @@ function requireHostExpress () {
 			client.__commands,
 			options.commandHandlers
 		);
-		let c = {};
+		const tables = getExposedTables(client.tables, exposureOptions);
+		const c = Object.create(null);
 		const readonly = { readonly: options.readonly};
 		const sharedHooks = options.hooks;
-		for (let tableName in client.tables) {
+		for (let tableName in tables) {
 			const tableOptions = options[tableName] || {};
 			const hooks = tableOptions.hooks || sharedHooks;
 			c[tableName] = hostLocal({
 				...dbOptions,
 				...readonly,
 				...tableOptions,
-				table: client.tables[tableName],
-				tables: client.tables,
+				table: tables[tableName],
+				tables,
 				tableConfigs: options,
 				isHttp: true,
 				client,
@@ -1856,11 +1915,11 @@ function requireHostExpress () {
 		}
 		const syncHandler = newSyncHandler(client, {
 			...options,
-			sync: options.sync && {
+			sync: options.sync === false ? false : {
 				...options.sync,
-				commands: mergeCommandHandlers(commandHandlers, options.sync.commands)
+				commands: mergeCommandHandlers(commandHandlers, options.sync?.commands)
 			}
-		});
+		}, tables);
 
 		async function handler(req, res) {
 			if (req.method === 'POST')
@@ -1889,14 +1948,14 @@ function requireHostExpress () {
 						throw e;
 					}
 
-					const result = getMeta(client.tables[request.query.table]);
+					const result = getMeta(tables[request.query.table]);
 					response.setHeader('content-type', 'text/plain');
 					response.status(200).send(result);
 				}
 				else {
 					const isNamespace = request.query.isNamespace === 'true';
 					let tsArg = Object.keys(c).map(x => {
-						return { table: client.tables[x], customFilters: options?.tables?.[x].customFilters, name: x };
+						return { table: tables[x], customFilters: options[x]?.customFilters, name: x };
 					});
 					response.setHeader('content-type', 'text/plain');
 					response.status(200).send(getTSDefinition(tsArg, { isNamespace, isHttp: true }));
@@ -1912,6 +1971,11 @@ function requireHostExpress () {
 
 		async function patch(request, response) {
 			try {
+				if (!(request.query.table in c)) {
+					const e = new Error('Table is not exposed or does not exist');
+					e.status = 400;
+					throw e;
+				}
 				response.json(await c[request.query.table].patch(request.body, request, response));
 			}
 			catch (e) {
@@ -7248,7 +7312,8 @@ function requireHostLocal () {
 			async function fn(context) {
 				setSessionSingleton(context, 'ignoreSerializable', true);
 				let patch = body.patch;
-				const options = { ..._options, ...body.options, isHttp };
+				const options = { ..._options, ...body.options,
+					table, tables: _options.tables, tableConfigs: _options.tableConfigs, client, isHttp };
 				await prepareSyncOutboxPatchCapture(context, patch);
 				const adHocPlan = await executePath(context, {
 					...options,
@@ -7330,7 +7395,9 @@ function requireHostLocal () {
 
 			async function fn(context) {
 				setSessionSingleton(context, 'ignoreSerializable', true);
-				const options = { ..._options, ...body.options, JSONFilter: body, request, response, isHttp };
+				const options = { ..._options, ...body.options,
+					table, tables: _options.tables, tableConfigs: _options.tableConfigs, client,
+					JSONFilter: body, request, response, isHttp };
 				result = await executePath(context, options);
 			}
 		}
@@ -7390,8 +7457,8 @@ function requireHostLocal () {
 
 		}
 
-		function express(client, options) {
-			return hostExpress(hostLocal, client, options);
+		function express(client, options, exposureOptions) {
+			return hostExpress(hostLocal, client, options, exposureOptions);
 		}
 
 		function hono(client, options) {
@@ -13524,7 +13591,7 @@ function requireClient () {
 
 		function express(arg) {
 			if (providers.express) {
-				return providers.express(client, { ...options, ...arg });
+				return providers.express(client, { ...options, ...arg }, arg || {});
 			}
 			else
 				throw new Error('Cannot host express clientside');
@@ -13751,8 +13818,7 @@ function requireClient () {
 				strategy = extractFetchingStrategy({}, strategy);
 				strategy = negotiateWhereSingle(strategy);
 				let args = [_, strategy].concat(Array.prototype.slice.call(arguments).slice(2));
-				let rows = await getManyCore.apply(null, args);
-				await metaPromise;
+				const [rows] = await Promise.all([getManyCore.apply(null, args), metaPromise]);
 				return proxify(rows, strategy, true);
 			}
 
