@@ -96,10 +96,12 @@ services:
       - 1521:1521
     healthcheck:
       # Match the tests' SYSDBA login; -L and WHENEVER turn failures into unhealthy.
+      # Use CONNECT as SQL*Plus input; putting "as sysdba" in the command-line
+      # argument makes SQL*Plus include it in the service name.
       test:
         - CMD-SHELL
         - >-
-          printf 'WHENEVER SQLERROR EXIT FAILURE\nWHENEVER OSERROR EXIT FAILURE\nSELECT 1 FROM DUAL;\nEXIT SUCCESS;\n' | sqlplus -L -s 'sys/"P@assword123"@localhost:1521/XE as sysdba'
+          printf 'WHENEVER SQLERROR EXIT FAILURE\nWHENEVER OSERROR EXIT FAILURE\nCONNECT sys/"P@assword123"@localhost:1521/XE AS SYSDBA\nSELECT 1 FROM DUAL;\nEXIT SUCCESS;\n' | sqlplus -L -s /nolog
       interval: 10s
       timeout: 10s
       retries: 30

@@ -84,8 +84,10 @@ jobs:
         ports:
           - 1521:1521
         # Verify the tests' SYSDBA login and make SQL*Plus fail on login/SQL errors.
+        # Use CONNECT as SQL*Plus input; putting "as sysdba" in the command-line
+        # argument makes SQL*Plus include it in the service name.
         options: >-
-          --health-cmd="printf 'WHENEVER SQLERROR EXIT FAILURE\nWHENEVER OSERROR EXIT FAILURE\nSELECT 1 FROM DUAL;\nEXIT SUCCESS;\n' | sqlplus -L -s 'sys/\"P@assword123\"@localhost:1521/XE as sysdba'"
+          --health-cmd="printf 'WHENEVER SQLERROR EXIT FAILURE\nWHENEVER OSERROR EXIT FAILURE\nCONNECT sys/\"P@assword123\"@localhost:1521/XE AS SYSDBA\nSELECT 1 FROM DUAL;\nEXIT SUCCESS;\n' | sqlplus -L -s /nolog"
           --health-interval=10s
           --health-timeout=10s
           --health-start-period=60s
@@ -213,8 +215,10 @@ jobs:
         ports:
           - 1521:1521
         # Verify the tests' SYSDBA login and make SQL*Plus fail on login/SQL errors.
+        # Use CONNECT as SQL*Plus input; putting "as sysdba" in the command-line
+        # argument makes SQL*Plus include it in the service name.
         options: >-
-          --health-cmd="printf 'WHENEVER SQLERROR EXIT FAILURE\nWHENEVER OSERROR EXIT FAILURE\nSELECT 1 FROM DUAL;\nEXIT SUCCESS;\n' | sqlplus -L -s 'sys/\"P@assword123\"@localhost:1521/XE as sysdba'"
+          --health-cmd="printf 'WHENEVER SQLERROR EXIT FAILURE\nWHENEVER OSERROR EXIT FAILURE\nCONNECT sys/\"P@assword123\"@localhost:1521/XE AS SYSDBA\nSELECT 1 FROM DUAL;\nEXIT SUCCESS;\n' | sqlplus -L -s /nolog"
           --health-interval=10s
           --health-timeout=10s
           --health-start-period=60s
@@ -295,8 +299,10 @@ jobs:
         ports:
           - 1521:1521
         # Verify the tests' SYSDBA login and make SQL*Plus fail on login/SQL errors.
+        # Use CONNECT as SQL*Plus input; putting "as sysdba" in the command-line
+        # argument makes SQL*Plus include it in the service name.
         options: >-
-          --health-cmd="printf 'WHENEVER SQLERROR EXIT FAILURE\nWHENEVER OSERROR EXIT FAILURE\nSELECT 1 FROM DUAL;\nEXIT SUCCESS;\n' | sqlplus -L -s 'sys/\"P@assword123\"@localhost:1521/XE as sysdba'"
+          --health-cmd="printf 'WHENEVER SQLERROR EXIT FAILURE\nWHENEVER OSERROR EXIT FAILURE\nCONNECT sys/\"P@assword123\"@localhost:1521/XE AS SYSDBA\nSELECT 1 FROM DUAL;\nEXIT SUCCESS;\n' | sqlplus -L -s /nolog"
           --health-interval=10s
           --health-timeout=10s
           --health-start-period=60s
