@@ -31445,6 +31445,21 @@ function requireSync () {
 			};
 		}
 
+		async function resolveBaseFilter(tx, meta, request, response) {
+			const configured = options[meta.name]?.baseFilter;
+			return typeof configured === 'function' ? configured(tx, request, response) : configured;
+		}
+
+		function readTable(tx, meta) {
+			// Resolve the Express filter with this request, rather than invoking an
+			// inherited client filter a second time without HTTP request objects.
+			return typeof tx === 'function' ? tx({ [meta.name]: { baseFilter: undefined } })[meta.name] : tx[meta.name];
+		}
+
+		function primaryKeyFilter(tx, meta, keys) {
+			return tx.or(...keys.map(pk => tx.and(...meta.pkColumns.map((column, i) => tx[meta.name][column.alias].eq(pk[i])))));
+		}
+
 		async function pullRows(body, request, response) {
 			const rawItems = Array.isArray(body.items) ? body.items : [];
 			const limit = normalizeRowsBatchLimit(rawItems.length, syncOptions.limits);
@@ -31522,7 +31537,8 @@ function requireSync () {
 			strategy.limit = limit;
 			const filter = buildSnapshotKeysetFilter(meta, lastPk, upperPk);
 			const rows = await runHookedTransaction(async (tx) => {
-				return tx[meta.name].getMany(filter, strategy);
+				const base = inlineRows ? await resolveBaseFilter(tx, meta, request, response) : undefined;
+				return readTable(tx, meta).getMany(base ? tx.and(base, filter) : filter, strategy);
 			}, { readonly: true }, request, response);
 			return rows;
 		}
@@ -31547,7 +31563,7 @@ function requireSync () {
 			strategy.orderBy = meta.pkColumns.map(x => `${x.alias} desc`);
 			strategy.limit = 1;
 			const rows = await runHookedTransaction(async (tx) => {
-				return tx[meta.name].getMany(undefined, strategy);
+				return readTable(tx, meta).getMany(undefined, strategy);
 			}, { readonly: true }, request, response);
 			return rows.length > 0 ? toPkArray(meta, rows[0]) : null;
 		}
@@ -31565,7 +31581,10 @@ function requireSync () {
 			if (keyObjects.length === 0)
 				return [];
 			return runHookedTransaction(async (tx) => {
-				return tx[meta.name].getMany({
+				const base = await resolveBaseFilter(tx, meta, request, response);
+				if (base)
+					return readTable(tx, meta).getMany(tx.and(base, primaryKeyFilter(tx, meta, keyObjects.map(key => toPkArray(meta, key)))));
+				return readTable(tx, meta).getMany({
 					where: () => keyObjects
 				});
 			}, { readonly: true }, request, response);
