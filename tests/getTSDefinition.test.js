@@ -28,11 +28,12 @@ describe('generated TypeScript definition', () => {
 
 	test('types explicit Express table exposure and optional sync configuration', () => {
 		const source = `
-import type { ExpressConfig } from './generated-express';
+import type { ExpressConfig, HonoConfig } from './generated-express';
 const endpoint: ExpressConfig = { order: {}, orderLine: {} };
 const disabled: ExpressConfig = { order: {}, sync: false };
 const tuned: ExpressConfig = { order: {}, sync: { enabled: true, limits: { maxKeysPerBatch: 10 } } };
 const disabledObject: ExpressConfig = { sync: { enabled: false } };
+const hono: HonoConfig = { tables: { order: {} }, sync: { enabled: true } };
 // @ts-expect-error Unknown tables cannot be exposed.
 const unknown: ExpressConfig = { missingTable: {} };
 `;
