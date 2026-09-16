@@ -1,7 +1,6 @@
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
-const compile = require('./compile');
 const { buildChangeTrackingSql, setupChangeTracking } = require('../src/sync/setupChangeTracking');
 
 async function generateTriggers(cwd, argv) {
@@ -159,6 +158,7 @@ async function loadModule(filePath) {
 	let targetPath = filePath;
 
 	if (ext === '.ts' || ext === '.mts' || ext === '.cts') {
+		const compile = require('./compile');
 		const nodeModules = findClosestNodeModules(filePath);
 		outDir = path.join(nodeModules, '/.orange-orm-triggers', '/' + Date.now());
 		targetPath = compile(filePath, { outDir });

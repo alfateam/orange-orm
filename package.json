@@ -153,8 +153,10 @@
         "pg-query-stream": "^3.3.2",
         "rollup": "^2.52.7",
         "tedious": "^19.2.1",
-        "typescript": "^5.4.5",
         "vitest": "^4.1.8"
+    },
+    "optionalDependencies": {
+        "typescript": "^5.4.5"
     },
     "engines": {
         "node": ">= 8.0.0"

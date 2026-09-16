@@ -1,7 +1,4 @@
 #! /usr/bin/env node
-const build = require('./build');
-const generateTriggers = require('./generate-triggers');
-
 async function main() {
 	const args = process.argv.slice(2);
 	const cwd = process.cwd();
@@ -15,10 +12,14 @@ async function main() {
 		printHelp();
 		return;
 	}
-	if (command === 'build')
+	if (command === 'build') {
+		const build = require('./build');
 		return build(cwd);
-	if (command === 'sync:setup')
+	}
+	if (command === 'sync:setup') {
+		const generateTriggers = require('./generate-triggers');
 		return generateTriggers(cwd, args.slice(1));
+	}
 
 	console.error(`Orange: unknown command "${command}"`);
 	printHelp();
