@@ -1076,7 +1076,7 @@ export type DbOptions<
   ConcurrencyConfig<M>
   & ColumnConcurrency & {
     db?: Pool | ((connectors: Connectors) => Pool | Promise<Pool>);
-    syncClient?: DBClient<M, Commands>['syncClient'];
+    syncClient?: SyncClient<M>;
     commands?: Commands;
     commandHandlers?: ServerCommandHandlers<M, Commands>;
   };
@@ -1122,20 +1122,23 @@ interface Connectors {
   oracle(config: PoolAttributes, options?: PoolOptions<any>): Pool;
 }
 
-type DbConnectable<M extends Record<string, TableDefinition<M>>> = {
-  http(url: string): DBClient<M>;
-  d1(database: D1Database): DBClient<M>;
-  postgres(connectionString: string, options?: PoolOptions<M>): DBClient<M>;
-  pglite(config?: PGliteOptions | string | undefined, options?: PoolOptions<M>): DBClient<M>;
-  sqlite(connectionString: string, options?: PoolOptions<M>): DBClient<M>;
-  sqliteOPFS(connectionString: string, options?: SqliteOPFSPoolOptions<M>): DBClient<M>;
-  sap(connectionString: string, options?: PoolOptions<M>): DBClient<M>;
-  mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions<M>): DBClient<M>;
-  mssql(connectionString: string, options?: PoolOptions<M>): DBClient<M>;
-  mssqlNative(connectionString: string, options?: PoolOptions<M>): DBClient<M>;
-  mysql(connectionString: string, options?: PoolOptions<M>): DBClient<M>;
-  mariadb(connectionString: string, options?: PoolOptions<M>): DBClient<M>;
-  oracle(config: PoolAttributes, options?: PoolOptions<M>): DBClient<M>;
+type DbConnectable<
+  M extends Record<string, TableDefinition<M>>,
+  Commands extends AnyCommandMap = {}
+> = {
+  http(url: string): DBClient<M, Commands>;
+  d1(database: D1Database): DBClient<M, Commands>;
+  postgres(connectionString: string, options?: PoolOptions<M>): DBClient<M, Commands>;
+  pglite(config?: PGliteOptions | string | undefined, options?: PoolOptions<M>): DBClient<M, Commands>;
+  sqlite(connectionString: string, options?: PoolOptions<M>): DBClient<M, Commands>;
+  sqliteOPFS(connectionString: string, options?: SqliteOPFSPoolOptions<M>): DBClient<M, Commands, true>;
+  sap(connectionString: string, options?: PoolOptions<M>): DBClient<M, Commands>;
+  mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions<M>): DBClient<M, Commands>;
+  mssql(connectionString: string, options?: PoolOptions<M>): DBClient<M, Commands>;
+  mssqlNative(connectionString: string, options?: PoolOptions<M>): DBClient<M, Commands>;
+  mysql(connectionString: string, options?: PoolOptions<M>): DBClient<M, Commands>;
+  mariadb(connectionString: string, options?: PoolOptions<M>): DBClient<M, Commands>;
+  oracle(config: PoolAttributes, options?: PoolOptions<M>): DBClient<M, Commands>;
 };
 
 export interface Pool {
@@ -1358,6 +1361,58 @@ export type SyncOperationEvent<
       error: SyncOperationError;
     };
 
+export interface SyncInitialReadyEvent<M extends Record<string, TableDefinition<M>> = any> {
+  /** Tables included in a regular SQLiteOPFS sync readiness event. */
+  tables?: SyncTableName<M>[];
+  /** Server change cursor represented by the readiness event. */
+  since?: number;
+  updatedAtMs: number;
+  source: string;
+  /** Present for the SQLiteOPFS dual-replica implementation. */
+  role?: 'a' | 'b';
+  activeRole?: 'a' | 'b';
+  stagingRole?: 'a' | 'b';
+  replicaState?: 'ready' | 'replica-pending';
+  generation?: number;
+  clientId?: string;
+  lastSuccessfulSyncAtMs?: number | null;
+}
+
+export interface SyncClient<M extends Record<string, TableDefinition<M>> = any> {
+  sync(options?: SyncOptions): Promise<void>;
+  ensureLocalSchema(options?: SyncOptions): Promise<SyncLocalSchemaResult<M>>;
+  resetLocal(options?: SyncResetLocalOptions<M>): Promise<SyncResetLocalResult<M>>;
+  start(): Promise<void>;
+  stop(): Promise<void>;
+  isRunning(): Promise<boolean>;
+  interceptors: SyncInterceptors;
+  on(event: 'sync', listener: (payload: SyncEvent) => void): () => void;
+  on<Context extends Record<string, unknown> = Record<string, unknown>, Memory = unknown>(
+    event: 'operation' | `operation:${string}`,
+    listener: (payload: SyncOperationEvent<Context, Memory>) => void
+  ): () => void;
+  on(event: 'initial-ready', listener: (payload: SyncInitialReadyEvent<M>) => void): () => void;
+  on(event: 'sync-progress', listener: (payload: SyncProgressEvent) => void): () => void;
+  on(event: 'error' | 'sync-error', listener: (payload: SyncErrorEvent) => void): () => void;
+  off(event: 'sync', listener: (payload: SyncEvent) => void): void;
+  off<Context extends Record<string, unknown> = Record<string, unknown>, Memory = unknown>(
+    event: 'operation' | `operation:${string}`,
+    listener: (payload: SyncOperationEvent<Context, Memory>) => void
+  ): void;
+  off(event: 'initial-ready', listener: (payload: SyncInitialReadyEvent<M>) => void): void;
+  off(event: 'sync-progress', listener: (payload: SyncProgressEvent) => void): void;
+  off(event: 'error' | 'sync-error', listener: (payload: SyncErrorEvent) => void): void;
+  once(event: 'sync', listener: (payload: SyncEvent) => void): () => void;
+  once<Context extends Record<string, unknown> = Record<string, unknown>, Memory = unknown>(
+    event: 'operation' | `operation:${string}`,
+    listener: (payload: SyncOperationEvent<Context, Memory>) => void
+  ): () => void;
+  once(event: 'initial-ready', listener: (payload: SyncInitialReadyEvent<M>) => void): () => void;
+  once(event: 'sync-progress', listener: (payload: SyncProgressEvent) => void): () => void;
+  once(event: 'error' | 'sync-error', listener: (payload: SyncErrorEvent) => void): () => void;
+  waitForInitialSync(): Promise<void>;
+}
+
 export interface PoolOptions<M extends Record<string, any> = any> {
   size?: number;
 }
@@ -1381,7 +1436,8 @@ export interface OpfsSahPoolOptions {
 
 export type DBClient<
   M extends Record<string, TableDefinition<M>>,
-  Commands extends AnyCommandMap = {}
+  Commands extends AnyCommandMap = {},
+  Sync extends boolean = false
 > = {
   [TableName in keyof M]: RootTableRefs<M, TableName> & TableClient<M, TableName>;
 } & CommandApi<Commands> & {
@@ -1407,7 +1463,7 @@ export type DBClient<
   createPatch(original: any, modified: any): JsonPatch;
   (
     config?: DbOptions<M, Commands>
-  ): DBClient<M, Commands>;
+  ): DBClient<M, Commands, Sync>;
   transaction<TR = unknown>(
     fn: (db: DBClient<M, Commands>, ctx: SyncTransactionContext) => Promise<TR> | TR
   ): Promise<TR>;
@@ -1416,43 +1472,10 @@ export type DBClient<
   hono(): HonoHandler;
   hono(config: HonoConfig<M>): HonoHandler;
   readonly metaData: DbConcurrency<M>;
-  syncClient: {
-    sync(options?: SyncOptions): Promise<void>;
-    ensureLocalSchema(options?: SyncOptions): Promise<SyncLocalSchemaResult<M>>;
-    resetLocal(options?: SyncResetLocalOptions<M>): Promise<SyncResetLocalResult<M>>;
-    start(): Promise<void>;
-    stop(): Promise<void>;
-    isRunning(): Promise<boolean>;
-    interceptors: SyncInterceptors;
-    on(event: 'sync', listener: (payload: SyncEvent) => void): () => void;
-    on<Context extends Record<string, unknown> = Record<string, unknown>, Memory = unknown>(
-      event: 'operation' | `operation:${string}`,
-      listener: (payload: SyncOperationEvent<Context, Memory>) => void
-    ): () => void;
-    on(event: 'initial-ready', listener: () => void): () => void;
-    on(event: 'sync-progress', listener: (payload: SyncProgressEvent) => void): () => void;
-    on(event: 'error' | 'sync-error', listener: (payload: SyncErrorEvent) => void): () => void;
-    off(event: 'sync', listener: (payload: SyncEvent) => void): void;
-    off<Context extends Record<string, unknown> = Record<string, unknown>, Memory = unknown>(
-      event: 'operation' | `operation:${string}`,
-      listener: (payload: SyncOperationEvent<Context, Memory>) => void
-    ): void;
-    off(event: 'initial-ready', listener: () => void): void;
-    off(event: 'sync-progress', listener: (payload: SyncProgressEvent) => void): void;
-    off(event: 'error' | 'sync-error', listener: (payload: SyncErrorEvent) => void): void;
-    once(event: 'sync', listener: (payload: SyncEvent) => void): () => void;
-    once<Context extends Record<string, unknown> = Record<string, unknown>, Memory = unknown>(
-      event: 'operation' | `operation:${string}`,
-      listener: (payload: SyncOperationEvent<Context, Memory>) => void
-    ): () => void;
-    once(event: 'initial-ready', listener: () => void): () => void;
-    once(event: 'sync-progress', listener: (payload: SyncProgressEvent) => void): () => void;
-    once(event: 'error' | 'sync-error', listener: (payload: SyncErrorEvent) => void): () => void;
-    waitForInitialSync(): Promise<void>;
-  };
 
   interceptors: WithInterceptors;
-} & WithInterceptors & DbConnectable<M>;
+} & WithInterceptors & DbConnectable<M, Commands>
+  & (Sync extends true ? { syncClient: SyncClient<M>; } : {});
 
 type HonoRequest = {
   method: string;
@@ -1498,7 +1521,11 @@ type HonoConfig<M extends Record<string, TableDefinition<M>>> = {
   [TableName in keyof M]?: HonoTableConfig<M>;
 } & {
   db?: Pool | ((connectors: Connectors) => Pool | Promise<Pool>);
+  commands?: AnyServerCommandHandlers<M>;
+  commandHandlers?: AnyServerCommandHandlers<M>;
   hooks?: HonoHooks<M>;
+  /** Sync is enabled by default and uses the same exposed tables as Hono. */
+  sync?: boolean | SyncServerConfig<M>;
 }
 
 type ExpressTableConfig<M extends Record<string, TableDefinition<M>>> = {
@@ -1532,6 +1559,7 @@ type ExpressHooks<M extends Record<string, TableDefinition<M>>> = ExpressTransac
 type SyncServerConfig<M extends Record<string, TableDefinition<M>>> = {
   enabled?: boolean;
   changeTable?: string;
+  appliedMutationsTable?: string;
   commands?: AnyServerCommandHandlers<M>;
   queue?: {
     concurrency?: number;
@@ -1540,6 +1568,7 @@ type SyncServerConfig<M extends Record<string, TableDefinition<M>>> = {
   limits?: {
     maxKeysPerBatch?: number;
     maxRowsPerBatch?: number;
+    maxMutationsPerBatch?: number;
     maxChangeWindow?: number;
   };
 }

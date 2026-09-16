@@ -43,7 +43,8 @@ services:
       - SA_PASSWORD=P@assword123
       - MSSQL_SA_PASSWORD=P@assword123
     tmpfs:
-      - /var/opt/mssql/data
+      # Keep the data directory writable by mssql after container restarts.
+      - /var/opt/mssql/data:uid=10001,gid=0,mode=0770
     ports:
       - 14330:1433
     healthcheck:
@@ -90,8 +91,9 @@ services:
     environment:
       - ORACLE_PASSWORD=P@assword123   
     hostname: oracle
-    tmpfs:
-      - /opt/oracle/oradata
+    # Database files exceed the default tmpfs size on low-memory Docker hosts.
+    volumes:
+      - oracle-data:/opt/oracle/oradata
     ports:
       - 1521:1521
     healthcheck:
@@ -107,4 +109,5 @@ services:
       retries: 30
       start_period: 60s
 volumes:
+  oracle-data:
   try-node-node_modules:

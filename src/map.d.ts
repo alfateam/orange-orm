@@ -3,7 +3,7 @@ import type { PGliteOptions } from './pglite.d.ts';
 import type { ConnectionConfiguration } from 'tedious';
 import type { D1Database } from '@cloudflare/workers-types';
 import type { PoolAttributes } from 'oracledb';
-import type { DBClient, SyncCommandHandler, SyncConfig } from './map2';
+import type { DBClient, SyncClient, SyncCommandHandler, SyncConfig } from './map2';
 
 export type MergeProperties<T, V> = {
 	[K in keyof T | keyof V]:
@@ -37,7 +37,7 @@ type DbConnectable<T> = {
 	postgres(connectionString: string, options?: PoolOptions<SchemaFromMappedDb<T>>): DBClient<SchemaFromMappedDb<T>>;
 	pglite(config?: PGliteOptions| string | undefined, options?: PoolOptions<SchemaFromMappedDb<T>>): DBClient<SchemaFromMappedDb<T>>;
 	sqlite(connectionString: string, options?: PoolOptions<SchemaFromMappedDb<T>>): DBClient<SchemaFromMappedDb<T>>;
-	sqliteOPFS(connectionString: string, options?: SqliteOPFSPoolOptions<SchemaFromMappedDb<T>>): DBClient<SchemaFromMappedDb<T>>;
+	sqliteOPFS(connectionString: string, options?: SqliteOPFSPoolOptions<SchemaFromMappedDb<T>>): DBClient<SchemaFromMappedDb<T>, {}, true>;
 	sap(connectionString: string, options?: PoolOptions<SchemaFromMappedDb<T>>): DBClient<SchemaFromMappedDb<T>>;
 	mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions<SchemaFromMappedDb<T>>): DBClient<SchemaFromMappedDb<T>>;
 	mssql(connectionString: string, options?: PoolOptions<SchemaFromMappedDb<T>>): DBClient<SchemaFromMappedDb<T>>;
@@ -80,7 +80,7 @@ type DbOptions<T, C extends AnyCommandMap = AnyCommandMap> = {
 	concurrency?: ConcurrencyValues;
 	readonly?: boolean;
 	db?: Pool | ((connectors: Connectors<SchemaFromMappedDb<T>>) => Pool | Promise<Pool>);
-	syncClient?: DBClient<SchemaFromMappedDb<T>>['syncClient'];
+	syncClient?: SyncClient<SchemaFromMappedDb<T>>;
 	commands?: C;
 	commandHandlers?: ServerCommandHandlers<SchemaFromMappedDb<T>, C>;
 };

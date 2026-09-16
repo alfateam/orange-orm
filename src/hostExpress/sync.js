@@ -26,13 +26,13 @@ function newSyncHandler(client, options = {}, tables = getExposedTables(client.t
 	return async function handleSync(request, response) {
 		try {
 			const result = await queue.run(() => execute(request.body || {}, request, response));
-			response.json(result);
+			return response.json(result);
 		}
 		catch (e) {
 			if (e.status === undefined)
-				response.status(500).send(e.message || e);
+				return response.status(500).send(e.message || e);
 			else
-				response.status(e.status).send(e.message);
+				return response.status(e.status).send(e.message);
 		}
 	};
 

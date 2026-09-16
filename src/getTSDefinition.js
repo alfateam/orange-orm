@@ -582,6 +582,7 @@ export interface HonoConfig {
 	readonly?: boolean;
 	disableBulkDeletes?: boolean;
 	hooks?: HonoHooks;
+	sync?: boolean | SyncServerConfig;
 }
 
 export interface ExpressContext {
