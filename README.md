@@ -2546,3 +2546,5 @@ COMMIT
 How to setup code coverage
 https://github.com/nystudio107/rollup-plugin-critical/blob/master/package.json
 https://dev.to/thejaredwilcurt/coverage-badge-with-github-actions-finally-59fa -->
+
+For SQLite OPFS and managed sync in browser applications, see the [browser bundling guide](docs/browser-sqlite.md).

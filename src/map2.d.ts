@@ -1419,6 +1419,17 @@ export interface PoolOptions<M extends Record<string, any> = any> {
 
 export interface SqliteOPFSPoolOptions<M extends Record<string, any> = any> extends PoolOptions<M> {
   sync?: string | SyncConfig<M>;
+  /** Optional externally managed SQLite worker or a port connected to one. */
+  worker?: Worker | MessagePort;
+  createWorker?: (connectionString: string, options: SqliteOPFSPoolOptions<M>) => Worker | MessagePort;
+  /** Runtime URL overrides are hosted by the application, including their dependencies. */
+  workerUrl?: string | URL;
+  sqliteModuleUrl?: string;
+  readWorker?: Worker | MessagePort;
+  createReadWorker?: (connectionString: string, options: SqliteOPFSPoolOptions<M>) => Worker | MessagePort;
+  singleWorker?: boolean;
+  /** Set false when closing a port must leave its shared database open. */
+  closeDbOnClose?: boolean;
   vfs?: 'opfs-sahpool' | 'opfs-wl';
   opfsSahPool?: OpfsSahPoolOptions;
   busyTimeoutMs?: number;

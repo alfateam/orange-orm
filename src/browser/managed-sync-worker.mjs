@@ -1,5 +1,5 @@
-const rdb = require('./managedSyncWorkerRdb');
-const mapFromSyncSchema = require('./mapFromSyncSchema');
+import rdb from '../client/managedSyncWorkerRdb.js';
+import mapFromSyncSchema from '../client/mapFromSyncSchema.js';
 
 let handler;
 const pendingEvents = [];

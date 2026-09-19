@@ -1,3 +1,4 @@
+const workerDefaults = require('../workerDefaults');
 const createSyncWorkerClient = require('./syncWorkerClient');
 const { buildSyncSchema } = require('./syncSchema');
 
@@ -46,13 +47,14 @@ function resolveConfiguredTables(client, syncConfig) {
 function createManagedWorker(config) {
 	if (typeof config.createWorker === 'function')
 		return config.createWorker();
-	const WorkerClass = typeof Worker === 'function' ? Worker : undefined;
-	if (!WorkerClass)
+	if (typeof Worker !== 'function')
 		throw new Error('Managed sync requires browser Worker support.');
 	const url = config.url || managedSyncWorkerUrl();
-	if (!url)
-		throw new Error('Managed sync worker URL is unavailable in this build.');
-	return new WorkerClass(url, { type: 'module', name: 'orange-orm-sync' });
+	if (url)
+		return new Worker(url, { type: 'module', name: 'orange-orm-sync' });
+	if (workerDefaults.createManagedSyncWorker)
+		return workerDefaults.createManagedSyncWorker();
+	throw new Error('Managed sync requires the browser build or an explicit sync.worker option.');
 }
 
 function managedSyncWorkerUrl() {
