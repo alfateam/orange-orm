@@ -94,7 +94,7 @@ jobs:
           --health-retries=30
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Inside Node container already; no setup-node needed.
       - run: apt-get update && apt-get install -y unixodbc-dev
@@ -138,7 +138,7 @@ jobs:
 
       - if: ${{ matrix.container == 'node:22-bookworm' && github.ref == 'refs/heads/master' }}
         name: Create the Badge
-        uses: schneegans/dynamic-badges-action@v1.7.0
+        uses: schneegans/dynamic-badges-action@v1.9.0
         with:
           auth: ${{ secrets.GIST_SECRET }}
           gistID: 1a69422f03da7f8155cf94fe66022452
@@ -225,7 +225,7 @@ jobs:
           --health-retries=30
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Setup Bun (latest)
         uses: oven-sh/setup-bun@v2
         with:
@@ -309,7 +309,7 @@ jobs:
           --health-retries=30
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
       # Install Deno
       - name: Setup Deno
