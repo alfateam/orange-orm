@@ -1,5 +1,6 @@
 const stringify = require('../client/stringify');
 const getExposedTables = require('./getExposedTables');
+const createQueue = require('./createQueue');
 
 function newSyncHandler(client, options = {}, tables = getExposedTables(client.tables, options)) {
 	const syncOptions = normalizeSyncOptions(options.sync);
@@ -651,45 +652,6 @@ function createTableMeta(tables, syncOptions) {
 		byDbName.set(split[split.length - 1], meta);
 	}
 	return { byName, byDbName };
-}
-
-function createQueue({ concurrency, maxPending }) {
-	let running = 0;
-	const pending = [];
-	let pendingHead = 0;
-	return { run };
-
-	function run(job) {
-		return new Promise((resolve, reject) => {
-			if (running >= concurrency && pending.length - pendingHead >= maxPending) {
-				const error = new Error('Sync queue is full. Try again later.');
-				error.status = 429;
-				reject(error);
-				return;
-			}
-			pending.push({ job, resolve, reject });
-			drain();
-		});
-	}
-
-	function drain() {
-		while (running < concurrency && pendingHead < pending.length) {
-			const next = pending[pendingHead];
-			pendingHead += 1;
-			if (pendingHead > 1024 && pendingHead * 2 > pending.length) {
-				pending.splice(0, pendingHead);
-				pendingHead = 0;
-			}
-			running += 1;
-			Promise.resolve()
-				.then(next.job)
-				.then(next.resolve, next.reject)
-				.finally(() => {
-					running -= 1;
-					drain();
-				});
-		}
-	}
 }
 
 function shouldUseSnapshot(cursor, bounds, maxChangeWindow) {
