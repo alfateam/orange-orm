@@ -1,4 +1,5 @@
 const {
+	clearSyncOperationMemory,
 	finalizeSyncOperationMemory,
 	serializeSyncPayload,
 	withSyncOperationMemory
@@ -23,6 +24,7 @@ function createDbWorkerClient(worker) {
 	let hasInitialReady = false;
 	let lastInitialReady;
 	let closed = false;
+	let closing;
 	let terminalError;
 
 	worker.addEventListener('message', onMessage);
@@ -105,7 +107,7 @@ function createDbWorkerClient(worker) {
 	}
 
 	function request(method, meta, ...args) {
-		if (closed)
+		if (closed && method !== 'close')
 			return Promise.reject(new Error('DB worker client closed.'));
 		if (terminalError)
 			return Promise.reject(terminalError);
@@ -134,6 +136,7 @@ function createDbWorkerClient(worker) {
 	}
 
 	function on(event, listener) {
+		if (closed) throw new Error('DB worker client closed.');
 		if (typeof event !== 'string' || typeof listener !== 'function')
 			return () => {};
 		let eventListeners = listeners.get(event);
@@ -177,34 +180,23 @@ function createDbWorkerClient(worker) {
 	}
 
 	function close() {
-		if (closed)
-			return;
+		if (closing) return closing;
 		closed = true;
-		worker.removeEventListener('message', onMessage);
-		worker.removeEventListener('error', onWorkerError);
-		worker.removeEventListener('messageerror', onWorkerError);
-		for (const entry of pending.values())
-			entry.reject(new Error('DB worker client closed.'));
+		clearSyncOperationMemory(client.syncClient);
+		for (const entry of pending.values()) entry.reject(new Error('DB worker client closed.'));
 		pending.clear();
 		listeners.clear();
 		hasInitialReady = false;
 		lastInitialReady = undefined;
-		if (typeof worker.terminate === 'function') {
-			try {
-				worker.terminate();
-			}
-			catch (_e) {
-				// Closing is best-effort for Worker-backed clients.
-			}
-		}
-		else if (typeof worker.close === 'function') {
-			try {
-				worker.close();
-			}
-			catch (_e) {
-				// Closing is best-effort for MessagePort-backed worker clients.
-			}
-		}
+		closing = request('close', {}).finally(() => {
+			worker.removeEventListener('message', onMessage);
+			worker.removeEventListener('error', onWorkerError);
+			worker.removeEventListener('messageerror', onWorkerError);
+			if (typeof worker.terminate === 'function') worker.terminate();
+			else if (typeof worker.close === 'function') worker.close();
+		});
+		closing.catch(() => {});
+		return closing;
 	}
 
 	function onMessage(event) {
@@ -212,10 +204,12 @@ function createDbWorkerClient(worker) {
 		if (!message || message.type === undefined)
 			return;
 		if (message.type === 'orange-db-interceptor-request') {
+			if (closed) return;
 			void handleInterceptorRequest(message);
 			return;
 		}
 		if (message.type === 'orange-db-event') {
+			if (closed) return;
 			const payload = deserializeEventPayload(message.payload);
 			if (message.event === 'initial-ready') {
 				hasInitialReady = true;
@@ -238,24 +232,24 @@ function createDbWorkerClient(worker) {
 
 	function emit(event, payload) {
 		if (event === 'operation') {
-			payload = withSyncOperationMemory(payload);
+			payload = withSyncOperationMemory(payload, client.syncClient);
 			try {
 				emitToListeners('operation', payload);
 				if (payload && typeof payload.operation === 'string')
 					emitToListeners(`operation:${payload.operation}`, payload);
 			}
 			finally {
-				finalizeSyncOperationMemory(payload);
+				finalizeSyncOperationMemory(payload, client.syncClient);
 			}
 			return;
 		}
 		if (event && event.startsWith && event.startsWith('operation:')) {
-			payload = withSyncOperationMemory(payload);
+			payload = withSyncOperationMemory(payload, client.syncClient);
 			try {
 				emitToListeners(event, payload);
 			}
 			finally {
-				finalizeSyncOperationMemory(payload);
+				finalizeSyncOperationMemory(payload, client.syncClient);
 			}
 			return;
 		}
@@ -263,6 +257,7 @@ function createDbWorkerClient(worker) {
 	}
 
 	function emitToListeners(event, payload) {
+		if (closed) return;
 		const eventListeners = listeners.get(event);
 		if (!eventListeners)
 			return;

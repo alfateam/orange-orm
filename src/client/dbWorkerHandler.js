@@ -27,6 +27,8 @@ function createDbWorkerHandler(client, options = {}) {
 	let autoStarted = false;
 	let clientReady = false;
 	let stopped = false;
+	let closing;
+	const activeRequests = new Set();
 	let hasPendingInitialReady = false;
 	let pendingInitialReady;
 	const postMessage = options.postMessage || ((message) => {
@@ -58,15 +60,27 @@ function createDbWorkerHandler(client, options = {}) {
 		}
 		if (message.type !== 'orange-db-request')
 			return;
+		if (message.method === 'close') {
+			try { await stop(); postResponse(message.id); }
+			catch (error) { postResponse(message.id, undefined, error); }
+			return;
+		}
+		if (stopped) {
+			postResponse(message.id, undefined, new Error('DB worker handler closed.'));
+			return;
+		}
 		if (message.method === 'sync.sync')
 			restartPendingRequestInterceptors();
+		const work = dispatch(message);
+		activeRequests.add(work);
 		try {
-			const result = await dispatch(message);
+			const result = await work;
 			postResponse(message.id, result);
 		}
 		catch (e) {
 			postResponse(message.id, undefined, e);
 		}
+		finally { activeRequests.delete(work); }
 	}
 
 	async function dispatch(message) {
@@ -99,6 +113,10 @@ function createDbWorkerHandler(client, options = {}) {
 		if (transactions.has(transactionId))
 			return { transactionId };
 		const releaseSyncWrite = await acquireSyncWrite(pool, txOptions);
+		if (stopped) {
+			releaseSyncWrite();
+			throw new Error('DB worker handler closed.');
+		}
 		let transaction;
 		try {
 			transaction = pool.createTransaction(txOptions);
@@ -189,6 +207,7 @@ function createDbWorkerHandler(client, options = {}) {
 		if (!client.syncClient || typeof client.syncClient.on !== 'function')
 			return;
 		const unsubscribe = client.syncClient.on(event, (payload) => {
+			if (stopped) return;
 			if (event === 'initial-ready' && !clientReady) {
 				hasPendingInitialReady = true;
 				pendingInitialReady = payload;
@@ -275,25 +294,32 @@ function createDbWorkerHandler(client, options = {}) {
 		}
 	}
 
-	async function stop() {
-		if (stopped)
-			return;
+	function stop() {
+		if (closing) return closing;
 		stopped = true;
-		if (options.stopSyncClient !== false && client.syncClient && typeof client.syncClient.stop === 'function')
-			await client.syncClient.stop();
-		for (const eject of interceptorEjectors)
-			eject();
+		closing = stopCore();
+		return closing;
+	}
+
+	async function stopCore() {
+		const syncStop = options.stopSyncClient !== false && client.syncClient
+			&& typeof client.syncClient.stop === 'function' ? client.syncClient.stop() : Promise.resolve();
+		for (const eject of interceptorEjectors) eject();
 		interceptorEjectors.length = 0;
 		for (const entry of new Set(pendingInterceptorRequests.values()))
 			settleInterceptorRequest(entry, entry.reject, syncAbortError(undefined, 'DB worker interceptor bridge stopped.'));
 		pendingInterceptorRequests.clear();
-		for (const unsubscribe of syncEventUnsubscribers.values())
-			unsubscribe();
+		for (const unsubscribe of syncEventUnsubscribers.values()) unsubscribe();
 		syncEventUnsubscribers.clear();
+		const rollbacks = [];
 		for (const [id, transaction] of transactions) {
 			transactions.delete(id);
-			void Promise.resolve(transaction(transaction.rollback)).finally(() => releaseSyncWrite(transaction));
+			rollbacks.push(Promise.resolve(transaction(transaction.rollback)).finally(() => releaseSyncWrite(transaction)));
 		}
+		await Promise.all(rollbacks);
+		await syncStop;
+		await Promise.allSettled(Array.from(activeRequests));
+		if (options.stopSyncClient !== false && typeof client.close === 'function') await client.close();
 	}
 
 	function handleClientReady() {

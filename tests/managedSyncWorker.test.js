@@ -80,14 +80,18 @@ describe('managed sync worker', () => {
 		expect(buildSyncSchema(rebuilt, ['parent', 'child'])).toEqual(schema);
 	});
 
-	test('creates a sync worker client with internal SQLite ports', () => {
+	test('creates a sync worker client with internal SQLite ports', async () => {
 		const messages = [];
 		let terminated = false;
+		let onMessage;
 		const worker = {
 			postMessage(message, transfer) {
 				messages.push({ message, transfer });
+				if (message.method === 'close') queueMicrotask(() => onMessage({ data: {
+					type: 'orange-sync-worker-response', id: message.id
+				} }));
 			},
-			addEventListener() {},
+			addEventListener(event, listener) { if (event === 'message') onMessage = listener; },
 			removeEventListener() {},
 			terminate() {
 				terminated = true;
@@ -136,7 +140,7 @@ describe('managed sync worker', () => {
 		expect(messages[0].transfer).toEqual(ports);
 		expect(messages[1].message).toEqual({ type: 'orange-sync-worker-ready' });
 
-		client.close();
+		await client.close();
 		expect(terminated).toBe(true);
 	});
 });

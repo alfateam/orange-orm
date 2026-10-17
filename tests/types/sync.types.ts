@@ -14,6 +14,10 @@ declare const db: DBClient<Model>;
 
 const sqliteOPFS = db.sqliteOPFS('app.sqlite3', { sync: { url: '/rdb' } });
 sqliteOPFS.syncClient.sync();
+const stopped: Promise<void> = sqliteOPFS.syncClient.stop();
+const closed: Promise<void> = sqliteOPFS.syncClient.close();
+void stopped;
+void closed;
 
 sqliteOPFS.syncClient.on('initial-ready', (event) => {
 	const source: string = event.source;

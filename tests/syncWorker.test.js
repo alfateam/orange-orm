@@ -7,6 +7,47 @@ const { syncAbortSignalSymbol, syncAutoStartSymbol } = require('../src/client/sy
 const { registerSyncOperationMemory } = require('../src/sync/operationContext');
 
 describe('sync worker rpc', () => {
+	test('removes worker subscriptions even when sync shutdown fails', async () => {
+		const subscriptions = new Set();
+		const bridge = createBridge({
+			on(event) {
+				subscriptions.add(event);
+				return () => subscriptions.delete(event);
+			},
+			close: async () => { throw new Error('storage shutdown failed'); }
+		}, { autoStart: false });
+		const client = rdb.createSyncWorkerClient(bridge.worker);
+		expect(subscriptions.size).toBeGreaterThan(0);
+		await expect(client.close()).rejects.toThrow('storage shutdown failed');
+		expect(subscriptions.size).toBe(0);
+		await expect(client.sync()).rejects.toThrow('closed');
+	});
+
+	test('close waits for worker cleanup and suppresses late events while another client stays usable', async () => {
+		let release;
+		const gate = new Promise(resolve => { release = resolve; });
+		const a = createEventSyncClient();
+		a.close = () => gate;
+		const b = createEventSyncClient();
+		const bridgeA = createBridge(a, { autoStart: false });
+		const bridgeB = createBridge(b, { autoStart: false });
+		const clientA = rdb.createSyncWorkerClient(bridgeA.worker);
+		const clientB = rdb.createSyncWorkerClient(bridgeB.worker);
+		const events = [];
+		clientA.on('sync', () => events.push('A'));
+		clientB.on('sync', () => events.push('B'));
+		let closed = false;
+		const closing = clientA.close().then(() => { closed = true; });
+		a.emit('sync', {});
+		b.emit('sync', {});
+		await wait(0);
+		expect(closed).toBe(false);
+		expect(events).toEqual(['B']);
+		await expect(clientA.start()).rejects.toThrow('closed');
+		release();
+		await closing;
+		await clientB.close();
+	});
 	test('starts sync from worker configuration only after the main-thread client is ready', async () => {
 		const calls = [];
 		const bridge = createBridge({
@@ -292,7 +333,7 @@ describe('sync worker rpc', () => {
 		const memory = { localOnly: true };
 		const offAll = client.on('operation', (event) => all.push(event));
 		const offNamed = client.on('operation:customer-save', (event) => named.push(event));
-		registerSyncOperationMemory('mutation-1', memory);
+		registerSyncOperationMemory('mutation-1', memory, client);
 
 		eventClient.emit('operation', {
 			ok: true,

@@ -1,7 +1,9 @@
+const { awaitWithSyncAbort, throwIfSyncAborted } = require('../client/syncAbort');
 const randomUuid = require('../randomUuid');
 
 async function runWithCrossTabLock(name, config, fn) {
 	const lockConfig = config || { enabled: true };
+	throwIfSyncAborted(lockConfig.signal);
 	if (!lockConfig.enabled)
 		return fn();
 	const locks = getWebLocks();
@@ -81,15 +83,24 @@ async function runWithWebLock(locks, name, config, fn) {
 	let timeoutId;
 	let waiting = true;
 	let timedOut = false;
-	if (timeoutMs && typeof AbortController === 'function') {
+	const externalSignal = config.signal;
+	let removeAbort;
+	if ((timeoutMs || externalSignal) && typeof AbortController === 'function') {
 		const controller = new AbortController();
 		options.signal = controller.signal;
-		timeoutId = setTimeout(() => {
-			if (!waiting)
-				return;
-			timedOut = true;
-			controller.abort();
-		}, timeoutMs);
+		if (externalSignal) {
+			const abort = () => controller.abort(externalSignal.reason);
+			externalSignal.addEventListener('abort', abort, { once: true });
+			removeAbort = () => externalSignal.removeEventListener('abort', abort);
+			if (externalSignal.aborted) abort();
+		}
+		if (timeoutMs)
+			timeoutId = setTimeout(() => {
+				if (!waiting)
+					return;
+				timedOut = true;
+				controller.abort();
+			}, timeoutMs);
 	}
 	try {
 		return await locks.request(name, options, async () => {
@@ -102,11 +113,13 @@ async function runWithWebLock(locks, name, config, fn) {
 		});
 	}
 	catch (e) {
+		throwIfSyncAborted(externalSignal);
 		if (timedOut || e && e.name === 'AbortError')
 			throw lockTimeoutError(name, timeoutMs, config);
 		throw e;
 	}
 	finally {
+		if (removeAbort) removeAbort();
 		if (timeoutId)
 			clearTimeout(timeoutId);
 	}
@@ -147,6 +160,7 @@ async function runWithLocalStorageLock(storage, name, config, fn) {
 }
 
 async function runLockBody(_name, _config, fn) {
+	throwIfSyncAborted(_config.signal);
 	return fn();
 }
 
@@ -157,6 +171,7 @@ async function acquireLocalStorageLock(storage, name, config) {
 	const pollMs = config.pollMs || 100;
 	const startedAt = Date.now();
 	for (;;) {
+		throwIfSyncAborted(config.signal);
 		const now = Date.now();
 		const current = readLocalStorageLock(storage, key);
 		if (!current || current.expiresAt <= now || current.owner === owner) {
@@ -167,7 +182,7 @@ async function acquireLocalStorageLock(storage, name, config) {
 		}
 		if (config.timeoutMs && now - startedAt >= config.timeoutMs)
 			throw lockTimeoutError(name, config.timeoutMs, config);
-		await delay(pollMs);
+		await awaitWithSyncAbort(delay(pollMs), config.signal);
 	}
 }
 

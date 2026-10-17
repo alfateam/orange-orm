@@ -447,12 +447,18 @@ describe('db worker rpc', () => {
 		expect(workers).toBe(1);
 	});
 
-	test('terminates real worker on close', () => {
+	test('terminates worker only after acknowledged close', async () => {
+		let onMessage;
+		let acknowledge;
 		let removed = false;
 		let terminated = false;
 		const workerClient = rdb.createDbWorkerClient({
-			postMessage() {},
-			addEventListener() {},
+			postMessage(message) {
+				if (message.method === 'close') acknowledge = () => onMessage({ data: {
+					type: 'orange-db-response', id: message.id
+				} });
+			},
+			addEventListener(event, listener) { if (event === 'message') onMessage = listener; },
 			removeEventListener(event) {
 				if (event === 'message')
 					removed = true;
@@ -462,7 +468,10 @@ describe('db worker rpc', () => {
 			}
 		});
 
-		workerClient.close();
+		const closing = workerClient.close();
+		expect(terminated).toBe(false);
+		acknowledge();
+		await closing;
 
 		expect(removed).toBe(true);
 		expect(terminated).toBe(true);

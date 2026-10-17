@@ -1,4 +1,5 @@
 const {
+	clearSyncOperationMemory,
 	finalizeSyncOperationMemory,
 	withSyncOperationMemory
 } = require('../sync/operationContext');
@@ -22,6 +23,7 @@ function createSyncWorkerClient(worker, options = {}) {
 	let hasInitialReady = false;
 	let lastInitialReady;
 	let closed = false;
+	let closing;
 	let terminalError;
 
 	worker.addEventListener('message', onMessage);
@@ -50,7 +52,7 @@ function createSyncWorkerClient(worker, options = {}) {
 	return client;
 
 	function request(method, ...args) {
-		if (closed)
+		if (closed && method !== 'close')
 			return Promise.reject(new Error('Sync worker client closed.'));
 		if (terminalError)
 			return Promise.reject(terminalError);
@@ -86,6 +88,7 @@ function createSyncWorkerClient(worker, options = {}) {
 	}
 
 	function on(event, listener) {
+		if (closed) throw new Error('Sync worker client closed.');
 		if (typeof event !== 'string' || typeof listener !== 'function')
 			return () => {};
 		let eventListeners = listeners.get(event);
@@ -129,27 +132,30 @@ function createSyncWorkerClient(worker, options = {}) {
 	}
 
 	function close() {
-		if (closed)
-			return;
+		if (closing) return closing;
 		closed = true;
+		clearSyncOperationMemory(client);
 		const closeError = new Error('Sync worker client closed.');
-		worker.removeEventListener('message', onMessage);
-		worker.removeEventListener('error', onWorkerError);
-		worker.removeEventListener('messageerror', onWorkerError);
 		for (const [id, entry] of pending) {
 			postCancel(id);
-			if (entry.timeoutId)
-				clearTimeout(entry.timeoutId);
+			if (entry.timeoutId) clearTimeout(entry.timeoutId);
 			entry.reject(closeError);
 		}
 		pending.clear();
 		listeners.clear();
 		hasInitialReady = false;
 		lastInitialReady = undefined;
-		if (typeof worker.terminate === 'function')
-			worker.terminate();
-		else if (typeof worker.close === 'function')
-			worker.close();
+		// Wait for rollback/storage work in the worker before terminating it.
+		closing = request('close').finally(() => {
+			worker.removeEventListener('message', onMessage);
+			worker.removeEventListener('error', onWorkerError);
+			worker.removeEventListener('messageerror', onWorkerError);
+			if (typeof worker.terminate === 'function') worker.terminate();
+			else if (typeof worker.close === 'function') worker.close();
+		});
+		// Older callers may ignore close's return value. Awaiting it still reports failure.
+		closing.catch(() => {});
+		return closing;
 	}
 
 	function onMessage(event) {
@@ -157,10 +163,12 @@ function createSyncWorkerClient(worker, options = {}) {
 		if (!message || message.type === undefined)
 			return;
 		if (message.type === 'orange-sync-worker-interceptor-request') {
+			if (closed) return;
 			void handleInterceptorRequest(message);
 			return;
 		}
 		if (message.type === 'orange-sync-worker-event') {
+			if (closed) return;
 			const payload = deserializeEventPayload(message.payload);
 			if (message.event === 'initial-ready') {
 				hasInitialReady = true;
@@ -206,24 +214,24 @@ function createSyncWorkerClient(worker, options = {}) {
 
 	function emit(event, payload) {
 		if (event === 'operation') {
-			payload = withSyncOperationMemory(payload);
+			payload = withSyncOperationMemory(payload, client);
 			try {
 				emitToListeners('operation', payload);
 				if (payload && typeof payload.operation === 'string')
 					emitToListeners(`operation:${payload.operation}`, payload);
 			}
 			finally {
-				finalizeSyncOperationMemory(payload);
+				finalizeSyncOperationMemory(payload, client);
 			}
 			return;
 		}
 		if (event && event.startsWith && event.startsWith('operation:')) {
-			payload = withSyncOperationMemory(payload);
+			payload = withSyncOperationMemory(payload, client);
 			try {
 				emitToListeners(event, payload);
 			}
 			finally {
-				finalizeSyncOperationMemory(payload);
+				finalizeSyncOperationMemory(payload, client);
 			}
 			return;
 		}
@@ -231,11 +239,14 @@ function createSyncWorkerClient(worker, options = {}) {
 	}
 
 	function emitToListeners(event, payload) {
+		if (closed) return;
 		const eventListeners = listeners.get(event);
 		if (!eventListeners)
 			return;
-		for (const listener of Array.from(eventListeners))
+		for (const listener of Array.from(eventListeners)) {
+			if (closed) break;
 			callListener(listener, payload);
+		}
 	}
 
 	function callListener(listener, payload) {

@@ -1,3 +1,4 @@
+const createSyncLifecycle = require('./syncLifecycle');
 const randomUuid = require('../randomUuid');
 const stringify = require('./stringify');
 const { createSyncAuto, syncAutoStartSymbol } = require('./syncAuto');
@@ -13,12 +14,15 @@ const {
 } = require('../sync/crossTabLock');
 const ensureOutboxOperationColumns = require('../sync/ensureOutboxOperationColumns');
 const {
+	clearSyncOperationMemory,
 	deleteSyncOperationMemory,
 	finalizeSyncOperationMemory,
 	withSyncOperationMemory
 } = require('../sync/operationContext');
 const {
 	awaitWithSyncAbort,
+	awaitSyncWork,
+	trackSyncWork,
 	isSyncAbortError,
 	syncAbortSignalSymbol,
 	throwIfSyncAborted
@@ -62,6 +66,7 @@ const setClientIdSymbol = typeof Symbol === 'function'
 	: '__orangeOrmSyncClientSetClientId';
 
 function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, internalOptions = {}) {
+	const lifecycle = createSyncLifecycle();
 	const sinceByScope = new Map();
 	const ensuredInternalTables = new WeakMap();
 	const syncStateTable = 'orange_sync_state';
@@ -89,27 +94,28 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 	const queuedEnsureLocalSchema = serializeSyncWork(lockedEnsureLocalSchema);
 	const observedSync = observeSyncMethod('sync', queuedSync);
 	const auto = createSyncAuto({
-		sync: observedSync
+		sync: options => lifecycle.run(observedSync, options)
 	}, getConfig);
 
 	const syncClientApi = {
-		sync: observedSync,
-		ensureLocalSchema: queuedEnsureLocalSchema,
-		resetLocal: lockedResetLocal,
-		start: auto.start,
-		stop: auto.stop,
+		sync: options => lifecycle.run(observedSync, options),
+		ensureLocalSchema: options => lifecycle.run(queuedEnsureLocalSchema, options, true),
+		resetLocal: options => lifecycle.run(lockedResetLocal, options, true),
+		start: options => lifecycle.start(auto.start, options),
+		stop: () => lifecycle.stop(auto.stop),
+		close,
 		isRunning: auto.isRunning,
 		on,
 		off,
 		once,
-		waitForInitialSync,
+		waitForInitialSync: options => lifecycle.run(waitForInitialSync, options),
 		interceptors
 	};
 	Object.defineProperty(syncClientApi, syncAutoStartSymbol, {
-		value: auto.startFromConfig
+		value: options => lifecycle.run(auto.startFromConfig, options)
 	});
 	Object.defineProperty(syncClientApi, ensureLocalSchemaReadySymbol, {
-		value: ensureLocalSchemaReady
+		value: options => lifecycle.run(ensureLocalSchemaReady, options, true)
 	});
 	Object.defineProperty(syncClientApi, syncAndCapturePullJournalSymbol, {
 		value: syncAndCapturePullJournal
@@ -137,6 +143,14 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 	});
 	return syncClientApi;
 
+	function close() {
+		const closing = lifecycle.close(auto.stop);
+		eventListeners.clear();
+		initialReadyListeners.clear();
+		clearSyncOperationMemory(syncClientApi);
+		return closing;
+	}
+
 	function withCrossTabSyncLock(fn) {
 		return async function lockedSyncMethod(options) {
 			const signal = options && options[syncAbortSignalSymbol];
@@ -148,7 +162,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 				return fn(options);
 			const lock = await resolveRuntimeCrossTabSyncLock(db, syncConfig);
 			const lockConfig = withRuntimeCrossTabLockConfig(lock.config, options);
-			return awaitWithSyncAbort(
+			return awaitSyncWork(
 				runWithCrossTabLock(lock.name, lockConfig, () => {
 					throwIfSyncAborted(signal);
 					return fn(options);
@@ -267,7 +281,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 	async function ensureLocalSchemaReady(options = {}) {
 		const signal = options[syncAbortSignalSymbol];
 		throwIfSyncAborted(signal);
-		const result = await awaitWithSyncAbort(getLocalSchemaReady({
+		const result = await awaitSyncWork(getLocalSchemaReady({
 			allowMissingSync: true,
 			fileSnapshotRollback: fileSnapshotRollbackDefault
 		}), signal);
@@ -339,10 +353,12 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 	}
 
 	function emit(event, payload) {
+		if (!lifecycle.active) return;
 		const listeners = eventListeners.get(event);
 		if (!listeners)
 			return;
 		for (const listener of Array.from(listeners)) {
+			if (!lifecycle.active) break;
 			try {
 				listener(payload);
 			}
@@ -387,7 +403,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		const hadStableBase = usesFileSnapshotRollback(normalizedOptions)
 			|| await hasStableBase(db, configuredTables);
 		if (!hadStableBase)
-			return awaitWithSyncAbort(
+			return awaitSyncWork(
 				runSyncMaintenance(db, () => pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, normalizedOptions)),
 				normalizedOptions[syncAbortSignalSymbol]
 			);
@@ -397,7 +413,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 	async function prepareLocalSyncSchema(options = {}, prepareOptions = {}) {
 		const signal = options[syncAbortSignalSymbol];
 		throwIfSyncAborted(signal);
-		const result = await awaitWithSyncAbort(getLocalSchemaReady({
+		const result = await awaitSyncWork(getLocalSchemaReady({
 			...prepareOptions,
 			fileSnapshotRollback: usesFileSnapshotRollback(options)
 		}), signal);
@@ -1327,7 +1343,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 				if (pumpRunning || !shouldFetchMorePullBatches())
 					return;
 				pumpRunning = true;
-				Promise.resolve()
+				trackSyncWork(Promise.resolve()
 					.then(pumpPullBatches)
 					.catch((error) => {
 						keyFetchError = error;
@@ -1337,7 +1353,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 						notifyPipelineChange();
 						if (shouldFetchMorePullBatches())
 							startPullBatchPump();
-					});
+					}), signal);
 			}
 
 			async function pumpPullBatches() {
@@ -1546,7 +1562,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 						return;
 					const job = queue.splice(index, 1)[0];
 					active += 1;
-					runRowJob(job);
+					trackSyncWork(runRowJob(job), signal);
 				}
 			}
 
@@ -2533,12 +2549,13 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 	}
 
 	function emitOperationEvent(event) {
-		event = withSyncOperationMemory(event);
+		const memoryScope = internalOptions.operationMemoryScope || syncClientApi;
+		event = withSyncOperationMemory(event, memoryScope);
 		emit('operation', event);
 		emit(`operation:${event.operation}`, event);
-		finalizeSyncOperationMemory(event);
+		finalizeSyncOperationMemory(event, memoryScope);
 		if (event.ok || event.retryable === false)
-			deleteSyncOperationMemory(event.mutationId);
+			deleteSyncOperationMemory(event.mutationId, memoryScope);
 	}
 
 	function syncOperationError(error) {
@@ -3266,11 +3283,12 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 	}
 
 	function on(event, listener) {
+		lifecycle.assertOpen();
 		if (typeof event !== 'string' || typeof listener !== 'function')
 			return () => {};
 		if (event === 'initial-ready') {
 			initialReadyListeners.add(listener);
-			void maybeEmitInitialReadyFromDb('persisted');
+			void lifecycle.run(() => maybeEmitInitialReadyFromDb('persisted')).catch(() => {});
 			return () => off(event, listener);
 		}
 		let listeners = eventListeners.get(event);
@@ -3305,16 +3323,19 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		return unsubscribe;
 	}
 
-	async function waitForInitialSync() {
+	async function waitForInitialSync(options = {}) {
+		const signal = options[syncAbortSignalSymbol];
 		const existing = await maybeEmitInitialReadyFromDb('persisted');
 		if (existing)
 			return;
-		return new Promise((resolve) => {
-			const unsubscribe = once('initial-ready', () => {
-				unsubscribe();
-				resolve();
-			});
-		});
+		throwIfSyncAborted(signal);
+		let unsubscribe;
+		try {
+			return await awaitWithSyncAbort(new Promise(resolve => {
+				unsubscribe = once('initial-ready', resolve);
+			}), signal);
+		}
+		finally { if (unsubscribe) unsubscribe(); }
 	}
 
 	async function readInitialSyncState() {
@@ -3371,7 +3392,9 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 	}
 
 	function emitInitialReady(payload) {
+		if (!lifecycle.active) return;
 		for (const listener of Array.from(initialReadyListeners)) {
+			if (!lifecycle.active) break;
 			try {
 				listener(payload);
 			}
@@ -3410,6 +3433,7 @@ function normalizeSyncConfig(sync) {
 }
 
 function withRuntimeCrossTabLockConfig(config, options) {
+	config = { ...config, signal: options && options[syncAbortSignalSymbol] };
 	if (!config || !config.enabled)
 		return config;
 	const timeoutMs = normalizePositiveInteger(options && options.timeoutMs);

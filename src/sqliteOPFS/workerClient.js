@@ -2,6 +2,7 @@ const log = require('../table/log');
 const createInlineSqliteOPFSWorker = require('./inlineWorker');
 const connectWorkerPort = require('./connectWorkerPort');
 const normalizeOpfsSahPoolOptions = require('./normalizeOpfsSahPoolOptions');
+const ownedWorkerUrls = new WeakMap();
 
 function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 	const requestedVfs = normalizeVfs(options.vfs);
@@ -11,6 +12,7 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 	const readonly = !!options.readonly;
 	const lane = readonly ? 'reader' : 'writer';
 	let closed = false;
+	let closing;
 	let openPromise;
 	let openInfo;
 
@@ -231,13 +233,12 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 	}
 
 	function close() {
-		if (closed)
-			return Promise.resolve();
+		if (closing) return closing;
 		closed = true;
 		const closeRequest = options.closeDbOnClose === false
 			? Promise.resolve()
 			: withTimeout(request('close'), 1000).catch(() => {});
-		return closeRequest.finally(() => {
+		closing = closeRequest.finally(() => {
 			worker.removeEventListener('message', onMessage);
 			worker.removeEventListener('error', onWorkerError);
 			worker.removeEventListener('messageerror', onWorkerError);
@@ -246,7 +247,10 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 				worker.terminate();
 			else if (typeof worker.close === 'function')
 				worker.close();
+			const url = ownedWorkerUrls.get(worker);
+			if (url) { URL.revokeObjectURL(url); ownedWorkerUrls.delete(worker); }
 		});
+		return closing;
 	}
 
 	function reset() {
@@ -329,7 +333,12 @@ function createWorker(connectionString, options) {
 			const source = createWorkerSource(options.sqliteModuleUrl || getDefaultSqliteModuleUrl() || '@sqlite.org/sqlite-wasm');
 			const blob = new Blob([source], { type: 'text/javascript' });
 			const url = URL.createObjectURL(blob);
-			return new Worker(url, { type: 'module' });
+			try {
+				const worker = new Worker(url, { type: 'module' });
+				ownedWorkerUrls.set(worker, url);
+				return worker;
+			}
+			catch (error) { URL.revokeObjectURL(url); throw error; }
 		}
 		catch (e) {
 			throw new Error(`sqliteOPFS could not create its worker automatically: ${e.message}`);

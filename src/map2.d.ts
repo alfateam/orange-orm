@@ -1383,7 +1383,10 @@ export interface SyncClient<M extends Record<string, TableDefinition<M>> = any> 
   ensureLocalSchema(options?: SyncOptions): Promise<SyncLocalSchemaResult<M>>;
   resetLocal(options?: SyncResetLocalOptions<M>): Promise<SyncResetLocalResult<M>>;
   start(): Promise<void>;
+  /** Cancel and drain sync work. Keeps listeners and persisted outbox; start() resumes. */
   stop(): Promise<void>;
+  /** Permanently dispose sync resources. Prefer db.close() to also close storage. */
+  close(): Promise<void>;
   isRunning(): Promise<boolean>;
   interceptors: SyncInterceptors;
   on(event: 'sync', listener: (payload: SyncEvent) => void): () => void;

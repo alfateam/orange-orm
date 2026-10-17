@@ -1,4 +1,13 @@
 ## Changelog
+__Unreleased__
+Strengthen SQLite sync shutdown for isolated account databases. `stop()` now cancels
+manual/queued sync as well as automatic work, drains storage work and requires
+`start()` before further manual sync. Subscriptions and durable outboxes survive
+pause. `db.close()` disposes sync before storage, clears instance event/memory state,
+and awaits worker shutdown. Scope transient operation memory by client instance;
+cancel queued cross-tab locks and release generated worker URLs. Applications still
+choose separate backend/account database identities and bind authentication to them.
+
 __5.5.0__  
 Add read-only ad-hoc `many()` and `one()` relations, allowing custom queries across relationships directly from fetch strategies. [#205](https://github.com/alfateam/orange-orm/issues/205)  
 Fix mapped `hasMany` fetch strategies so nested `limit` and `offset` work independently for each parent.  [#206](https://github.com/alfateam/orange-orm/issues/206)  

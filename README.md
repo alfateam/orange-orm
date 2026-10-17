@@ -316,6 +316,74 @@ await pool.close();         // closes all pooled connections
 __Why close ?__
 In serverless environments (e.g. AWS Lambda, Vercel, Cloudflare Workers) execution contexts are frequently frozen and resumed. Explicitly closing the client or pool ensures that file handles are released promptly and prevents “database locked” errors between invocations.
 
+__SQLite sync lifecycle and account switching__
+
+Each local replica belongs to one backend and one authenticated identity. Give
+anonymous use and every account distinct, stable database filenames. On an
+account's first use, create an empty database and let Orange bootstrap with that
+account's credentials. Do not copy another account's database or checkpoint:
+newly visible rows can predate the old checkpoint without producing new changes.
+Later logins can reopen that account's files and resume its own pending writes.
+Permission changes for the same account also need an application resnapshot policy.
+
+The application owns authentication and selects the database. Orange owns the
+sync queues, cancellation, workers, subscriptions and storage cleanup:
+
+```ts
+// Block new application work for the previous session before closing it.
+await previousDatabase.close();
+
+const database = map.sqliteOPFS(accountDatabaseName, {
+  sync: { url: syncUrl, auto: false }
+});
+database.syncClient.interceptors.request.use(config => ({
+  ...config,
+  headers: { ...config.headers, Authorization: `Bearer ${session.token()}` }
+}));
+await database.syncClient.start();
+```
+
+`session` must remain bound to this account, including token refresh. An old
+instance must never read credentials from a global mutable "current user".
+Local separation does not replace server-side read and write authorization.
+
+- `await syncClient.stop()` pauses sync, cancels active and queued sync requests,
+  and drains storage/rollback work before resolving. Timers and reconnect listeners
+  stop. No sync events are delivered while paused. Outbox rows and checkpoints
+  remain on disk, and event subscriptions remain registered for a later `start()`.
+- After `stop()`, manual `sync()` calls reject with `code: 'ORANGE_SYNC_ABORT'`
+  until `start()` resumes the instance. A new instance still supports manual sync
+  with `auto: false`. Explicit schema setup/reset and local reads/writes remain
+  available while paused; calls during the stop transition are rejected.
+- `await db.close()` permanently closes sync and storage. It drains sync work,
+  clears subscriptions and transient operation memory, closes manifest channels,
+  and waits for worker shutdown acknowledgement before terminating workers.
+  Repeated close calls share completion. New operations on the closed instance
+  reject; use a new instance when reopening the same files. Await close and handle
+  a close failure before activating another account.
+- `syncClient.close()` disposes the sync client; prefer `db.close()` when switching
+  accounts so the underlying storage closes as well. `on()` returns an unsubscribe
+  function. No explicit worker/event cleanup is needed in the application.
+
+Checkpoints (`orange_sync_state`), outgoing mutations (`orange_sync_outbox`),
+pull journals and dual-replica metadata are persisted in the database files.
+SQLite OPFS derives its second replica and delta files from the database identity.
+The localStorage fallback contains only database-scoped cross-tab lock leases,
+not checkpoints or user rows. Transient operation memory is scoped to the client
+instance, including when mutation IDs are identical across instances.
+
+Closing cannot recall requests already processed by a server or cancel application
+callbacks that an earlier event started. The application still owns those callbacks,
+its own storage/downloads, and coordinating logout across other tabs. Unrelated
+database instances and their listeners continue normally.
+
+The focused real-browser check uses Chromium, real OPFS and managed sync workers:
+`npm run build`, then `node tests/browser/accounts.mjs`. It requires Playwright
+(with Chromium installed) and esbuild; pass a project directory as the optional
+argument to use tools already installed there. It checks both OPFS VFS variants
+with fresh browser contexts and server rows, A → B → A, old private rows, preserved
+checkpoints/outboxes, late events and worker shutdown.
+
 __SQLite user-defined functions__
 You can register custom SQLite functions using `db.function(name, fn)`.
 For full behavior, runtime caveats, and examples, see [SQLite user-defined functions](#sqlite-user-defined-functions).

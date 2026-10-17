@@ -6436,16 +6436,138 @@ function requireOutboxTableSql () {
 	return outboxTableSql_1;
 }
 
+var syncAbort;
+var hasRequiredSyncAbort;
+
+function requireSyncAbort () {
+	if (hasRequiredSyncAbort) return syncAbort;
+	hasRequiredSyncAbort = 1;
+	const syncAbortSignalSymbol = typeof Symbol === 'function'
+		? Symbol.for('orange-orm.syncClient.abortSignal')
+		: '__orangeOrmSyncClientAbortSignal';
+	const syncAbortCode = 'ORANGE_SYNC_ABORT';
+	const syncWorkTrackerSymbol = Symbol('syncWorkTracker');
+
+	function trackSyncWork(value, signal) {
+		return signal && signal[syncWorkTrackerSymbol]
+			? signal[syncWorkTrackerSymbol](value)
+			: Promise.resolve(value);
+	}
+
+	function awaitSyncWork(value, signal) {
+		return awaitWithSyncAbort(trackSyncWork(value, signal), signal);
+	}
+
+	function createSyncAbortController() {
+		if (typeof AbortController === 'function')
+			return new AbortController();
+
+		const listeners = new Set();
+		const signal = {
+			aborted: false,
+			reason: undefined,
+			addEventListener(event, listener) {
+				if (event === 'abort' && typeof listener === 'function')
+					listeners.add(listener);
+			},
+			removeEventListener(event, listener) {
+				if (event === 'abort')
+					listeners.delete(listener);
+			}
+		};
+		return {
+			signal,
+			abort(reason) {
+				if (signal.aborted)
+					return;
+				signal.aborted = true;
+				signal.reason = reason;
+				for (const listener of Array.from(listeners))
+					listener.call(signal, { type: 'abort', target: signal });
+				listeners.clear();
+			}
+		};
+	}
+
+	function syncAbortError(reason, fallbackMessage = 'Sync stopped.') {
+		let error = reason instanceof Error
+			? reason
+			: new Error(typeof reason === 'string' && reason.length > 0 ? reason : fallbackMessage);
+		if (!(reason instanceof Error))
+			error.name = 'AbortError';
+		try {
+			error.code = syncAbortCode;
+		}
+		catch (_error) {
+			// DOMException.code is read-only; preserve it as the cause, not our marker.
+		}
+		if (error.code !== syncAbortCode) {
+			const cause = error;
+			error = new Error(cause.message);
+			error.name = 'AbortError';
+			error.code = syncAbortCode;
+			error.cause = cause;
+		}
+		return error;
+	}
+
+	function throwIfSyncAborted(signal) {
+		if (signal && signal.aborted)
+			throw syncAbortError(signal.reason);
+	}
+
+	function awaitWithSyncAbort(value, signal) {
+		if (!signal)
+			return Promise.resolve(value);
+		throwIfSyncAborted(signal);
+		return new Promise((resolve, reject) => {
+			let settled = false;
+			const finish = (callback, result) => {
+				if (settled)
+					return;
+				settled = true;
+				signal.removeEventListener('abort', onAbort);
+				callback(result);
+			};
+			const onAbort = () => finish(reject, syncAbortError(signal.reason));
+			signal.addEventListener('abort', onAbort, { once: true });
+			Promise.resolve(value).then(
+				(result) => finish(resolve, result),
+				(error) => finish(reject, error)
+			);
+		});
+	}
+
+	function isSyncAbortError(error) {
+		return !!error && error.code === syncAbortCode;
+	}
+
+	syncAbort = {
+		awaitSyncWork,
+		trackSyncWork,
+		syncWorkTrackerSymbol,
+		awaitWithSyncAbort,
+		createSyncAbortController,
+		isSyncAbortError,
+		syncAbortError,
+		syncAbortSignalSymbol,
+		throwIfSyncAborted
+	};
+	return syncAbort;
+}
+
 var crossTabLock;
 var hasRequiredCrossTabLock;
 
 function requireCrossTabLock () {
 	if (hasRequiredCrossTabLock) return crossTabLock;
 	hasRequiredCrossTabLock = 1;
+	const { awaitWithSyncAbort, throwIfSyncAborted } = requireSyncAbort();
 	const randomUuid = requireRandomUuid();
 
 	async function runWithCrossTabLock(name, config, fn) {
 		const lockConfig = config || { enabled: true };
+		throwIfSyncAborted(lockConfig.signal);
 		if (!lockConfig.enabled)
 			return fn();
 		const locks = getWebLocks();
@@ -6525,15 +6647,24 @@ function requireCrossTabLock () {
 		let timeoutId;
 		let waiting = true;
 		let timedOut = false;
-		if (timeoutMs && typeof AbortController === 'function') {
+		const externalSignal = config.signal;
+		let removeAbort;
+		if ((timeoutMs || externalSignal) && typeof AbortController === 'function') {
 			const controller = new AbortController();
 			options.signal = controller.signal;
-			timeoutId = setTimeout(() => {
-				if (!waiting)
-					return;
-				timedOut = true;
-				controller.abort();
-			}, timeoutMs);
+			if (externalSignal) {
+				const abort = () => controller.abort(externalSignal.reason);
+				externalSignal.addEventListener('abort', abort, { once: true });
+				removeAbort = () => externalSignal.removeEventListener('abort', abort);
+				if (externalSignal.aborted) abort();
+			}
+			if (timeoutMs)
+				timeoutId = setTimeout(() => {
+					if (!waiting)
+						return;
+					timedOut = true;
+					controller.abort();
+				}, timeoutMs);
 		}
 		try {
 			return await locks.request(name, options, async () => {
@@ -6546,11 +6677,13 @@ function requireCrossTabLock () {
 			});
 		}
 		catch (e) {
+			throwIfSyncAborted(externalSignal);
 			if (timedOut || e && e.name === 'AbortError')
 				throw lockTimeoutError(name, timeoutMs, config);
 			throw e;
 		}
 		finally {
+			if (removeAbort) removeAbort();
 			if (timeoutId)
 				clearTimeout(timeoutId);
 		}
@@ -6591,6 +6724,7 @@ function requireCrossTabLock () {
 	}
 
 	async function runLockBody(_name, _config, fn) {
+		throwIfSyncAborted(_config.signal);
 		return fn();
 	}
 
@@ -6601,6 +6735,7 @@ function requireCrossTabLock () {
 		const pollMs = config.pollMs || 100;
 		const startedAt = Date.now();
 		for (;;) {
+			throwIfSyncAborted(config.signal);
 			const now = Date.now();
 			const current = readLocalStorageLock(storage, key);
 			if (!current || current.expiresAt <= now || current.owner === owner) {
@@ -6611,7 +6746,7 @@ function requireCrossTabLock () {
 			}
 			if (config.timeoutMs && now - startedAt >= config.timeoutMs)
 				throw lockTimeoutError(name, config.timeoutMs, config);
-			await delay(pollMs);
+			await awaitWithSyncAbort(delay(pollMs), config.signal);
 		}
 	}
 
@@ -7122,7 +7257,21 @@ function requireOperationContext () {
 
 	const sessionKey = 'syncTransactionContext';
 	const captureKey = 'syncOutboxCapture';
-	const memoryByMutationId = new Map();
+	const memoryByScope = new WeakMap();
+	const defaultMemoryScope = {};
+
+	function operationMemory(scope = defaultMemoryScope) {
+		let memory = memoryByScope.get(scope);
+		if (!memory) {
+			memory = new Map();
+			memoryByScope.set(scope, memory);
+		}
+		return memory;
+	}
+
+	function clearSyncOperationMemory(scope) {
+		memoryByScope.delete(scope);
+	}
 
 	function createSyncTransactionContext(context, memory) {
 		return {
@@ -7218,27 +7367,27 @@ function requireOperationContext () {
 		}
 	}
 
-	function registerSyncOperationMemory(mutationId, memory) {
+	function registerSyncOperationMemory(mutationId, memory, scope) {
 		if (typeof mutationId !== 'string' || mutationId.length === 0 || memory === undefined)
 			return;
-		memoryByMutationId.set(mutationId, memory);
+		operationMemory(scope).set(mutationId, memory);
 	}
 
-	function getSyncOperationMemory(mutationId) {
+	function getSyncOperationMemory(mutationId, scope) {
 		if (typeof mutationId !== 'string')
 			return undefined;
-		return memoryByMutationId.get(mutationId);
+		return operationMemory(scope).get(mutationId);
 	}
 
-	function deleteSyncOperationMemory(mutationId) {
+	function deleteSyncOperationMemory(mutationId, scope) {
 		if (typeof mutationId === 'string')
-			memoryByMutationId.delete(mutationId);
+			operationMemory(scope).delete(mutationId);
 	}
 
-	function withSyncOperationMemory(event) {
+	function withSyncOperationMemory(event, scope) {
 		if (!event || !event.mutationId || event.memory !== undefined)
 			return event;
-		const memory = getSyncOperationMemory(event.mutationId);
+		const memory = getSyncOperationMemory(event.mutationId, scope);
 		if (memory === undefined)
 			return event;
 		return {
@@ -7247,11 +7396,11 @@ function requireOperationContext () {
 		};
 	}
 
-	function finalizeSyncOperationMemory(event) {
+	function finalizeSyncOperationMemory(event, scope) {
 		if (!event || !event.mutationId)
 			return;
 		if (event.ok || event.retryable === false)
-			deleteSyncOperationMemory(event.mutationId);
+			deleteSyncOperationMemory(event.mutationId, scope);
 	}
 
 	async function updateOutboxOperationColumns(context, state, metadata) {
@@ -7302,6 +7451,7 @@ function requireOperationContext () {
 	}
 
 	operationContext = {
+		clearSyncOperationMemory,
 		createSyncTransactionContext,
 		deleteSyncOperationMemory,
 		finalizeSyncOperationMemory,
@@ -8229,103 +8379,110 @@ function requireFlags () {
 
 var syncClient = {exports: {}};
 
-var syncAbort;
-var hasRequiredSyncAbort;
+var syncLifecycle;
+var hasRequiredSyncLifecycle;
 
-function requireSyncAbort () {
-	if (hasRequiredSyncAbort) return syncAbort;
-	hasRequiredSyncAbort = 1;
-	const syncAbortSignalSymbol = typeof Symbol === 'function'
-		? Symbol.for('orange-orm.syncClient.abortSignal')
-		: '__orangeOrmSyncClientAbortSignal';
-	const syncAbortCode = 'ORANGE_SYNC_ABORT';
-
-	function createSyncAbortController() {
-		if (typeof AbortController === 'function')
-			return new AbortController();
-
-		const listeners = new Set();
-		const signal = {
-			aborted: false,
-			reason: undefined,
-			addEventListener(event, listener) {
-				if (event === 'abort' && typeof listener === 'function')
-					listeners.add(listener);
-			},
-			removeEventListener(event, listener) {
-				if (event === 'abort')
-					listeners.delete(listener);
-			}
-		};
-		return {
-			signal,
-			abort(reason) {
-				if (signal.aborted)
-					return;
-				signal.aborted = true;
-				signal.reason = reason;
-				for (const listener of Array.from(listeners))
-					listener.call(signal, { type: 'abort', target: signal });
-				listeners.clear();
-			}
-		};
-	}
-
-	function syncAbortError(reason, fallbackMessage = 'Sync stopped.') {
-		const error = reason instanceof Error
-			? reason
-			: new Error(typeof reason === 'string' && reason.length > 0 ? reason : fallbackMessage);
-		if (!(reason instanceof Error))
-			error.name = 'AbortError';
-		try {
-			error.code = syncAbortCode;
-		}
-		catch (_error) {
-			// Built-in error objects are writable in supported runtimes; retain the AbortError fallback otherwise.
-		}
-		return error;
-	}
-
-	function throwIfSyncAborted(signal) {
-		if (signal && signal.aborted)
-			throw syncAbortError(signal.reason);
-	}
-
-	function awaitWithSyncAbort(value, signal) {
-		if (!signal)
-			return Promise.resolve(value);
-		throwIfSyncAborted(signal);
-		return new Promise((resolve, reject) => {
-			let settled = false;
-			const finish = (callback, result) => {
-				if (settled)
-					return;
-				settled = true;
-				signal.removeEventListener('abort', onAbort);
-				callback(result);
-			};
-			const onAbort = () => finish(reject, syncAbortError(signal.reason));
-			signal.addEventListener('abort', onAbort, { once: true });
-			Promise.resolve(value).then(
-				(result) => finish(resolve, result),
-				(error) => finish(reject, error)
-			);
-		});
-	}
-
-	function isSyncAbortError(error) {
-		return !!error && error.code === syncAbortCode;
-	}
-
-	syncAbort = {
-		awaitWithSyncAbort,
+function requireSyncLifecycle () {
+	if (hasRequiredSyncLifecycle) return syncLifecycle;
+	hasRequiredSyncLifecycle = 1;
+	const {
 		createSyncAbortController,
 		isSyncAbortError,
 		syncAbortError,
 		syncAbortSignalSymbol,
+		syncWorkTrackerSymbol,
 		throwIfSyncAborted
-	};
-	return syncAbort;
+	} = requireSyncAbort();
+
+	// Own every operation, including work still unwinding after an abortable await.
+	// No account/auth state belongs here: each database has its own lifecycle.
+	function createSyncLifecycle() {
+		const controllers = new Set();
+		const pending = new Set();
+		let paused = false;
+		let closed = false;
+		let stopping;
+
+		return { run, track, start, stop, close, assertOpen,
+			get active() { return !paused && !closed; },
+			get closed() { return closed; }
+		};
+
+		function assertOpen() {
+			if (closed)
+				throw syncAbortError(undefined, 'Sync client closed.');
+		}
+
+		function track(value) {
+			const promise = Promise.resolve(value);
+			pending.add(promise);
+			promise.then(() => pending.delete(promise), () => pending.delete(promise));
+			return promise;
+		}
+
+		function run(fn, options = {}, allowPaused = false) {
+			try {
+				assertOpen();
+				if (stopping || (paused && !allowPaused))
+					throw syncAbortError(undefined, 'Sync client stopped. Call start() to resume.');
+			}
+			catch (error) { return Promise.reject(error); }
+			const controller = createSyncAbortController();
+			const external = options && options[syncAbortSignalSymbol];
+			const abort = () => controller.abort(syncAbortError(external.reason));
+			if (external) {
+				if (external.aborted) abort();
+				else external.addEventListener('abort', abort, { once: true });
+			}
+			controller.signal[syncWorkTrackerSymbol] = value => {
+				if (external && external[syncWorkTrackerSymbol])
+					external[syncWorkTrackerSymbol](value);
+				return track(value);
+			};
+			controllers.add(controller);
+			return track(Promise.resolve().then(() => {
+				throwIfSyncAborted(controller.signal);
+				return fn({ ...options, [syncAbortSignalSymbol]: controller.signal });
+			}).finally(() => {
+				controllers.delete(controller);
+				if (external) external.removeEventListener('abort', abort);
+			}));
+		}
+
+		function start(fn, options) {
+			try {
+				assertOpen();
+				if (stopping)
+					throw syncAbortError(undefined, 'Sync client is stopping. Await stop() before start().');
+				paused = false;
+			}
+			catch (error) { return Promise.reject(error); }
+			return run(fn, options).catch(error => {
+				if (!(paused && isSyncAbortError(error))) throw error;
+			});
+		}
+
+		function stop(stopScheduler = () => {}) {
+			if (stopping) return stopping;
+			paused = true;
+			// Install the fence before abort listeners can synchronously call start().
+			stopping = Promise.resolve().then(stopScheduler).then(async () => {
+				// A cancelled operation can enqueue rollback/cleanup before settling.
+				while (pending.size) await Promise.allSettled(Array.from(pending));
+			}).finally(() => { stopping = undefined; });
+			for (const controller of Array.from(controllers))
+				controller.abort(syncAbortError(undefined, closed ? 'Sync client closed.' : 'Sync stopped.'));
+			return stopping;
+		}
+
+		function close(stopScheduler) {
+			closed = true;
+			return stop(stopScheduler);
+		}
+	}
+
+	syncLifecycle = createSyncLifecycle;
+	return syncLifecycle;
 }
 
 var syncAuto;
@@ -8949,6 +9106,7 @@ var hasRequiredSyncClient;
 function requireSyncClient () {
 	if (hasRequiredSyncClient) return syncClient.exports;
 	hasRequiredSyncClient = 1;
+	const createSyncLifecycle = requireSyncLifecycle();
 	const randomUuid = requireRandomUuid();
 	const stringify = requireStringify();
 	const { createSyncAuto, syncAutoStartSymbol } = requireSyncAuto();
@@ -8964,12 +9122,15 @@ function requireSyncClient () {
 	} = requireCrossTabLock();
 	const ensureOutboxOperationColumns = requireEnsureOutboxOperationColumns();
 	const {
+		clearSyncOperationMemory,
 		deleteSyncOperationMemory,
 		finalizeSyncOperationMemory,
 		withSyncOperationMemory
 	} = requireOperationContext();
 	const {
 		awaitWithSyncAbort,
+		awaitSyncWork,
+		trackSyncWork,
 		isSyncAbortError,
 		syncAbortSignalSymbol,
 		throwIfSyncAborted
@@ -9013,6 +9174,7 @@ function requireSyncClient () {
 		: '__orangeOrmSyncClientSetClientId';
 
 	function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, internalOptions = {}) {
+		const lifecycle = createSyncLifecycle();
 		const sinceByScope = new Map();
 		const ensuredInternalTables = new WeakMap();
 		const syncStateTable = 'orange_sync_state';
@@ -9040,27 +9202,28 @@ function requireSyncClient () {
 		const queuedEnsureLocalSchema = serializeSyncWork(lockedEnsureLocalSchema);
 		const observedSync = observeSyncMethod('sync', queuedSync);
 		const auto = createSyncAuto({
-			sync: observedSync
+			sync: options => lifecycle.run(observedSync, options)
 		}, getConfig);
 
 		const syncClientApi = {
-			sync: observedSync,
-			ensureLocalSchema: queuedEnsureLocalSchema,
-			resetLocal: lockedResetLocal,
-			start: auto.start,
-			stop: auto.stop,
+			sync: options => lifecycle.run(observedSync, options),
+			ensureLocalSchema: options => lifecycle.run(queuedEnsureLocalSchema, options, true),
+			resetLocal: options => lifecycle.run(lockedResetLocal, options, true),
+			start: options => lifecycle.start(auto.start, options),
+			stop: () => lifecycle.stop(auto.stop),
+			close,
 			isRunning: auto.isRunning,
 			on,
 			off,
 			once,
-			waitForInitialSync,
+			waitForInitialSync: options => lifecycle.run(waitForInitialSync, options),
 			interceptors
 		};
 		Object.defineProperty(syncClientApi, syncAutoStartSymbol, {
-			value: auto.startFromConfig
+			value: options => lifecycle.run(auto.startFromConfig, options)
 		});
 		Object.defineProperty(syncClientApi, ensureLocalSchemaReadySymbol, {
-			value: ensureLocalSchemaReady
+			value: options => lifecycle.run(ensureLocalSchemaReady, options, true)
 		});
 		Object.defineProperty(syncClientApi, syncAndCapturePullJournalSymbol, {
 			value: syncAndCapturePullJournal
@@ -9088,6 +9251,14 @@ function requireSyncClient () {
 		});
 		return syncClientApi;
 
+		function close() {
+			const closing = lifecycle.close(auto.stop);
+			eventListeners.clear();
+			initialReadyListeners.clear();
+			clearSyncOperationMemory(syncClientApi);
+			return closing;
+		}
+
 		function withCrossTabSyncLock(fn) {
 			return async function lockedSyncMethod(options) {
 				const signal = options && options[syncAbortSignalSymbol];
@@ -9099,7 +9270,7 @@ function requireSyncClient () {
 					return fn(options);
 				const lock = await resolveRuntimeCrossTabSyncLock(db, syncConfig);
 				const lockConfig = withRuntimeCrossTabLockConfig(lock.config, options);
-				return awaitWithSyncAbort(
+				return awaitSyncWork(
 					runWithCrossTabLock(lock.name, lockConfig, () => {
 						throwIfSyncAborted(signal);
 						return fn(options);
@@ -9218,7 +9389,7 @@ function requireSyncClient () {
 		async function ensureLocalSchemaReady(options = {}) {
 			const signal = options[syncAbortSignalSymbol];
 			throwIfSyncAborted(signal);
-			const result = await awaitWithSyncAbort(getLocalSchemaReady({
+			const result = await awaitSyncWork(getLocalSchemaReady({
 				allowMissingSync: true,
 				fileSnapshotRollback: fileSnapshotRollbackDefault
 			}), signal);
@@ -9290,10 +9461,12 @@ function requireSyncClient () {
 		}
 
 		function emit(event, payload) {
+			if (!lifecycle.active) return;
 			const listeners = eventListeners.get(event);
 			if (!listeners)
 				return;
 			for (const listener of Array.from(listeners)) {
+				if (!lifecycle.active) break;
 				try {
 					listener(payload);
 				}
@@ -9338,7 +9511,7 @@ function requireSyncClient () {
 			const hadStableBase = usesFileSnapshotRollback(normalizedOptions)
 				|| await hasStableBase(db, configuredTables);
 			if (!hadStableBase)
-				return awaitWithSyncAbort(
+				return awaitSyncWork(
 					runSyncMaintenance(db, () => pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, normalizedOptions)),
 					normalizedOptions[syncAbortSignalSymbol]
 				);
@@ -9348,7 +9521,7 @@ function requireSyncClient () {
 		async function prepareLocalSyncSchema(options = {}, prepareOptions = {}) {
 			const signal = options[syncAbortSignalSymbol];
 			throwIfSyncAborted(signal);
-			const result = await awaitWithSyncAbort(getLocalSchemaReady({
+			const result = await awaitSyncWork(getLocalSchemaReady({
 				...prepareOptions,
 				fileSnapshotRollback: usesFileSnapshotRollback(options)
 			}), signal);
@@ -10278,7 +10451,7 @@ function requireSyncClient () {
 					if (pumpRunning || !shouldFetchMorePullBatches())
 						return;
 					pumpRunning = true;
-					Promise.resolve()
+					trackSyncWork(Promise.resolve()
 						.then(pumpPullBatches)
 						.catch((error) => {
 							keyFetchError = error;
@@ -10288,7 +10461,7 @@ function requireSyncClient () {
 							notifyPipelineChange();
 							if (shouldFetchMorePullBatches())
 								startPullBatchPump();
-						});
+						}), signal);
 				}
 
 				async function pumpPullBatches() {
@@ -10497,7 +10670,7 @@ function requireSyncClient () {
 							return;
 						const job = queue.splice(index, 1)[0];
 						active += 1;
-						runRowJob(job);
+						trackSyncWork(runRowJob(job), signal);
 					}
 				}
 
@@ -11484,12 +11657,13 @@ function requireSyncClient () {
 		}
 
 		function emitOperationEvent(event) {
-			event = withSyncOperationMemory(event);
+			const memoryScope = internalOptions.operationMemoryScope || syncClientApi;
+			event = withSyncOperationMemory(event, memoryScope);
 			emit('operation', event);
 			emit(`operation:${event.operation}`, event);
-			finalizeSyncOperationMemory(event);
+			finalizeSyncOperationMemory(event, memoryScope);
 			if (event.ok || event.retryable === false)
-				deleteSyncOperationMemory(event.mutationId);
+				deleteSyncOperationMemory(event.mutationId, memoryScope);
 		}
 
 		function syncOperationError(error) {
@@ -12217,11 +12391,12 @@ function requireSyncClient () {
 		}
 
 		function on(event, listener) {
+			lifecycle.assertOpen();
 			if (typeof event !== 'string' || typeof listener !== 'function')
 				return () => {};
 			if (event === 'initial-ready') {
 				initialReadyListeners.add(listener);
-				void maybeEmitInitialReadyFromDb('persisted');
+				void lifecycle.run(() => maybeEmitInitialReadyFromDb('persisted')).catch(() => {});
 				return () => off(event, listener);
 			}
 			let listeners = eventListeners.get(event);
@@ -12256,16 +12431,19 @@ function requireSyncClient () {
 			return unsubscribe;
 		}
 
-		async function waitForInitialSync() {
+		async function waitForInitialSync(options = {}) {
+			const signal = options[syncAbortSignalSymbol];
 			const existing = await maybeEmitInitialReadyFromDb('persisted');
 			if (existing)
 				return;
-			return new Promise((resolve) => {
-				const unsubscribe = once('initial-ready', () => {
-					unsubscribe();
-					resolve();
-				});
-			});
+			throwIfSyncAborted(signal);
+			let unsubscribe;
+			try {
+				return await awaitWithSyncAbort(new Promise(resolve => {
+					unsubscribe = once('initial-ready', resolve);
+				}), signal);
+			}
+			finally { if (unsubscribe) unsubscribe(); }
 		}
 
 		async function readInitialSyncState() {
@@ -12322,7 +12500,9 @@ function requireSyncClient () {
 		}
 
 		function emitInitialReady(payload) {
+			if (!lifecycle.active) return;
 			for (const listener of Array.from(initialReadyListeners)) {
+				if (!lifecycle.active) break;
 				try {
 					listener(payload);
 				}
@@ -12361,6 +12541,7 @@ function requireSyncClient () {
 	}
 
 	function withRuntimeCrossTabLockConfig(config, options) {
+		config = { ...config, signal: options && options[syncAbortSignalSymbol] };
 		if (!config || !config.enabled)
 			return config;
 		const timeoutMs = normalizePositiveInteger(options && options.timeoutMs);
@@ -13450,6 +13631,8 @@ function requireClient () {
 			baseUrl = typeof options.db === 'function' ? providers(options.db) : options.db;
 		const httpInterceptor = createHttpInterceptor();
 		const syncOwner = resolveImmediateDb(baseUrl);
+		let closing;
+		let closed = false;
 
 		function client(_options = {}) {
 			if (_options.pg)
@@ -13510,7 +13693,15 @@ function requireClient () {
 		client.close = close;
 
 		function close() {
-			return client.db.end ? client.db.end() : Promise.resolve();
+			if (closing) return closing;
+			closing = (async () => {
+				if (typeof client.syncClient.close === 'function') await client.syncClient.close();
+				else if (typeof client.syncClient.stop === 'function') await client.syncClient.stop();
+				const db = await getDb();
+				if (db && typeof db.end === 'function') await db.end();
+				closed = true;
+			})();
+			return closing;
 		}
 
 		function onProvider(name, ...args) {
@@ -13588,11 +13779,13 @@ function requireClient () {
 		}
 
 		async function query() {
+			if (closed) throw new Error('Database closed.');
 			const adapter = netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } });
 			return adapter.query.apply(null, arguments);
 		}
 
 		async function sqliteFunction() {
+			if (closed) throw new Error('Database closed.');
 			const adapter = netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } });
 			return adapter.sqliteFunction.apply(null, arguments);
 		}
@@ -13686,6 +13879,7 @@ function requireClient () {
 		}
 
 		async function getDb() {
+			if (closed) throw new Error('Database closed.');
 			let db = baseUrl;
 			if (typeof db === 'function') {
 				let dbPromise = db();
@@ -13708,6 +13902,7 @@ function requireClient () {
 		}
 
 		async function ensureLocalSchemaReady() {
+			if (closed) throw new Error('Database closed.');
 			if (transaction)
 				return;
 			if (localSchemaReadySkipped)
@@ -13744,7 +13939,7 @@ function requireClient () {
 					transaction.done = true;
 					await transaction(transaction.commit);
 					if (operationMetadata && operationMetadata.operationName)
-						registerSyncOperationMemory(operationMetadata.mutationId, syncContext.memory);
+						registerSyncOperationMemory(operationMetadata.mutationId, syncContext.memory, client.syncClient);
 					return result;
 				}
 				catch (e) {
@@ -23806,6 +24001,7 @@ function requireDbWorkerClient () {
 	if (hasRequiredDbWorkerClient) return dbWorkerClient;
 	hasRequiredDbWorkerClient = 1;
 	const {
+		clearSyncOperationMemory,
 		finalizeSyncOperationMemory,
 		serializeSyncPayload,
 		withSyncOperationMemory
@@ -23830,6 +24026,7 @@ function requireDbWorkerClient () {
 		let hasInitialReady = false;
 		let lastInitialReady;
 		let closed = false;
+		let closing;
 		let terminalError;
 
 		worker.addEventListener('message', onMessage);
@@ -23912,7 +24109,7 @@ function requireDbWorkerClient () {
 		}
 
 		function request(method, meta, ...args) {
-			if (closed)
+			if (closed && method !== 'close')
 				return Promise.reject(new Error('DB worker client closed.'));
 			if (terminalError)
 				return Promise.reject(terminalError);
@@ -23941,6 +24138,7 @@ function requireDbWorkerClient () {
 		}
 
 		function on(event, listener) {
+			if (closed) throw new Error('DB worker client closed.');
 			if (typeof event !== 'string' || typeof listener !== 'function')
 				return () => {};
 			let eventListeners = listeners.get(event);
@@ -23984,34 +24182,23 @@ function requireDbWorkerClient () {
 		}
 
 		function close() {
-			if (closed)
-				return;
+			if (closing) return closing;
 			closed = true;
-			worker.removeEventListener('message', onMessage);
-			worker.removeEventListener('error', onWorkerError);
-			worker.removeEventListener('messageerror', onWorkerError);
-			for (const entry of pending.values())
-				entry.reject(new Error('DB worker client closed.'));
+			clearSyncOperationMemory(client.syncClient);
+			for (const entry of pending.values()) entry.reject(new Error('DB worker client closed.'));
 			pending.clear();
 			listeners.clear();
 			hasInitialReady = false;
 			lastInitialReady = undefined;
-			if (typeof worker.terminate === 'function') {
-				try {
-					worker.terminate();
-				}
-				catch (_e) {
-					// Closing is best-effort for Worker-backed clients.
-				}
-			}
-			else if (typeof worker.close === 'function') {
-				try {
-					worker.close();
-				}
-				catch (_e) {
-					// Closing is best-effort for MessagePort-backed worker clients.
-				}
-			}
+			closing = request('close', {}).finally(() => {
+				worker.removeEventListener('message', onMessage);
+				worker.removeEventListener('error', onWorkerError);
+				worker.removeEventListener('messageerror', onWorkerError);
+				if (typeof worker.terminate === 'function') worker.terminate();
+				else if (typeof worker.close === 'function') worker.close();
+			});
+			closing.catch(() => {});
+			return closing;
 		}
 
 		function onMessage(event) {
@@ -24019,10 +24206,12 @@ function requireDbWorkerClient () {
 			if (!message || message.type === undefined)
 				return;
 			if (message.type === 'orange-db-interceptor-request') {
+				if (closed) return;
 				void handleInterceptorRequest(message);
 				return;
 			}
 			if (message.type === 'orange-db-event') {
+				if (closed) return;
 				const payload = deserializeEventPayload(message.payload);
 				if (message.event === 'initial-ready') {
 					hasInitialReady = true;
@@ -24045,24 +24234,24 @@ function requireDbWorkerClient () {
 
 		function emit(event, payload) {
 			if (event === 'operation') {
-				payload = withSyncOperationMemory(payload);
+				payload = withSyncOperationMemory(payload, client.syncClient);
 				try {
 					emitToListeners('operation', payload);
 					if (payload && typeof payload.operation === 'string')
 						emitToListeners(`operation:${payload.operation}`, payload);
 				}
 				finally {
-					finalizeSyncOperationMemory(payload);
+					finalizeSyncOperationMemory(payload, client.syncClient);
 				}
 				return;
 			}
 			if (event && event.startsWith && event.startsWith('operation:')) {
-				payload = withSyncOperationMemory(payload);
+				payload = withSyncOperationMemory(payload, client.syncClient);
 				try {
 					emitToListeners(event, payload);
 				}
 				finally {
-					finalizeSyncOperationMemory(payload);
+					finalizeSyncOperationMemory(payload, client.syncClient);
 				}
 				return;
 			}
@@ -24070,6 +24259,7 @@ function requireDbWorkerClient () {
 		}
 
 		function emitToListeners(event, payload) {
+			if (closed) return;
 			const eventListeners = listeners.get(event);
 			if (!eventListeners)
 				return;
@@ -24195,6 +24385,8 @@ function requireDbWorkerHandler () {
 		let autoStarted = false;
 		let clientReady = false;
 		let stopped = false;
+		let closing;
+		const activeRequests = new Set();
 		let hasPendingInitialReady = false;
 		let pendingInitialReady;
 		const postMessage = options.postMessage || ((message) => {
@@ -24226,15 +24418,27 @@ function requireDbWorkerHandler () {
 			}
 			if (message.type !== 'orange-db-request')
 				return;
+			if (message.method === 'close') {
+				try { await stop(); postResponse(message.id); }
+				catch (error) { postResponse(message.id, undefined, error); }
+				return;
+			}
+			if (stopped) {
+				postResponse(message.id, undefined, new Error('DB worker handler closed.'));
+				return;
+			}
 			if (message.method === 'sync.sync')
 				restartPendingRequestInterceptors();
+			const work = dispatch(message);
+			activeRequests.add(work);
 			try {
-				const result = await dispatch(message);
+				const result = await work;
 				postResponse(message.id, result);
 			}
 			catch (e) {
 				postResponse(message.id, undefined, e);
 			}
+			finally { activeRequests.delete(work); }
 		}
 
 		async function dispatch(message) {
@@ -24267,6 +24471,10 @@ function requireDbWorkerHandler () {
 			if (transactions.has(transactionId))
 				return { transactionId };
 			const releaseSyncWrite = await acquireSyncWrite(pool, txOptions);
+			if (stopped) {
+				releaseSyncWrite();
+				throw new Error('DB worker handler closed.');
+			}
 			let transaction;
 			try {
 				transaction = pool.createTransaction(txOptions);
@@ -24357,6 +24565,7 @@ function requireDbWorkerHandler () {
 			if (!client.syncClient || typeof client.syncClient.on !== 'function')
 				return;
 			const unsubscribe = client.syncClient.on(event, (payload) => {
+				if (stopped) return;
 				if (event === 'initial-ready' && !clientReady) {
 					hasPendingInitialReady = true;
 					pendingInitialReady = payload;
@@ -24443,25 +24652,32 @@ function requireDbWorkerHandler () {
 			}
 		}
 
-		async function stop() {
-			if (stopped)
-				return;
+		function stop() {
+			if (closing) return closing;
 			stopped = true;
-			if (options.stopSyncClient !== false && client.syncClient && typeof client.syncClient.stop === 'function')
-				await client.syncClient.stop();
-			for (const eject of interceptorEjectors)
-				eject();
+			closing = stopCore();
+			return closing;
+		}
+
+		async function stopCore() {
+			const syncStop = options.stopSyncClient !== false && client.syncClient
+				&& typeof client.syncClient.stop === 'function' ? client.syncClient.stop() : Promise.resolve();
+			for (const eject of interceptorEjectors) eject();
 			interceptorEjectors.length = 0;
 			for (const entry of new Set(pendingInterceptorRequests.values()))
 				settleInterceptorRequest(entry, entry.reject, syncAbortError(undefined, 'DB worker interceptor bridge stopped.'));
 			pendingInterceptorRequests.clear();
-			for (const unsubscribe of syncEventUnsubscribers.values())
-				unsubscribe();
+			for (const unsubscribe of syncEventUnsubscribers.values()) unsubscribe();
 			syncEventUnsubscribers.clear();
+			const rollbacks = [];
 			for (const [id, transaction] of transactions) {
 				transactions.delete(id);
-				void Promise.resolve(transaction(transaction.rollback)).finally(() => releaseSyncWrite(transaction));
+				rollbacks.push(Promise.resolve(transaction(transaction.rollback)).finally(() => releaseSyncWrite(transaction)));
 			}
+			await Promise.all(rollbacks);
+			await syncStop;
+			await Promise.allSettled(Array.from(activeRequests));
+			if (options.stopSyncClient !== false && typeof client.close === 'function') await client.close();
 		}
 
 		function handleClientReady() {
@@ -24642,6 +24858,7 @@ function requireSyncWorkerClient () {
 	if (hasRequiredSyncWorkerClient) return syncWorkerClient;
 	hasRequiredSyncWorkerClient = 1;
 	const {
+		clearSyncOperationMemory,
 		finalizeSyncOperationMemory,
 		withSyncOperationMemory
 	} = requireOperationContext();
@@ -24665,6 +24882,7 @@ function requireSyncWorkerClient () {
 		let hasInitialReady = false;
 		let lastInitialReady;
 		let closed = false;
+		let closing;
 		let terminalError;
 
 		worker.addEventListener('message', onMessage);
@@ -24693,7 +24911,7 @@ function requireSyncWorkerClient () {
 		return client;
 
 		function request(method, ...args) {
-			if (closed)
+			if (closed && method !== 'close')
 				return Promise.reject(new Error('Sync worker client closed.'));
 			if (terminalError)
 				return Promise.reject(terminalError);
@@ -24729,6 +24947,7 @@ function requireSyncWorkerClient () {
 		}
 
 		function on(event, listener) {
+			if (closed) throw new Error('Sync worker client closed.');
 			if (typeof event !== 'string' || typeof listener !== 'function')
 				return () => {};
 			let eventListeners = listeners.get(event);
@@ -24772,27 +24991,30 @@ function requireSyncWorkerClient () {
 		}
 
 		function close() {
-			if (closed)
-				return;
+			if (closing) return closing;
 			closed = true;
+			clearSyncOperationMemory(client);
 			const closeError = new Error('Sync worker client closed.');
-			worker.removeEventListener('message', onMessage);
-			worker.removeEventListener('error', onWorkerError);
-			worker.removeEventListener('messageerror', onWorkerError);
 			for (const [id, entry] of pending) {
 				postCancel(id);
-				if (entry.timeoutId)
-					clearTimeout(entry.timeoutId);
+				if (entry.timeoutId) clearTimeout(entry.timeoutId);
 				entry.reject(closeError);
 			}
 			pending.clear();
 			listeners.clear();
 			hasInitialReady = false;
 			lastInitialReady = undefined;
-			if (typeof worker.terminate === 'function')
-				worker.terminate();
-			else if (typeof worker.close === 'function')
-				worker.close();
+			// Wait for rollback/storage work in the worker before terminating it.
+			closing = request('close').finally(() => {
+				worker.removeEventListener('message', onMessage);
+				worker.removeEventListener('error', onWorkerError);
+				worker.removeEventListener('messageerror', onWorkerError);
+				if (typeof worker.terminate === 'function') worker.terminate();
+				else if (typeof worker.close === 'function') worker.close();
+			});
+			// Older callers may ignore close's return value. Awaiting it still reports failure.
+			closing.catch(() => {});
+			return closing;
 		}
 
 		function onMessage(event) {
@@ -24800,10 +25022,12 @@ function requireSyncWorkerClient () {
 			if (!message || message.type === undefined)
 				return;
 			if (message.type === 'orange-sync-worker-interceptor-request') {
+				if (closed) return;
 				void handleInterceptorRequest(message);
 				return;
 			}
 			if (message.type === 'orange-sync-worker-event') {
+				if (closed) return;
 				const payload = deserializeEventPayload(message.payload);
 				if (message.event === 'initial-ready') {
 					hasInitialReady = true;
@@ -24849,24 +25073,24 @@ function requireSyncWorkerClient () {
 
 		function emit(event, payload) {
 			if (event === 'operation') {
-				payload = withSyncOperationMemory(payload);
+				payload = withSyncOperationMemory(payload, client);
 				try {
 					emitToListeners('operation', payload);
 					if (payload && typeof payload.operation === 'string')
 						emitToListeners(`operation:${payload.operation}`, payload);
 				}
 				finally {
-					finalizeSyncOperationMemory(payload);
+					finalizeSyncOperationMemory(payload, client);
 				}
 				return;
 			}
 			if (event && event.startsWith && event.startsWith('operation:')) {
-				payload = withSyncOperationMemory(payload);
+				payload = withSyncOperationMemory(payload, client);
 				try {
 					emitToListeners(event, payload);
 				}
 				finally {
-					finalizeSyncOperationMemory(payload);
+					finalizeSyncOperationMemory(payload, client);
 				}
 				return;
 			}
@@ -24874,11 +25098,14 @@ function requireSyncWorkerClient () {
 		}
 
 		function emitToListeners(event, payload) {
+			if (closed) return;
 			const eventListeners = listeners.get(event);
 			if (!eventListeners)
 				return;
-			for (const listener of Array.from(eventListeners))
+			for (const listener of Array.from(eventListeners)) {
+				if (closed) break;
 				callListener(listener, payload);
+			}
 		}
 
 		function callListener(listener, payload) {
@@ -25013,6 +25240,7 @@ function requireSyncWorkerHandler () {
 		let autoStarted = false;
 		let clientReady = false;
 		let stopped = false;
+		let closing;
 		let hasPendingInitialReady = false;
 		let pendingInitialReady;
 		const postMessage = options.postMessage || ((message) => {
@@ -25051,6 +25279,15 @@ function requireSyncWorkerHandler () {
 			}
 			if (message.type !== 'orange-sync-worker-request')
 				return;
+			if (message.method === 'close') {
+				try { await stop(); postResponse(message.id); }
+				catch (error) { postResponse(message.id, undefined, error); }
+				return;
+			}
+			if (stopped) {
+				postResponse(message.id, undefined, new Error('Sync worker handler closed.'));
+				return;
+			}
 			if (message.method === 'sync')
 				restartPendingRequestInterceptors();
 			const controller = createSyncAbortController();
@@ -25114,22 +25351,34 @@ function requireSyncWorkerHandler () {
 			syncEventUnsubscribers.delete(event);
 		}
 
-		async function stop() {
+		function stop() {
+			if (closing) return closing;
 			stopped = true;
+			closing = stopCore();
+			return closing;
+		}
+
+		async function stopCore() {
 			for (const controller of requestControllers.values())
 				controller.abort(syncAbortError(undefined, 'Sync worker handler stopped.'));
 			requestControllers.clear();
-			if (options.stopSyncClient !== false && typeof syncClient.stop === 'function')
-				await syncClient.stop();
-			for (const eject of interceptorEjectors)
-				eject();
-			interceptorEjectors.length = 0;
-			for (const entry of new Set(pendingInterceptorRequests.values()))
-				settleInterceptorRequest(entry, entry.reject, new Error('Sync worker interceptor bridge stopped.'));
-			pendingInterceptorRequests.clear();
-			for (const unsubscribe of syncEventUnsubscribers.values())
-				unsubscribe();
-			syncEventUnsubscribers.clear();
+			try {
+				if (options.stopSyncClient !== false) {
+					if (typeof syncClient.close === 'function') await syncClient.close();
+					else if (typeof syncClient.stop === 'function') await syncClient.stop();
+				}
+			}
+			finally {
+				for (const eject of interceptorEjectors)
+					eject();
+				interceptorEjectors.length = 0;
+				for (const entry of new Set(pendingInterceptorRequests.values()))
+					settleInterceptorRequest(entry, entry.reject, new Error('Sync worker interceptor bridge stopped.'));
+				pendingInterceptorRequests.clear();
+				for (const unsubscribe of syncEventUnsubscribers.values())
+					unsubscribe();
+				syncEventUnsubscribers.clear();
+			}
 		}
 
 		function handleClientReady() {
@@ -25159,6 +25408,7 @@ function requireSyncWorkerHandler () {
 		}
 
 		function postEvent(event, payload) {
+			if (stopped) return;
 			postMessage({
 				type: 'orange-sync-worker-event',
 				event,
@@ -25900,6 +26150,7 @@ function requireWorkerClient () {
 	const createInlineSqliteOPFSWorker = requireInlineWorker();
 	const connectWorkerPort = requireConnectWorkerPort();
 	const normalizeOpfsSahPoolOptions = requireNormalizeOpfsSahPoolOptions();
+	const ownedWorkerUrls = new WeakMap();
 
 	function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 		const requestedVfs = normalizeVfs(options.vfs);
@@ -25909,6 +26160,7 @@ function requireWorkerClient () {
 		const readonly = !!options.readonly;
 		const lane = readonly ? 'reader' : 'writer';
 		let closed = false;
+		let closing;
 		let openPromise;
 		let openInfo;
 
@@ -26129,13 +26381,12 @@ function requireWorkerClient () {
 		}
 
 		function close() {
-			if (closed)
-				return Promise.resolve();
+			if (closing) return closing;
 			closed = true;
 			const closeRequest = options.closeDbOnClose === false
 				? Promise.resolve()
 				: withTimeout(request('close'), 1000).catch(() => {});
-			return closeRequest.finally(() => {
+			closing = closeRequest.finally(() => {
 				worker.removeEventListener('message', onMessage);
 				worker.removeEventListener('error', onWorkerError);
 				worker.removeEventListener('messageerror', onWorkerError);
@@ -26144,7 +26395,10 @@ function requireWorkerClient () {
 					worker.terminate();
 				else if (typeof worker.close === 'function')
 					worker.close();
+				const url = ownedWorkerUrls.get(worker);
+				if (url) { URL.revokeObjectURL(url); ownedWorkerUrls.delete(worker); }
 			});
+			return closing;
 		}
 
 		function reset() {
@@ -26227,7 +26481,12 @@ function requireWorkerClient () {
 				const source = createWorkerSource(options.sqliteModuleUrl || getDefaultSqliteModuleUrl() || '@sqlite.org/sqlite-wasm');
 				const blob = new Blob([source], { type: 'text/javascript' });
 				const url = URL.createObjectURL(blob);
-				return new Worker(url, { type: 'module' });
+				try {
+					const worker = new Worker(url, { type: 'module' });
+					ownedWorkerUrls.set(worker, url);
+					return worker;
+				}
+				catch (error) { URL.revokeObjectURL(url); throw error; }
 			}
 			catch (e) {
 				throw new Error(`sqliteOPFS could not create its worker automatically: ${e.message}`);
@@ -33029,6 +33288,8 @@ function requireNewPool$5 () {
 		let readClient;
 		let c = {};
 		let ended = false;
+		let closing;
+		let prewarmTimer;
 		let writerBusy = false;
 		const writerQueue = [];
 		let nextWriterQueueSeq = 1;
@@ -33062,6 +33323,7 @@ function requireNewPool$5 () {
 		};
 
 		c.connectRead = function(cb, priority) {
+			if (ended) return cb(new Error('sqliteOPFS pool is closed.'), null, noop);
 			if (singleWorker)
 				return c.connect(cb, priority);
 			ensureReadClient();
@@ -33072,7 +33334,9 @@ function requireNewPool$5 () {
 		};
 
 		c.end = function() {
+			if (closing) return closing;
 			ended = true;
+			clearTimeout(prewarmTimer);
 			rejectQueuedWriters();
 			const closes = [];
 			if (client.close)
@@ -33080,7 +33344,8 @@ function requireNewPool$5 () {
 			if (readClient && readClient.close)
 				closes.push(readClient.close());
 			delete pools[id];
-			return Promise.all(closes).then(() => undefined);
+			closing = Promise.all(closes).then(() => undefined);
+			return closing;
 		};
 
 		pools[id] = c;
@@ -33091,7 +33356,8 @@ function requireNewPool$5 () {
 				return;
 			if (poolOptions && poolOptions.prewarmRead === false)
 				return;
-			setTimeout(() => {
+			prewarmTimer = setTimeout(() => {
+				if (ended) return;
 				try {
 					ensureReadClient();
 					if (readClient.ready && typeof readClient.ready.catch === 'function')
@@ -33518,6 +33784,8 @@ var hasRequiredDualSyncDatabase;
 function requireDualSyncDatabase () {
 	if (hasRequiredDualSyncDatabase) return dualSyncDatabase.exports;
 	hasRequiredDualSyncDatabase = 1;
+	const { clearSyncOperationMemory } = requireOperationContext();
+	const createSyncLifecycle = requireSyncLifecycle();
 	const hostLocal = requireHostLocal();
 	const express = requireHostExpress();
 	const hono = requireHostHono();
@@ -33529,6 +33797,9 @@ function requireDualSyncDatabase () {
 	const { createSyncAuto, syncAutoStartSymbol } = requireSyncAuto();
 	const {
 		awaitWithSyncAbort,
+		awaitSyncWork,
+		trackSyncWork,
+		syncAbortError,
 		isSyncAbortError,
 		syncAbortSignalSymbol,
 		throwIfSyncAborted
@@ -33578,6 +33849,10 @@ function requireDualSyncDatabase () {
 		: '__orangeOrmDualSyncFaultInjector';
 
 	function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase) {
+		const lifecycle = createSyncLifecycle();
+		let syncAuto;
+		let closing;
+		const roleUnsubscribers = new Set();
 		const roleConnectionStrings = {
 			[roleA]: connectionString,
 			[roleB]: appendRoleSuffix(connectionString, 'b')
@@ -33651,6 +33926,7 @@ function requireDualSyncDatabase () {
 		return router;
 
 		function transaction(options, fn) {
+			lifecycle.assertOpen();
 			if ((arguments.length === 1) && (typeof options === 'function')) {
 				fn = options;
 				options = undefined;
@@ -33662,6 +33938,7 @@ function requireDualSyncDatabase () {
 		}
 
 		function createTransaction(options) {
+			lifecycle.assertOpen();
 			let releaseRead = () => {};
 			let readReleased = false;
 			const transactionPromise = Promise.resolve()
@@ -33700,40 +33977,35 @@ function requireDualSyncDatabase () {
 		}
 
 		function query(sql, options) {
+			lifecycle.assertOpen();
 			return runSyncRead(router,
 				() => getActiveReadyDb().then(db => db.query(sql, options))
 			);
 		}
 
 		function sqliteFunction(...args) {
+			lifecycle.assertOpen();
 			return runSyncRead(router,
 				() => getActiveReadyDb().then(db => db.sqliteFunction(...args))
 			);
 		}
 
-		async function end() {
-			if (managedSyncClient) {
-				try {
-					await managedSyncClient.stop();
-				}
-				catch (_e) {
-					// Continue closing the SQLite workers after a failed or already closed sync worker.
-				}
-				if (typeof managedSyncClient.close === 'function')
-					managedSyncClient.close();
-			}
-			const closes = [];
-			for (const db of dbByRole.values()) {
-				if (db && typeof db.end === 'function')
-					closes.push(db.end());
-			}
-			if (cacheDb && typeof cacheDb.end === 'function')
-				closes.push(cacheDb.end());
-			if (externalSyncUnsubscribe)
-				externalSyncUnsubscribe();
-			if (manifestChannel && typeof manifestChannel.close === 'function')
-				manifestChannel.close();
-			await Promise.all(closes);
+		function end() {
+			if (closing) return closing;
+			const stopped = lifecycle.close(() => syncAuto && syncAuto.stop());
+			eventListeners.clear();
+			if (externalSyncClient) clearSyncOperationMemory(externalSyncClient);
+			closing = (async () => {
+				await stopped;
+				if (managedSyncClient) await managedSyncClient.close();
+				for (const unsubscribe of roleUnsubscribers) unsubscribe();
+				roleUnsubscribers.clear();
+				for (const client of clientByRole.values()) await client.syncClient.close();
+				if (externalSyncUnsubscribe) externalSyncUnsubscribe();
+				if (manifestChannel) manifestChannel.close();
+				await Promise.all([...dbByRole.values(), cacheDb].filter(Boolean).map(db => db.end()));
+			})();
+			return closing;
 		}
 
 		function accept(caller) {
@@ -33741,6 +34013,7 @@ function requireDualSyncDatabase () {
 		}
 
 		function __createSyncClient(rootClient, _getDb, httpInterceptor) {
+			lifecycle.assertOpen();
 			if (isManagedSyncWorkerEnabled(poolOptions && poolOptions.sync)) {
 				if (!managedSyncClient) {
 					managedSyncClient = createManagedSyncWorkerClient({
@@ -33759,26 +34032,27 @@ function requireDualSyncDatabase () {
 			}
 			roleClientFactory = rootClient;
 			roleHttpInterceptor = httpInterceptor;
-			const auto = createSyncAuto(
+			const auto = syncAuto = createSyncAuto(
 				{ sync: syncObserved },
 				async () => router.__sqliteSync,
 				{ runSync: syncAutomatic }
 			);
 			const syncClient = {
 				sync: syncObserved,
-				ensureLocalSchema,
-				resetLocal,
-				start: auto.start,
-				stop: auto.stop,
+				ensureLocalSchema: options => lifecycle.run(ensureLocalSchema, options, true),
+				resetLocal: options => lifecycle.run(resetLocal, options, true),
+				start: options => lifecycle.start(auto.start, options),
+				stop: () => lifecycle.stop(auto.stop),
+				close: end,
 				isRunning: auto.isRunning,
 				on,
 				off,
 				once,
-				waitForInitialSync,
+				waitForInitialSync: options => lifecycle.run(waitForInitialSync, options),
 				interceptors: syncInterceptors
 			};
 			Object.defineProperty(syncClient, syncAutoStartSymbol, {
-				value: auto.startFromConfig
+				value: options => lifecycle.run(auto.startFromConfig, options)
 			});
 			Object.defineProperty(syncClient, ensureLocalSchemaReadySymbol, {
 				value: ensureActiveLocalSchemaReady
@@ -33787,13 +34061,13 @@ function requireDualSyncDatabase () {
 		}
 
 		function syncObserved(options = {}) {
-			return coalesceSync(normalizeSyncOptions(options));
+			return lifecycle.run(bound => coalesceSync(normalizeSyncOptions(bound)), options);
 		}
 
 		function syncAutomatic(config, syncOptions) {
-			return coalesceSync(normalizeSyncOptions(syncOptions), {
+			return lifecycle.run(bound => coalesceSync(normalizeSyncOptions(bound), {
 				minimumIntervalMs: normalizeAutoSyncIntervalMs(config && config.intervalMs)
-			});
+			}), syncOptions);
 		}
 
 		function coalesceSync(normalizedOptions, schedule = {}) {
@@ -33827,6 +34101,10 @@ function requireDualSyncDatabase () {
 			pendingSyncRequest = null;
 			if (!pending)
 				return;
+			if (!lifecycle.active) {
+				pending.reject(syncAbortError());
+				return;
+			}
 			const nextRun = startSyncRun(pending.normalizedOptions, pending.schedule);
 			nextRun.then(pending.resolve, pending.reject);
 		}
@@ -33853,9 +34131,7 @@ function requireDualSyncDatabase () {
 			const timeoutMs = Math.max(pendingTimeoutMs || 0, requestedTimeoutMs || 0);
 			const pendingSignal = pending.normalizedOptions[syncAbortSignalSymbol];
 			const requestedSignal = normalizedOptions[syncAbortSignalSymbol];
-			const signal = pendingSignal && pendingSignal === requestedSignal
-				? pendingSignal
-				: undefined;
+			const signal = pendingSignal || requestedSignal;
 			pending.normalizedOptions = timeoutMs > 0 ? { timeoutMs } : {};
 			if (signal)
 				pending.normalizedOptions[syncAbortSignalSymbol] = signal;
@@ -33872,7 +34148,7 @@ function requireDualSyncDatabase () {
 				leftQueue = true;
 				queuedSyncCount = Math.max(0, queuedSyncCount - 1);
 				emitSyncProgress('waiting-for-sync-lock', { queueDepth: queuedSyncCount });
-				return awaitWithSyncAbort(observe('sync', () => runWithCrossTabLock(
+				return awaitSyncWork(observe('sync', () => runWithCrossTabLock(
 					dualSyncLockName,
 					toDualSyncLockConfig(poolOptions && poolOptions.sync, normalizedOptions),
 					() => {
@@ -34014,7 +34290,7 @@ function requireDualSyncDatabase () {
 			let deferred;
 
 			emitSyncProgress('waiting-for-write-barrier', { activeRole, stagingRole });
-			await awaitWithSyncAbort(runSyncSwap(router, async () => {
+			await awaitSyncWork(runSyncSwap(router, async () => {
 				throwIfSyncAborted(signal);
 				const currentManifest = await getManifest(true);
 				assertExpectedManifest(currentManifest, manifest);
@@ -34143,7 +34419,7 @@ function requireDualSyncDatabase () {
 			let replayKind = recovery && recovery.replayKind;
 			let publishedManifest;
 			emitSyncProgress('publishing-data-ready', { activeRole, stagingRole });
-			await awaitWithSyncAbort(runSyncSwap(router, async () => {
+			await awaitSyncWork(runSyncSwap(router, async () => {
 				throwIfSyncAborted(signal);
 				const currentManifest = await getManifest(true);
 				assertExpectedManifest(currentManifest, manifest);
@@ -34315,7 +34591,7 @@ function requireDualSyncDatabase () {
 			throwIfSyncAborted(signal);
 
 			let readyManifest;
-			await awaitWithSyncAbort(runSyncSwap(router, async () => {
+			await awaitSyncWork(runSyncSwap(router, async () => {
 				throwIfSyncAborted(signal);
 				const currentManifest = await getManifest(true);
 				if (currentManifest.activeRole !== activeRole
@@ -34705,7 +34981,7 @@ function requireDualSyncDatabase () {
 
 			let publishedManifest;
 			let cloneMs = 0;
-			await awaitWithSyncAbort(runSyncSwap(router, async () => {
+			await awaitSyncWork(runSyncSwap(router, async () => {
 				throwIfSyncAborted(signal);
 				const currentManifest = await getManifest(true);
 				assertExpectedManifest(currentManifest, manifest);
@@ -34995,26 +35271,27 @@ function requireDualSyncDatabase () {
 			return { reset: true, ...manifest };
 		}
 
-		async function waitForInitialSync() {
+		async function waitForInitialSync(options = {}) {
+			const signal = options[syncAbortSignalSymbol];
 			const manifest = await getManifest();
-			if (await roleIsInitialReady(manifest.activeRole))
-				return;
-			return new Promise((resolve) => {
-				const unsubscribe = once('initial-ready', () => {
-					unsubscribe();
-					resolve();
-				});
-				void Promise.resolve().then(async () => {
-					const current = await getManifest(true);
-					if (!await roleIsInitialReady(current.activeRole))
-						return;
-					unsubscribe();
-					resolve();
-				}).catch(() => {});
-			});
+			if (await roleIsInitialReady(manifest.activeRole)) return;
+			throwIfSyncAborted(signal);
+			let unsubscribe;
+			try {
+				return await awaitWithSyncAbort(new Promise(resolve => {
+					unsubscribe = once('initial-ready', resolve);
+					trackSyncWork(Promise.resolve().then(async () => {
+						throwIfSyncAborted(signal);
+						const current = await getManifest(true);
+						if (await roleIsInitialReady(current.activeRole)) resolve();
+					}).catch(() => {}), signal);
+				}), signal);
+			}
+			finally { if (unsubscribe) unsubscribe(); }
 		}
 
 		function on(event, listener) {
+			lifecycle.assertOpen();
 			if (typeof event !== 'string' || typeof listener !== 'function')
 				return () => {};
 			let listeners = eventListeners.get(event);
@@ -35025,7 +35302,7 @@ function requireDualSyncDatabase () {
 			}
 			listeners.add(listener);
 			if (event === 'initial-ready')
-				void maybeEmitInitialReadyFromActive();
+				void lifecycle.run(maybeEmitInitialReadyFromActive).catch(() => {});
 			return () => off(event, listener);
 		}
 
@@ -35070,10 +35347,12 @@ function requireDualSyncDatabase () {
 		}
 
 		function emit(event, payload) {
+			if (!lifecycle.active) return;
 			const listeners = eventListeners.get(event);
 			if (!listeners)
 				return;
 			for (const listener of Array.from(listeners)) {
+				if (!lifecycle.active) break;
 				try {
 					listener(payload);
 				}
@@ -35092,7 +35371,7 @@ function requireDualSyncDatabase () {
 					continue;
 				const syncClient = clientByRole.get(role)?.syncClient;
 				if (syncClient && typeof syncClient.on === 'function') {
-					syncClient.on(event, payload => emit(event, payload));
+					roleUnsubscribers.add(syncClient.on(event, payload => emit(event, payload)));
 					roleEventSubscriptions.add(key);
 				}
 			}
@@ -35342,7 +35621,7 @@ function requireDualSyncDatabase () {
 					getDb,
 					roleHttpInterceptor,
 					syncInterceptors,
-					{ fileSnapshotRollback: true }
+					{ fileSnapshotRollback: true, operationMemoryScope: externalSyncClient }
 				);
 				clientByRole.set(role, roleClient);
 				for (const event of eventListeners.keys())
@@ -35352,7 +35631,7 @@ function requireDualSyncDatabase () {
 		}
 
 		function warmManifest() {
-			return getManifest().catch(() => {});
+			return lifecycle.run(() => getManifest(), {}, true).catch(() => {});
 		}
 
 		function attachExternalSyncClient(syncClient, rootClient, httpInterceptor) {
@@ -36285,7 +36564,7 @@ function requireDualSyncDatabase () {
 		const configured = sync && sync === Object(sync) && !Array.isArray(sync)
 			? sync.crossTabLock
 			: undefined;
-		const config = normalizeCrossTabLockConfig(configured);
+		const config = { ...normalizeCrossTabLockConfig(configured), signal: options && options[syncAbortSignalSymbol] };
 		const timeoutMs = normalizeTimeoutMs(options && options.timeoutMs);
 		if (!timeoutMs || config.timeoutMs)
 			return config;

@@ -1,3 +1,5 @@
+const { clearSyncOperationMemory } = require('../sync/operationContext');
+const createSyncLifecycle = require('../client/syncLifecycle');
 const hostLocal = require('../hostLocal');
 const express = require('../hostExpress');
 const hono = require('../hostHono');
@@ -9,6 +11,9 @@ const newSyncClient = require('../client/syncClient');
 const { createSyncAuto, syncAutoStartSymbol } = require('../client/syncAuto');
 const {
 	awaitWithSyncAbort,
+	awaitSyncWork,
+	trackSyncWork,
+	syncAbortError,
 	isSyncAbortError,
 	syncAbortSignalSymbol,
 	throwIfSyncAborted
@@ -58,6 +63,10 @@ const dualSyncFaultInjectorSymbol = typeof Symbol === 'function'
 	: '__orangeOrmDualSyncFaultInjector';
 
 function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase) {
+	const lifecycle = createSyncLifecycle();
+	let syncAuto;
+	let closing;
+	const roleUnsubscribers = new Set();
 	const roleConnectionStrings = {
 		[roleA]: connectionString,
 		[roleB]: appendRoleSuffix(connectionString, 'b')
@@ -131,6 +140,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	return router;
 
 	function transaction(options, fn) {
+		lifecycle.assertOpen();
 		if ((arguments.length === 1) && (typeof options === 'function')) {
 			fn = options;
 			options = undefined;
@@ -142,6 +152,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	}
 
 	function createTransaction(options) {
+		lifecycle.assertOpen();
 		let releaseRead = () => {};
 		let readReleased = false;
 		const transactionPromise = Promise.resolve()
@@ -180,40 +191,35 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	}
 
 	function query(sql, options) {
+		lifecycle.assertOpen();
 		return runSyncRead(router,
 			() => getActiveReadyDb().then(db => db.query(sql, options))
 		);
 	}
 
 	function sqliteFunction(...args) {
+		lifecycle.assertOpen();
 		return runSyncRead(router,
 			() => getActiveReadyDb().then(db => db.sqliteFunction(...args))
 		);
 	}
 
-	async function end() {
-		if (managedSyncClient) {
-			try {
-				await managedSyncClient.stop();
-			}
-			catch (_e) {
-				// Continue closing the SQLite workers after a failed or already closed sync worker.
-			}
-			if (typeof managedSyncClient.close === 'function')
-				managedSyncClient.close();
-		}
-		const closes = [];
-		for (const db of dbByRole.values()) {
-			if (db && typeof db.end === 'function')
-				closes.push(db.end());
-		}
-		if (cacheDb && typeof cacheDb.end === 'function')
-			closes.push(cacheDb.end());
-		if (externalSyncUnsubscribe)
-			externalSyncUnsubscribe();
-		if (manifestChannel && typeof manifestChannel.close === 'function')
-			manifestChannel.close();
-		await Promise.all(closes);
+	function end() {
+		if (closing) return closing;
+		const stopped = lifecycle.close(() => syncAuto && syncAuto.stop());
+		eventListeners.clear();
+		if (externalSyncClient) clearSyncOperationMemory(externalSyncClient);
+		closing = (async () => {
+			await stopped;
+			if (managedSyncClient) await managedSyncClient.close();
+			for (const unsubscribe of roleUnsubscribers) unsubscribe();
+			roleUnsubscribers.clear();
+			for (const client of clientByRole.values()) await client.syncClient.close();
+			if (externalSyncUnsubscribe) externalSyncUnsubscribe();
+			if (manifestChannel) manifestChannel.close();
+			await Promise.all([...dbByRole.values(), cacheDb].filter(Boolean).map(db => db.end()));
+		})();
+		return closing;
 	}
 
 	function accept(caller) {
@@ -221,6 +227,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	}
 
 	function __createSyncClient(rootClient, _getDb, httpInterceptor) {
+		lifecycle.assertOpen();
 		if (isManagedSyncWorkerEnabled(poolOptions && poolOptions.sync)) {
 			if (!managedSyncClient) {
 				managedSyncClient = createManagedSyncWorkerClient({
@@ -239,26 +246,27 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		}
 		roleClientFactory = rootClient;
 		roleHttpInterceptor = httpInterceptor;
-		const auto = createSyncAuto(
+		const auto = syncAuto = createSyncAuto(
 			{ sync: syncObserved },
 			async () => router.__sqliteSync,
 			{ runSync: syncAutomatic }
 		);
 		const syncClient = {
 			sync: syncObserved,
-			ensureLocalSchema,
-			resetLocal,
-			start: auto.start,
-			stop: auto.stop,
+			ensureLocalSchema: options => lifecycle.run(ensureLocalSchema, options, true),
+			resetLocal: options => lifecycle.run(resetLocal, options, true),
+			start: options => lifecycle.start(auto.start, options),
+			stop: () => lifecycle.stop(auto.stop),
+			close: end,
 			isRunning: auto.isRunning,
 			on,
 			off,
 			once,
-			waitForInitialSync,
+			waitForInitialSync: options => lifecycle.run(waitForInitialSync, options),
 			interceptors: syncInterceptors
 		};
 		Object.defineProperty(syncClient, syncAutoStartSymbol, {
-			value: auto.startFromConfig
+			value: options => lifecycle.run(auto.startFromConfig, options)
 		});
 		Object.defineProperty(syncClient, ensureLocalSchemaReadySymbol, {
 			value: ensureActiveLocalSchemaReady
@@ -267,13 +275,13 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	}
 
 	function syncObserved(options = {}) {
-		return coalesceSync(normalizeSyncOptions(options));
+		return lifecycle.run(bound => coalesceSync(normalizeSyncOptions(bound)), options);
 	}
 
 	function syncAutomatic(config, syncOptions) {
-		return coalesceSync(normalizeSyncOptions(syncOptions), {
+		return lifecycle.run(bound => coalesceSync(normalizeSyncOptions(bound), {
 			minimumIntervalMs: normalizeAutoSyncIntervalMs(config && config.intervalMs)
-		});
+		}), syncOptions);
 	}
 
 	function coalesceSync(normalizedOptions, schedule = {}) {
@@ -307,6 +315,10 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		pendingSyncRequest = null;
 		if (!pending)
 			return;
+		if (!lifecycle.active) {
+			pending.reject(syncAbortError());
+			return;
+		}
 		const nextRun = startSyncRun(pending.normalizedOptions, pending.schedule);
 		nextRun.then(pending.resolve, pending.reject);
 	}
@@ -333,9 +345,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		const timeoutMs = Math.max(pendingTimeoutMs || 0, requestedTimeoutMs || 0);
 		const pendingSignal = pending.normalizedOptions[syncAbortSignalSymbol];
 		const requestedSignal = normalizedOptions[syncAbortSignalSymbol];
-		const signal = pendingSignal && pendingSignal === requestedSignal
-			? pendingSignal
-			: undefined;
+		const signal = pendingSignal || requestedSignal;
 		pending.normalizedOptions = timeoutMs > 0 ? { timeoutMs } : {};
 		if (signal)
 			pending.normalizedOptions[syncAbortSignalSymbol] = signal;
@@ -352,7 +362,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			leftQueue = true;
 			queuedSyncCount = Math.max(0, queuedSyncCount - 1);
 			emitSyncProgress('waiting-for-sync-lock', { queueDepth: queuedSyncCount });
-			return awaitWithSyncAbort(observe('sync', () => runWithCrossTabLock(
+			return awaitSyncWork(observe('sync', () => runWithCrossTabLock(
 				dualSyncLockName,
 				toDualSyncLockConfig(poolOptions && poolOptions.sync, normalizedOptions),
 				() => {
@@ -494,7 +504,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		let deferred;
 
 		emitSyncProgress('waiting-for-write-barrier', { activeRole, stagingRole });
-		await awaitWithSyncAbort(runSyncSwap(router, async () => {
+		await awaitSyncWork(runSyncSwap(router, async () => {
 			throwIfSyncAborted(signal);
 			const currentManifest = await getManifest(true);
 			assertExpectedManifest(currentManifest, manifest);
@@ -623,7 +633,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		let replayKind = recovery && recovery.replayKind;
 		let publishedManifest;
 		emitSyncProgress('publishing-data-ready', { activeRole, stagingRole });
-		await awaitWithSyncAbort(runSyncSwap(router, async () => {
+		await awaitSyncWork(runSyncSwap(router, async () => {
 			throwIfSyncAborted(signal);
 			const currentManifest = await getManifest(true);
 			assertExpectedManifest(currentManifest, manifest);
@@ -795,7 +805,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		throwIfSyncAborted(signal);
 
 		let readyManifest;
-		await awaitWithSyncAbort(runSyncSwap(router, async () => {
+		await awaitSyncWork(runSyncSwap(router, async () => {
 			throwIfSyncAborted(signal);
 			const currentManifest = await getManifest(true);
 			if (currentManifest.activeRole !== activeRole
@@ -1185,7 +1195,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 
 		let publishedManifest;
 		let cloneMs = 0;
-		await awaitWithSyncAbort(runSyncSwap(router, async () => {
+		await awaitSyncWork(runSyncSwap(router, async () => {
 			throwIfSyncAborted(signal);
 			const currentManifest = await getManifest(true);
 			assertExpectedManifest(currentManifest, manifest);
@@ -1475,26 +1485,27 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		return { reset: true, ...manifest };
 	}
 
-	async function waitForInitialSync() {
+	async function waitForInitialSync(options = {}) {
+		const signal = options[syncAbortSignalSymbol];
 		const manifest = await getManifest();
-		if (await roleIsInitialReady(manifest.activeRole))
-			return;
-		return new Promise((resolve) => {
-			const unsubscribe = once('initial-ready', () => {
-				unsubscribe();
-				resolve();
-			});
-			void Promise.resolve().then(async () => {
-				const current = await getManifest(true);
-				if (!await roleIsInitialReady(current.activeRole))
-					return;
-				unsubscribe();
-				resolve();
-			}).catch(() => {});
-		});
+		if (await roleIsInitialReady(manifest.activeRole)) return;
+		throwIfSyncAborted(signal);
+		let unsubscribe;
+		try {
+			return await awaitWithSyncAbort(new Promise(resolve => {
+				unsubscribe = once('initial-ready', resolve);
+				trackSyncWork(Promise.resolve().then(async () => {
+					throwIfSyncAborted(signal);
+					const current = await getManifest(true);
+					if (await roleIsInitialReady(current.activeRole)) resolve();
+				}).catch(() => {}), signal);
+			}), signal);
+		}
+		finally { if (unsubscribe) unsubscribe(); }
 	}
 
 	function on(event, listener) {
+		lifecycle.assertOpen();
 		if (typeof event !== 'string' || typeof listener !== 'function')
 			return () => {};
 		let listeners = eventListeners.get(event);
@@ -1505,7 +1516,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		}
 		listeners.add(listener);
 		if (event === 'initial-ready')
-			void maybeEmitInitialReadyFromActive();
+			void lifecycle.run(maybeEmitInitialReadyFromActive).catch(() => {});
 		return () => off(event, listener);
 	}
 
@@ -1550,10 +1561,12 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	}
 
 	function emit(event, payload) {
+		if (!lifecycle.active) return;
 		const listeners = eventListeners.get(event);
 		if (!listeners)
 			return;
 		for (const listener of Array.from(listeners)) {
+			if (!lifecycle.active) break;
 			try {
 				listener(payload);
 			}
@@ -1572,7 +1585,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				continue;
 			const syncClient = clientByRole.get(role)?.syncClient;
 			if (syncClient && typeof syncClient.on === 'function') {
-				syncClient.on(event, payload => emit(event, payload));
+				roleUnsubscribers.add(syncClient.on(event, payload => emit(event, payload)));
 				roleEventSubscriptions.add(key);
 			}
 		}
@@ -1822,7 +1835,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				getDb,
 				roleHttpInterceptor,
 				syncInterceptors,
-				{ fileSnapshotRollback: true }
+				{ fileSnapshotRollback: true, operationMemoryScope: externalSyncClient }
 			);
 			clientByRole.set(role, roleClient);
 			for (const event of eventListeners.keys())
@@ -1832,7 +1845,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	}
 
 	function warmManifest() {
-		return getManifest().catch(() => {});
+		return lifecycle.run(() => getManifest(), {}, true).catch(() => {});
 	}
 
 	function attachExternalSyncClient(syncClient, rootClient, httpInterceptor) {
@@ -2765,7 +2778,7 @@ function toDualSyncLockConfig(sync, options) {
 	const configured = sync && sync === Object(sync) && !Array.isArray(sync)
 		? sync.crossTabLock
 		: undefined;
-	const config = normalizeCrossTabLockConfig(configured);
+	const config = { ...normalizeCrossTabLockConfig(configured), signal: options && options[syncAbortSignalSymbol] };
 	const timeoutMs = normalizeTimeoutMs(options && options.timeoutMs);
 	if (!timeoutMs || config.timeoutMs)
 		return config;

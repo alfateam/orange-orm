@@ -37,6 +37,8 @@ function rdbClient(options = {}) {
 		baseUrl = typeof options.db === 'function' ? providers(options.db) : options.db;
 	const httpInterceptor = createHttpInterceptor();
 	const syncOwner = resolveImmediateDb(baseUrl);
+	let closing;
+	let closed = false;
 
 	function client(_options = {}) {
 		if (_options.pg)
@@ -97,7 +99,15 @@ function rdbClient(options = {}) {
 	client.close = close;
 
 	function close() {
-		return client.db.end ? client.db.end() : Promise.resolve();
+		if (closing) return closing;
+		closing = (async () => {
+			if (typeof client.syncClient.close === 'function') await client.syncClient.close();
+			else if (typeof client.syncClient.stop === 'function') await client.syncClient.stop();
+			const db = await getDb();
+			if (db && typeof db.end === 'function') await db.end();
+			closed = true;
+		})();
+		return closing;
 	}
 
 	function onProvider(name, ...args) {
@@ -175,11 +185,13 @@ function rdbClient(options = {}) {
 	}
 
 	async function query() {
+		if (closed) throw new Error('Database closed.');
 		const adapter = netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } });
 		return adapter.query.apply(null, arguments);
 	}
 
 	async function sqliteFunction() {
+		if (closed) throw new Error('Database closed.');
 		const adapter = netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } });
 		return adapter.sqliteFunction.apply(null, arguments);
 	}
@@ -273,6 +285,7 @@ function rdbClient(options = {}) {
 	}
 
 	async function getDb() {
+		if (closed) throw new Error('Database closed.');
 		let db = baseUrl;
 		if (typeof db === 'function') {
 			let dbPromise = db();
@@ -295,6 +308,7 @@ function rdbClient(options = {}) {
 	}
 
 	async function ensureLocalSchemaReady() {
+		if (closed) throw new Error('Database closed.');
 		if (transaction)
 			return;
 		if (localSchemaReadySkipped)
@@ -331,7 +345,7 @@ function rdbClient(options = {}) {
 				transaction.done = true;
 				await transaction(transaction.commit);
 				if (operationMetadata && operationMetadata.operationName)
-					registerSyncOperationMemory(operationMetadata.mutationId, syncContext.memory);
+					registerSyncOperationMemory(operationMetadata.mutationId, syncContext.memory, client.syncClient);
 				return result;
 			}
 			catch (e) {

@@ -1766,6 +1766,232 @@ function requireFlags () {
 
 var syncClient = {exports: {}};
 
+var syncAbort;
+var hasRequiredSyncAbort;
+
+function requireSyncAbort () {
+	if (hasRequiredSyncAbort) return syncAbort;
+	hasRequiredSyncAbort = 1;
+	const syncAbortSignalSymbol = typeof Symbol === 'function'
+		? Symbol.for('orange-orm.syncClient.abortSignal')
+		: '__orangeOrmSyncClientAbortSignal';
+	const syncAbortCode = 'ORANGE_SYNC_ABORT';
+	const syncWorkTrackerSymbol = Symbol('syncWorkTracker');
+
+	function trackSyncWork(value, signal) {
+		return signal && signal[syncWorkTrackerSymbol]
+			? signal[syncWorkTrackerSymbol](value)
+			: Promise.resolve(value);
+	}
+
+	function awaitSyncWork(value, signal) {
+		return awaitWithSyncAbort(trackSyncWork(value, signal), signal);
+	}
+
+	function createSyncAbortController() {
+		if (typeof AbortController === 'function')
+			return new AbortController();
+
+		const listeners = new Set();
+		const signal = {
+			aborted: false,
+			reason: undefined,
+			addEventListener(event, listener) {
+				if (event === 'abort' && typeof listener === 'function')
+					listeners.add(listener);
+			},
+			removeEventListener(event, listener) {
+				if (event === 'abort')
+					listeners.delete(listener);
+			}
+		};
+		return {
+			signal,
+			abort(reason) {
+				if (signal.aborted)
+					return;
+				signal.aborted = true;
+				signal.reason = reason;
+				for (const listener of Array.from(listeners))
+					listener.call(signal, { type: 'abort', target: signal });
+				listeners.clear();
+			}
+		};
+	}
+
+	function syncAbortError(reason, fallbackMessage = 'Sync stopped.') {
+		let error = reason instanceof Error
+			? reason
+			: new Error(typeof reason === 'string' && reason.length > 0 ? reason : fallbackMessage);
+		if (!(reason instanceof Error))
+			error.name = 'AbortError';
+		try {
+			error.code = syncAbortCode;
+		}
+		catch (_error) {
+			// DOMException.code is read-only; preserve it as the cause, not our marker.
+		}
+		if (error.code !== syncAbortCode) {
+			const cause = error;
+			error = new Error(cause.message);
+			error.name = 'AbortError';
+			error.code = syncAbortCode;
+			error.cause = cause;
+		}
+		return error;
+	}
+
+	function throwIfSyncAborted(signal) {
+		if (signal && signal.aborted)
+			throw syncAbortError(signal.reason);
+	}
+
+	function awaitWithSyncAbort(value, signal) {
+		if (!signal)
+			return Promise.resolve(value);
+		throwIfSyncAborted(signal);
+		return new Promise((resolve, reject) => {
+			let settled = false;
+			const finish = (callback, result) => {
+				if (settled)
+					return;
+				settled = true;
+				signal.removeEventListener('abort', onAbort);
+				callback(result);
+			};
+			const onAbort = () => finish(reject, syncAbortError(signal.reason));
+			signal.addEventListener('abort', onAbort, { once: true });
+			Promise.resolve(value).then(
+				(result) => finish(resolve, result),
+				(error) => finish(reject, error)
+			);
+		});
+	}
+
+	function isSyncAbortError(error) {
+		return !!error && error.code === syncAbortCode;
+	}
+
+	syncAbort = {
+		awaitSyncWork,
+		trackSyncWork,
+		syncWorkTrackerSymbol,
+		awaitWithSyncAbort,
+		createSyncAbortController,
+		isSyncAbortError,
+		syncAbortError,
+		syncAbortSignalSymbol,
+		throwIfSyncAborted
+	};
+	return syncAbort;
+}
+
+var syncLifecycle;
+var hasRequiredSyncLifecycle;
+
+function requireSyncLifecycle () {
+	if (hasRequiredSyncLifecycle) return syncLifecycle;
+	hasRequiredSyncLifecycle = 1;
+	const {
+		createSyncAbortController,
+		isSyncAbortError,
+		syncAbortError,
+		syncAbortSignalSymbol,
+		syncWorkTrackerSymbol,
+		throwIfSyncAborted
+	} = requireSyncAbort();
+
+	// Own every operation, including work still unwinding after an abortable await.
+	// No account/auth state belongs here: each database has its own lifecycle.
+	function createSyncLifecycle() {
+		const controllers = new Set();
+		const pending = new Set();
+		let paused = false;
+		let closed = false;
+		let stopping;
+
+		return { run, track, start, stop, close, assertOpen,
+			get active() { return !paused && !closed; },
+			get closed() { return closed; }
+		};
+
+		function assertOpen() {
+			if (closed)
+				throw syncAbortError(undefined, 'Sync client closed.');
+		}
+
+		function track(value) {
+			const promise = Promise.resolve(value);
+			pending.add(promise);
+			promise.then(() => pending.delete(promise), () => pending.delete(promise));
+			return promise;
+		}
+
+		function run(fn, options = {}, allowPaused = false) {
+			try {
+				assertOpen();
+				if (stopping || (paused && !allowPaused))
+					throw syncAbortError(undefined, 'Sync client stopped. Call start() to resume.');
+			}
+			catch (error) { return Promise.reject(error); }
+			const controller = createSyncAbortController();
+			const external = options && options[syncAbortSignalSymbol];
+			const abort = () => controller.abort(syncAbortError(external.reason));
+			if (external) {
+				if (external.aborted) abort();
+				else external.addEventListener('abort', abort, { once: true });
+			}
+			controller.signal[syncWorkTrackerSymbol] = value => {
+				if (external && external[syncWorkTrackerSymbol])
+					external[syncWorkTrackerSymbol](value);
+				return track(value);
+			};
+			controllers.add(controller);
+			return track(Promise.resolve().then(() => {
+				throwIfSyncAborted(controller.signal);
+				return fn({ ...options, [syncAbortSignalSymbol]: controller.signal });
+			}).finally(() => {
+				controllers.delete(controller);
+				if (external) external.removeEventListener('abort', abort);
+			}));
+		}
+
+		function start(fn, options) {
+			try {
+				assertOpen();
+				if (stopping)
+					throw syncAbortError(undefined, 'Sync client is stopping. Await stop() before start().');
+				paused = false;
+			}
+			catch (error) { return Promise.reject(error); }
+			return run(fn, options).catch(error => {
+				if (!(paused && isSyncAbortError(error))) throw error;
+			});
+		}
+
+		function stop(stopScheduler = () => {}) {
+			if (stopping) return stopping;
+			paused = true;
+			// Install the fence before abort listeners can synchronously call start().
+			stopping = Promise.resolve().then(stopScheduler).then(async () => {
+				// A cancelled operation can enqueue rollback/cleanup before settling.
+				while (pending.size) await Promise.allSettled(Array.from(pending));
+			}).finally(() => { stopping = undefined; });
+			for (const controller of Array.from(controllers))
+				controller.abort(syncAbortError(undefined, closed ? 'Sync client closed.' : 'Sync stopped.'));
+			return stopping;
+		}
+
+		function close(stopScheduler) {
+			closed = true;
+			return stop(stopScheduler);
+		}
+	}
+
+	syncLifecycle = createSyncLifecycle;
+	return syncLifecycle;
+}
+
 var randomUuid_1;
 var hasRequiredRandomUuid;
 
@@ -1805,105 +2031,6 @@ function requireRandomUuid () {
 
 	randomUuid_1 = randomUuid;
 	return randomUuid_1;
-}
-
-var syncAbort;
-var hasRequiredSyncAbort;
-
-function requireSyncAbort () {
-	if (hasRequiredSyncAbort) return syncAbort;
-	hasRequiredSyncAbort = 1;
-	const syncAbortSignalSymbol = typeof Symbol === 'function'
-		? Symbol.for('orange-orm.syncClient.abortSignal')
-		: '__orangeOrmSyncClientAbortSignal';
-	const syncAbortCode = 'ORANGE_SYNC_ABORT';
-
-	function createSyncAbortController() {
-		if (typeof AbortController === 'function')
-			return new AbortController();
-
-		const listeners = new Set();
-		const signal = {
-			aborted: false,
-			reason: undefined,
-			addEventListener(event, listener) {
-				if (event === 'abort' && typeof listener === 'function')
-					listeners.add(listener);
-			},
-			removeEventListener(event, listener) {
-				if (event === 'abort')
-					listeners.delete(listener);
-			}
-		};
-		return {
-			signal,
-			abort(reason) {
-				if (signal.aborted)
-					return;
-				signal.aborted = true;
-				signal.reason = reason;
-				for (const listener of Array.from(listeners))
-					listener.call(signal, { type: 'abort', target: signal });
-				listeners.clear();
-			}
-		};
-	}
-
-	function syncAbortError(reason, fallbackMessage = 'Sync stopped.') {
-		const error = reason instanceof Error
-			? reason
-			: new Error(typeof reason === 'string' && reason.length > 0 ? reason : fallbackMessage);
-		if (!(reason instanceof Error))
-			error.name = 'AbortError';
-		try {
-			error.code = syncAbortCode;
-		}
-		catch (_error) {
-			// Built-in error objects are writable in supported runtimes; retain the AbortError fallback otherwise.
-		}
-		return error;
-	}
-
-	function throwIfSyncAborted(signal) {
-		if (signal && signal.aborted)
-			throw syncAbortError(signal.reason);
-	}
-
-	function awaitWithSyncAbort(value, signal) {
-		if (!signal)
-			return Promise.resolve(value);
-		throwIfSyncAborted(signal);
-		return new Promise((resolve, reject) => {
-			let settled = false;
-			const finish = (callback, result) => {
-				if (settled)
-					return;
-				settled = true;
-				signal.removeEventListener('abort', onAbort);
-				callback(result);
-			};
-			const onAbort = () => finish(reject, syncAbortError(signal.reason));
-			signal.addEventListener('abort', onAbort, { once: true });
-			Promise.resolve(value).then(
-				(result) => finish(resolve, result),
-				(error) => finish(reject, error)
-			);
-		});
-	}
-
-	function isSyncAbortError(error) {
-		return !!error && error.code === syncAbortCode;
-	}
-
-	syncAbort = {
-		awaitWithSyncAbort,
-		createSyncAbortController,
-		isSyncAbortError,
-		syncAbortError,
-		syncAbortSignalSymbol,
-		throwIfSyncAborted
-	};
-	return syncAbort;
 }
 
 var syncAuto;
@@ -2559,10 +2686,12 @@ var hasRequiredCrossTabLock;
 function requireCrossTabLock () {
 	if (hasRequiredCrossTabLock) return crossTabLock;
 	hasRequiredCrossTabLock = 1;
+	const { awaitWithSyncAbort, throwIfSyncAborted } = requireSyncAbort();
 	const randomUuid = requireRandomUuid();
 
 	async function runWithCrossTabLock(name, config, fn) {
 		const lockConfig = config || { enabled: true };
+		throwIfSyncAborted(lockConfig.signal);
 		if (!lockConfig.enabled)
 			return fn();
 		const locks = getWebLocks();
@@ -2642,15 +2771,24 @@ function requireCrossTabLock () {
 		let timeoutId;
 		let waiting = true;
 		let timedOut = false;
-		if (timeoutMs && typeof AbortController === 'function') {
+		const externalSignal = config.signal;
+		let removeAbort;
+		if ((timeoutMs || externalSignal) && typeof AbortController === 'function') {
 			const controller = new AbortController();
 			options.signal = controller.signal;
-			timeoutId = setTimeout(() => {
-				if (!waiting)
-					return;
-				timedOut = true;
-				controller.abort();
-			}, timeoutMs);
+			if (externalSignal) {
+				const abort = () => controller.abort(externalSignal.reason);
+				externalSignal.addEventListener('abort', abort, { once: true });
+				removeAbort = () => externalSignal.removeEventListener('abort', abort);
+				if (externalSignal.aborted) abort();
+			}
+			if (timeoutMs)
+				timeoutId = setTimeout(() => {
+					if (!waiting)
+						return;
+					timedOut = true;
+					controller.abort();
+				}, timeoutMs);
 		}
 		try {
 			return await locks.request(name, options, async () => {
@@ -2663,11 +2801,13 @@ function requireCrossTabLock () {
 			});
 		}
 		catch (e) {
+			throwIfSyncAborted(externalSignal);
 			if (timedOut || e && e.name === 'AbortError')
 				throw lockTimeoutError(name, timeoutMs, config);
 			throw e;
 		}
 		finally {
+			if (removeAbort) removeAbort();
 			if (timeoutId)
 				clearTimeout(timeoutId);
 		}
@@ -2708,6 +2848,7 @@ function requireCrossTabLock () {
 	}
 
 	async function runLockBody(_name, _config, fn) {
+		throwIfSyncAborted(_config.signal);
 		return fn();
 	}
 
@@ -2718,6 +2859,7 @@ function requireCrossTabLock () {
 		const pollMs = config.pollMs || 100;
 		const startedAt = Date.now();
 		for (;;) {
+			throwIfSyncAborted(config.signal);
 			const now = Date.now();
 			const current = readLocalStorageLock(storage, key);
 			if (!current || current.expiresAt <= now || current.owner === owner) {
@@ -2728,7 +2870,7 @@ function requireCrossTabLock () {
 			}
 			if (config.timeoutMs && now - startedAt >= config.timeoutMs)
 				throw lockTimeoutError(name, config.timeoutMs, config);
-			await delay(pollMs);
+			await awaitWithSyncAbort(delay(pollMs), config.signal);
 		}
 	}
 
@@ -3806,7 +3948,21 @@ function requireOperationContext () {
 
 	const sessionKey = 'syncTransactionContext';
 	const captureKey = 'syncOutboxCapture';
-	const memoryByMutationId = new Map();
+	const memoryByScope = new WeakMap();
+	const defaultMemoryScope = {};
+
+	function operationMemory(scope = defaultMemoryScope) {
+		let memory = memoryByScope.get(scope);
+		if (!memory) {
+			memory = new Map();
+			memoryByScope.set(scope, memory);
+		}
+		return memory;
+	}
+
+	function clearSyncOperationMemory(scope) {
+		memoryByScope.delete(scope);
+	}
 
 	function createSyncTransactionContext(context, memory) {
 		return {
@@ -3902,27 +4058,27 @@ function requireOperationContext () {
 		}
 	}
 
-	function registerSyncOperationMemory(mutationId, memory) {
+	function registerSyncOperationMemory(mutationId, memory, scope) {
 		if (typeof mutationId !== 'string' || mutationId.length === 0 || memory === undefined)
 			return;
-		memoryByMutationId.set(mutationId, memory);
+		operationMemory(scope).set(mutationId, memory);
 	}
 
-	function getSyncOperationMemory(mutationId) {
+	function getSyncOperationMemory(mutationId, scope) {
 		if (typeof mutationId !== 'string')
 			return undefined;
-		return memoryByMutationId.get(mutationId);
+		return operationMemory(scope).get(mutationId);
 	}
 
-	function deleteSyncOperationMemory(mutationId) {
+	function deleteSyncOperationMemory(mutationId, scope) {
 		if (typeof mutationId === 'string')
-			memoryByMutationId.delete(mutationId);
+			operationMemory(scope).delete(mutationId);
 	}
 
-	function withSyncOperationMemory(event) {
+	function withSyncOperationMemory(event, scope) {
 		if (!event || !event.mutationId || event.memory !== undefined)
 			return event;
-		const memory = getSyncOperationMemory(event.mutationId);
+		const memory = getSyncOperationMemory(event.mutationId, scope);
 		if (memory === undefined)
 			return event;
 		return {
@@ -3931,11 +4087,11 @@ function requireOperationContext () {
 		};
 	}
 
-	function finalizeSyncOperationMemory(event) {
+	function finalizeSyncOperationMemory(event, scope) {
 		if (!event || !event.mutationId)
 			return;
 		if (event.ok || event.retryable === false)
-			deleteSyncOperationMemory(event.mutationId);
+			deleteSyncOperationMemory(event.mutationId, scope);
 	}
 
 	async function updateOutboxOperationColumns(context, state, metadata) {
@@ -3986,6 +4142,7 @@ function requireOperationContext () {
 	}
 
 	operationContext = {
+		clearSyncOperationMemory,
 		createSyncTransactionContext,
 		deleteSyncOperationMemory,
 		finalizeSyncOperationMemory,
@@ -4006,6 +4163,7 @@ var hasRequiredSyncClient;
 function requireSyncClient () {
 	if (hasRequiredSyncClient) return syncClient.exports;
 	hasRequiredSyncClient = 1;
+	const createSyncLifecycle = requireSyncLifecycle();
 	const randomUuid = requireRandomUuid();
 	const stringify = requireStringify();
 	const { createSyncAuto, syncAutoStartSymbol } = requireSyncAuto();
@@ -4021,12 +4179,15 @@ function requireSyncClient () {
 	} = requireCrossTabLock();
 	const ensureOutboxOperationColumns = requireEnsureOutboxOperationColumns();
 	const {
+		clearSyncOperationMemory,
 		deleteSyncOperationMemory,
 		finalizeSyncOperationMemory,
 		withSyncOperationMemory
 	} = requireOperationContext();
 	const {
 		awaitWithSyncAbort,
+		awaitSyncWork,
+		trackSyncWork,
 		isSyncAbortError,
 		syncAbortSignalSymbol,
 		throwIfSyncAborted
@@ -4070,6 +4231,7 @@ function requireSyncClient () {
 		: '__orangeOrmSyncClientSetClientId';
 
 	function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, internalOptions = {}) {
+		const lifecycle = createSyncLifecycle();
 		const sinceByScope = new Map();
 		const ensuredInternalTables = new WeakMap();
 		const syncStateTable = 'orange_sync_state';
@@ -4097,27 +4259,28 @@ function requireSyncClient () {
 		const queuedEnsureLocalSchema = serializeSyncWork(lockedEnsureLocalSchema);
 		const observedSync = observeSyncMethod('sync', queuedSync);
 		const auto = createSyncAuto({
-			sync: observedSync
+			sync: options => lifecycle.run(observedSync, options)
 		}, getConfig);
 
 		const syncClientApi = {
-			sync: observedSync,
-			ensureLocalSchema: queuedEnsureLocalSchema,
-			resetLocal: lockedResetLocal,
-			start: auto.start,
-			stop: auto.stop,
+			sync: options => lifecycle.run(observedSync, options),
+			ensureLocalSchema: options => lifecycle.run(queuedEnsureLocalSchema, options, true),
+			resetLocal: options => lifecycle.run(lockedResetLocal, options, true),
+			start: options => lifecycle.start(auto.start, options),
+			stop: () => lifecycle.stop(auto.stop),
+			close,
 			isRunning: auto.isRunning,
 			on,
 			off,
 			once,
-			waitForInitialSync,
+			waitForInitialSync: options => lifecycle.run(waitForInitialSync, options),
 			interceptors
 		};
 		Object.defineProperty(syncClientApi, syncAutoStartSymbol, {
-			value: auto.startFromConfig
+			value: options => lifecycle.run(auto.startFromConfig, options)
 		});
 		Object.defineProperty(syncClientApi, ensureLocalSchemaReadySymbol, {
-			value: ensureLocalSchemaReady
+			value: options => lifecycle.run(ensureLocalSchemaReady, options, true)
 		});
 		Object.defineProperty(syncClientApi, syncAndCapturePullJournalSymbol, {
 			value: syncAndCapturePullJournal
@@ -4145,6 +4308,14 @@ function requireSyncClient () {
 		});
 		return syncClientApi;
 
+		function close() {
+			const closing = lifecycle.close(auto.stop);
+			eventListeners.clear();
+			initialReadyListeners.clear();
+			clearSyncOperationMemory(syncClientApi);
+			return closing;
+		}
+
 		function withCrossTabSyncLock(fn) {
 			return async function lockedSyncMethod(options) {
 				const signal = options && options[syncAbortSignalSymbol];
@@ -4156,7 +4327,7 @@ function requireSyncClient () {
 					return fn(options);
 				const lock = await resolveRuntimeCrossTabSyncLock(db, syncConfig);
 				const lockConfig = withRuntimeCrossTabLockConfig(lock.config, options);
-				return awaitWithSyncAbort(
+				return awaitSyncWork(
 					runWithCrossTabLock(lock.name, lockConfig, () => {
 						throwIfSyncAborted(signal);
 						return fn(options);
@@ -4275,7 +4446,7 @@ function requireSyncClient () {
 		async function ensureLocalSchemaReady(options = {}) {
 			const signal = options[syncAbortSignalSymbol];
 			throwIfSyncAborted(signal);
-			const result = await awaitWithSyncAbort(getLocalSchemaReady({
+			const result = await awaitSyncWork(getLocalSchemaReady({
 				allowMissingSync: true,
 				fileSnapshotRollback: fileSnapshotRollbackDefault
 			}), signal);
@@ -4347,10 +4518,12 @@ function requireSyncClient () {
 		}
 
 		function emit(event, payload) {
+			if (!lifecycle.active) return;
 			const listeners = eventListeners.get(event);
 			if (!listeners)
 				return;
 			for (const listener of Array.from(listeners)) {
+				if (!lifecycle.active) break;
 				try {
 					listener(payload);
 				}
@@ -4395,7 +4568,7 @@ function requireSyncClient () {
 			const hadStableBase = usesFileSnapshotRollback(normalizedOptions)
 				|| await hasStableBase(db, configuredTables);
 			if (!hadStableBase)
-				return awaitWithSyncAbort(
+				return awaitSyncWork(
 					runSyncMaintenance(db, () => pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, normalizedOptions)),
 					normalizedOptions[syncAbortSignalSymbol]
 				);
@@ -4405,7 +4578,7 @@ function requireSyncClient () {
 		async function prepareLocalSyncSchema(options = {}, prepareOptions = {}) {
 			const signal = options[syncAbortSignalSymbol];
 			throwIfSyncAborted(signal);
-			const result = await awaitWithSyncAbort(getLocalSchemaReady({
+			const result = await awaitSyncWork(getLocalSchemaReady({
 				...prepareOptions,
 				fileSnapshotRollback: usesFileSnapshotRollback(options)
 			}), signal);
@@ -5335,7 +5508,7 @@ function requireSyncClient () {
 					if (pumpRunning || !shouldFetchMorePullBatches())
 						return;
 					pumpRunning = true;
-					Promise.resolve()
+					trackSyncWork(Promise.resolve()
 						.then(pumpPullBatches)
 						.catch((error) => {
 							keyFetchError = error;
@@ -5345,7 +5518,7 @@ function requireSyncClient () {
 							notifyPipelineChange();
 							if (shouldFetchMorePullBatches())
 								startPullBatchPump();
-						});
+						}), signal);
 				}
 
 				async function pumpPullBatches() {
@@ -5554,7 +5727,7 @@ function requireSyncClient () {
 							return;
 						const job = queue.splice(index, 1)[0];
 						active += 1;
-						runRowJob(job);
+						trackSyncWork(runRowJob(job), signal);
 					}
 				}
 
@@ -6541,12 +6714,13 @@ function requireSyncClient () {
 		}
 
 		function emitOperationEvent(event) {
-			event = withSyncOperationMemory(event);
+			const memoryScope = internalOptions.operationMemoryScope || syncClientApi;
+			event = withSyncOperationMemory(event, memoryScope);
 			emit('operation', event);
 			emit(`operation:${event.operation}`, event);
-			finalizeSyncOperationMemory(event);
+			finalizeSyncOperationMemory(event, memoryScope);
 			if (event.ok || event.retryable === false)
-				deleteSyncOperationMemory(event.mutationId);
+				deleteSyncOperationMemory(event.mutationId, memoryScope);
 		}
 
 		function syncOperationError(error) {
@@ -7274,11 +7448,12 @@ function requireSyncClient () {
 		}
 
 		function on(event, listener) {
+			lifecycle.assertOpen();
 			if (typeof event !== 'string' || typeof listener !== 'function')
 				return () => {};
 			if (event === 'initial-ready') {
 				initialReadyListeners.add(listener);
-				void maybeEmitInitialReadyFromDb('persisted');
+				void lifecycle.run(() => maybeEmitInitialReadyFromDb('persisted')).catch(() => {});
 				return () => off(event, listener);
 			}
 			let listeners = eventListeners.get(event);
@@ -7313,16 +7488,19 @@ function requireSyncClient () {
 			return unsubscribe;
 		}
 
-		async function waitForInitialSync() {
+		async function waitForInitialSync(options = {}) {
+			const signal = options[syncAbortSignalSymbol];
 			const existing = await maybeEmitInitialReadyFromDb('persisted');
 			if (existing)
 				return;
-			return new Promise((resolve) => {
-				const unsubscribe = once('initial-ready', () => {
-					unsubscribe();
-					resolve();
-				});
-			});
+			throwIfSyncAborted(signal);
+			let unsubscribe;
+			try {
+				return await awaitWithSyncAbort(new Promise(resolve => {
+					unsubscribe = once('initial-ready', resolve);
+				}), signal);
+			}
+			finally { if (unsubscribe) unsubscribe(); }
 		}
 
 		async function readInitialSyncState() {
@@ -7379,7 +7557,9 @@ function requireSyncClient () {
 		}
 
 		function emitInitialReady(payload) {
+			if (!lifecycle.active) return;
 			for (const listener of Array.from(initialReadyListeners)) {
+				if (!lifecycle.active) break;
 				try {
 					listener(payload);
 				}
@@ -7418,6 +7598,7 @@ function requireSyncClient () {
 	}
 
 	function withRuntimeCrossTabLockConfig(config, options) {
+		config = { ...config, signal: options && options[syncAbortSignalSymbol] };
 		if (!config || !config.enabled)
 			return config;
 		const timeoutMs = normalizePositiveInteger(options && options.timeoutMs);
@@ -8539,6 +8720,8 @@ function requireClient () {
 			baseUrl = typeof options.db === 'function' ? providers(options.db) : options.db;
 		const httpInterceptor = createHttpInterceptor();
 		const syncOwner = resolveImmediateDb(baseUrl);
+		let closing;
+		let closed = false;
 
 		function client(_options = {}) {
 			if (_options.pg)
@@ -8599,7 +8782,15 @@ function requireClient () {
 		client.close = close;
 
 		function close() {
-			return client.db.end ? client.db.end() : Promise.resolve();
+			if (closing) return closing;
+			closing = (async () => {
+				if (typeof client.syncClient.close === 'function') await client.syncClient.close();
+				else if (typeof client.syncClient.stop === 'function') await client.syncClient.stop();
+				const db = await getDb();
+				if (db && typeof db.end === 'function') await db.end();
+				closed = true;
+			})();
+			return closing;
 		}
 
 		function onProvider(name, ...args) {
@@ -8677,11 +8868,13 @@ function requireClient () {
 		}
 
 		async function query() {
+			if (closed) throw new Error('Database closed.');
 			const adapter = netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } });
 			return adapter.query.apply(null, arguments);
 		}
 
 		async function sqliteFunction() {
+			if (closed) throw new Error('Database closed.');
 			const adapter = netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } });
 			return adapter.sqliteFunction.apply(null, arguments);
 		}
@@ -8775,6 +8968,7 @@ function requireClient () {
 		}
 
 		async function getDb() {
+			if (closed) throw new Error('Database closed.');
 			let db = baseUrl;
 			if (typeof db === 'function') {
 				let dbPromise = db();
@@ -8797,6 +8991,7 @@ function requireClient () {
 		}
 
 		async function ensureLocalSchemaReady() {
+			if (closed) throw new Error('Database closed.');
 			if (transaction)
 				return;
 			if (localSchemaReadySkipped)
@@ -8833,7 +9028,7 @@ function requireClient () {
 					transaction.done = true;
 					await transaction(transaction.commit);
 					if (operationMetadata && operationMetadata.operationName)
-						registerSyncOperationMemory(operationMetadata.mutationId, syncContext.memory);
+						registerSyncOperationMemory(operationMetadata.mutationId, syncContext.memory, client.syncClient);
 					return result;
 				}
 				catch (e) {
@@ -14089,13 +14284,45 @@ function requireUtils () {
 	const isIPv4 = RegExp.prototype.test.bind(/^(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)$/u);
 
 	/** @type {(value: string) => boolean} */
+	const isPort = RegExp.prototype.test.bind(/^\d*$/u);
+
+	/** @type {(value: string) => boolean} */
 	const isHexPair = RegExp.prototype.test.bind(/^[\da-f]{2}$/iu);
 
 	/** @type {(value: string) => boolean} */
 	const isUnreserved = RegExp.prototype.test.bind(/^[\da-z\-._~]$/iu);
 
 	/** @type {(value: string) => boolean} */
-	const isPathCharacter = RegExp.prototype.test.bind(/^[\da-z\-._~!$&'()*+,;=:@/]$/iu);
+	const isPathCharacter = RegExp.prototype.test.bind(/^[A-Za-z0-9\-._~!$&'()*+,;=:@/]$/u);
+
+	/** @type {(value: string) => boolean} */
+	const isQueryFragmentCharacter = RegExp.prototype.test.bind(/^[A-Za-z0-9\-._~!$&'()*+,;=:@/?]$/u);
+
+	/** @type {(value: string) => boolean} */
+	const isUserinfoCharacter = RegExp.prototype.test.bind(/^[A-Za-z0-9\-._~!$&'()*+,;=:]$/u);
+
+	const BYTE_HEX = new Array(256);
+	{
+	  const HEX_DIGITS = '0123456789ABCDEF';
+	  for (let i = 0; i < 256; i++) {
+	    BYTE_HEX[i] = '%' + HEX_DIGITS[i >> 4] + HEX_DIGITS[i & 0xF];
+	  }
+	}
+	function percentEncodeNonAscii (cp) {
+	  if (cp < 0x800) {
+	    return BYTE_HEX[0xC0 | (cp >> 6)] +
+	           BYTE_HEX[0x80 | (cp & 0x3F)]
+	  }
+	  if (cp < 0x10000) {
+	    return BYTE_HEX[0xE0 | (cp >> 12)] +
+	           BYTE_HEX[0x80 | ((cp >> 6) & 0x3F)] +
+	           BYTE_HEX[0x80 | (cp & 0x3F)]
+	  }
+	  return BYTE_HEX[0xF0 | (cp >> 18)] +
+	         BYTE_HEX[0x80 | ((cp >> 12) & 0x3F)] +
+	         BYTE_HEX[0x80 | ((cp >> 6) & 0x3F)] +
+	         BYTE_HEX[0x80 | (cp & 0x3F)]
+	}
 
 	/**
 	 * @param {Array<string>} input
@@ -14128,12 +14355,14 @@ function requireUtils () {
 	  return acc
 	}
 
-	/**
-	 * @typedef {Object} GetIPV6Result
-	 * @property {boolean} error - Indicates if there was an error parsing the IPv6 address.
-	 * @property {string} address - The parsed IPv6 address.
-	 * @property {string} [zone] - The zone identifier, if present.
-	 */
+	/** @type {(value: string) => boolean} */
+	const isHextet = RegExp.prototype.test.bind(/^[\dA-Fa-f]{1,4}$/);
+
+	/** @type {(value: string) => boolean} */
+	const isIPvFuture = RegExp.prototype.test.bind(/^[vV][\dA-Fa-f]+\.[A-Za-z\d\-._~!$&'()*+,;=:]+$/);
+
+	/** @type {(value: string) => boolean} */
+	const isZoneCharacter = RegExp.prototype.test.bind(/^[A-Za-z\d\-._~]$/);
 
 	/**
 	 * @param {string} value
@@ -14142,88 +14371,104 @@ function requireUtils () {
 	const nonSimpleDomain = RegExp.prototype.test.bind(/[^!"$&'()*+,\-.;=_`a-z{}~]/u);
 
 	/**
-	 * @param {Array<string>} buffer
+	 * @param {string} zone
 	 * @returns {boolean}
 	 */
-	function consumeIsZone (buffer) {
-	  buffer.length = 0;
-	  return true
-	}
+	function isZoneIdentifier (zone) {
+	  if (zone.length === 0) return false
 
-	/**
-	 * @param {Array<string>} buffer
-	 * @param {Array<string>} address
-	 * @param {GetIPV6Result} output
-	 * @returns {boolean}
-	 */
-	function consumeHextets (buffer, address, output) {
-	  if (buffer.length) {
-	    const hex = stringArrayToHexStripped(buffer);
-	    if (hex !== '') {
-	      address.push(hex);
-	    } else {
-	      output.error = true;
-	      return false
+	  for (let i = 0; i < zone.length; i++) {
+	    if (isZoneCharacter(zone[i])) continue
+	    if (zone[i] === '%' && i + 2 < zone.length && isHexPair(zone.slice(i + 1, i + 3))) {
+	      i += 2;
+	      continue
 	    }
-	    buffer.length = 0;
+	    return false
 	  }
+
 	  return true
 	}
 
 	/**
+	 * Compresses the longest run of zero hextets to "::" per RFC 5952. A run of a
+	 * single zero hextet is left uncompressed. On ties the leftmost run wins.
+	 *
+	 * @param {string[]} hextets
+	 * @returns {string}
+	 */
+	function compressIPv6ZeroRun (hextets) {
+	  let bestStart = -1;
+	  let bestLength = 0;
+	  let runStart = -1;
+	  let runLength = 0;
+	  for (let i = 0; i < hextets.length; i++) {
+	    if (hextets[i] === '0') {
+	      if (runStart === -1) runStart = i;
+	      runLength++;
+	      if (runLength > bestLength) {
+	        bestLength = runLength;
+	        bestStart = runStart;
+	      }
+	    } else {
+	      runStart = -1;
+	      runLength = 0;
+	    }
+	  }
+
+	  if (bestLength < 2) return hextets.join(':')
+
+	  const head = hextets.slice(0, bestStart).join(':');
+	  const tail = hextets.slice(bestStart + bestLength).join(':');
+	  return head + '::' + tail
+	}
+
+	/**
+	 * Validates an IPv6 address against the alternatives in RFC 3986 section
+	 * 3.2.2 and returns the same address with leading hextet zeroes removed.
+	 * An embedded IPv4 address counts as two hextets and is only valid at the end.
+	 *
 	 * @param {string} input
-	 * @returns {GetIPV6Result}
+	 * @returns {string|undefined}
 	 */
-	function getIPV6 (input) {
-	  let tokenCount = 0;
-	  const output = { error: false, address: '', zone: '' };
-	  /** @type {Array<string>} */
-	  const address = [];
-	  /** @type {Array<string>} */
-	  const buffer = [];
-	  let endipv6Encountered = false;
-	  let endIpv6 = false;
+	function normalizeIPv6Address (input) {
+	  const compression = input.indexOf('::');
+	  if (compression !== -1 && input.indexOf('::', compression + 1) !== -1) return undefined
 
-	  let consume = consumeHextets;
+	  const left = compression === -1 ? input.split(':') : input.slice(0, compression).split(':');
+	  const right = compression === -1 ? [] : input.slice(compression + 2).split(':');
+	  if (compression !== -1) {
+	    if (left.length === 1 && left[0] === '') left.length = 0;
+	    if (right.length === 1 && right[0] === '') right.length = 0;
+	  }
 
-	  for (let i = 0; i < input.length; i++) {
-	    const cursor = input[i];
-	    if (cursor === '[' || cursor === ']') { continue }
-	    if (cursor === ':') {
-	      if (endipv6Encountered === true) {
-	        endIpv6 = true;
-	      }
-	      if (!consume(buffer, address, output)) { break }
-	      if (++tokenCount > 7) {
-	        // not valid
-	        output.error = true;
-	        break
-	      }
-	      if (i > 0 && input[i - 1] === ':') {
-	        endipv6Encountered = true;
-	      }
-	      address.push(':');
-	      continue
-	    } else if (cursor === '%') {
-	      if (!consume(buffer, address, output)) { break }
-	      // switch to zone detection
-	      consume = consumeIsZone;
-	    } else {
-	      buffer.push(cursor);
+	  const parts = left.concat(right);
+	  let hextetCount = 0;
+	  for (let i = 0; i < parts.length; i++) {
+	    const part = parts[i];
+	    if (part === '') return undefined
+
+	    if (part.indexOf('.') !== -1) {
+	      if (i !== parts.length - 1 || (compression !== -1 && right.length === 0) || !isIPv4(part)) return undefined
+	      hextetCount += 2;
 	      continue
 	    }
+
+	    if (!isHextet(part)) return undefined
+	    parts[i] = parseInt(part, 16).toString(16);
+	    hextetCount++;
 	  }
-	  if (buffer.length) {
-	    if (consume === consumeIsZone) {
-	      output.zone = buffer.join('');
-	    } else if (endIpv6) {
-	      address.push(buffer.join(''));
-	    } else {
-	      address.push(stringArrayToHexStripped(buffer));
-	    }
+
+	  if (compression === -1) {
+	    if (hextetCount !== 8) return undefined
+	    return compressIPv6ZeroRun(parts)
 	  }
-	  output.address = address.join('');
-	  return output
+	  if (hextetCount >= 8) return undefined
+
+	  // expand "::" then re-compress the longest run for a canonical result
+	  const expanded = parts.slice(0, left.length);
+	  for (let i = hextetCount; i < 8; i++) expanded.push('0');
+	  for (let i = left.length; i < parts.length; i++) expanded.push(parts[i]);
+	  return compressIPv6ZeroRun(expanded)
 	}
 
 	/**
@@ -14231,26 +14476,49 @@ function requireUtils () {
 	 * @property {string} host - The normalized host.
 	 * @property {string} [escapedHost] - The escaped host.
 	 * @property {boolean} isIPV6 - Indicates if the host is an IPv6 address.
+	 * @property {boolean} [isIPVFuture] - Indicates if the host is an IPvFuture literal.
+	 * @property {boolean} [error] - Indicates if a bracketed IP literal is malformed.
 	 */
 
 	/**
+	 * Validates and normalizes a bracketed IP literal. Raw zone separators remain
+	 * accepted for backwards compatibility, while encoded separators and zone
+	 * contents follow RFC 6874.
+	 *
 	 * @param {string} host
 	 * @returns {NormalizeIPv6Result}
 	 */
 	function normalizeIPv6 (host) {
-	  if (findToken(host, ':') < 2) { return { host, isIPV6: false } }
-	  const ipv6 = getIPV6(host);
+	  const bracketed = host[0] === '[' && host[host.length - 1] === ']';
+	  const hasBracket = host[0] === '[' || host[host.length - 1] === ']';
+	  if (hasBracket && !bracketed) return { host, isIPV6: false, error: true }
 
-	  if (!ipv6.error) {
-	    let newHost = ipv6.address;
-	    let escapedHost = ipv6.address;
-	    if (ipv6.zone) {
-	      newHost += '%' + ipv6.zone;
-	      escapedHost += '%25' + ipv6.zone;
-	    }
-	    return { host: newHost, isIPV6: true, escapedHost }
-	  } else {
-	    return { host, isIPV6: false }
+	  let input = bracketed ? host.slice(1, -1) : host;
+	  if (bracketed && isIPvFuture(input)) {
+	    input = input.toLowerCase();
+	    return { host: `[${input}]`, escapedHost: input, isIPV6: false, isIPVFuture: true }
+	  }
+
+	  if (findToken(input, ':') < 2) {
+	    return { host, isIPV6: false, error: bracketed }
+	  }
+
+	  let zoneIdentifier = '';
+	  const zoneSeparator = input.indexOf('%');
+	  if (zoneSeparator !== -1) {
+	    const separatorLength = input.slice(zoneSeparator, zoneSeparator + 3).toLowerCase() === '%25' ? 3 : 1;
+	    zoneIdentifier = input.slice(zoneSeparator + separatorLength);
+	    if (!isZoneIdentifier(zoneIdentifier)) return { host, isIPV6: false, error: true }
+	    input = input.slice(0, zoneSeparator);
+	  }
+
+	  const address = normalizeIPv6Address(input);
+	  if (address === undefined) return { host, isIPV6: false, error: true }
+
+	  return {
+	    host: address + (zoneIdentifier ? '%' + zoneIdentifier : ''),
+	    escapedHost: address + (zoneIdentifier ? '%25' + zoneIdentifier : ''),
+	    isIPV6: true
 	  }
 	}
 
@@ -14376,7 +14644,7 @@ function requireUtils () {
 
 	/**
 	 * Normalizes percent escapes and optionally decodes only unreserved ASCII bytes.
-	 * Reserved delimiters such as `%2F` and `%2E` stay escaped.
+	 * Reserved delimiters such as `%2F` stay escaped; `%2E` is unreserved.
 	 *
 	 * @param {string} input
 	 * @param {boolean} [decodeUnreserved=false]
@@ -14425,7 +14693,8 @@ function requireUtils () {
 	  let output = '';
 
 	  for (let i = 0; i < input.length; i++) {
-	    if (input[i] === '%' && i + 2 < input.length) {
+	    const ch = input[i];
+	    if (ch === '%' && i + 2 < input.length) {
 	      const hex = input.slice(i + 1, i + 3);
 	      if (isHexPair(hex)) {
 	        const normalizedHex = hex.toUpperCase();
@@ -14442,10 +14711,225 @@ function requireUtils () {
 	      }
 	    }
 
-	    if (isPathCharacter(input[i])) {
-	      output += input[i];
+	    if (isPathCharacter(ch)) {
+	      output += ch;
 	    } else {
-	      output += escape(input[i]);
+	      const code = input.charCodeAt(i);
+	      if (code < 0x80) {
+	        output += isEscapeSafe(code) ? ch : BYTE_HEX[code];
+	      } else if (code < 0xD800 || code > 0xDFFF) {
+	        output += percentEncodeNonAscii(code);
+	      } else if (code <= 0xDBFF && i + 1 < input.length) {
+	        const low = input.charCodeAt(i + 1);
+	        if (low >= 0xDC00 && low <= 0xDFFF) {
+	          output += percentEncodeNonAscii(0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00));
+	          i++;
+	        } else {
+	          output += percentEncodeNonAscii(0xFFFD);
+	        }
+	      } else {
+	        output += percentEncodeNonAscii(0xFFFD);
+	      }
+	    }
+	  }
+
+	  return output
+	}
+
+	/**
+	 * Serializes a path without rewriting reserved data. Raw RFC 3986 path
+	 * characters remain literal, valid escapes are preserved and uppercased, and
+	 * everything else is UTF-8 percent-encoded. In a path-noscheme, a colon in the
+	 * first segment must be escaped so the result cannot be parsed as a scheme.
+	 *
+	 * @param {string} input
+	 * @param {boolean} [pathNoScheme=false]
+	 * @returns {string}
+	 */
+	function serializePathEncoding (input, pathNoScheme = false) {
+	  let output = '';
+	  let firstSegment = pathNoScheme && input[0] !== '/';
+
+	  for (let i = 0; i < input.length; i++) {
+	    const ch = input[i];
+	    if (ch === '%' && i + 2 < input.length) {
+	      const hex = input.slice(i + 1, i + 3);
+	      if (isHexPair(hex)) {
+	        output += '%' + hex.toUpperCase();
+	        i += 2;
+	        continue
+	      }
+	    }
+
+	    if (ch === '/') {
+	      firstSegment = false;
+	    }
+
+	    if (isPathCharacter(ch) && (ch !== ':' || !firstSegment)) {
+	      output += ch;
+	    } else {
+	      const code = input.charCodeAt(i);
+	      if (code < 0x80) {
+	        output += BYTE_HEX[code];
+	      } else if (code < 0xD800 || code > 0xDFFF) {
+	        output += percentEncodeNonAscii(code);
+	      } else if (code <= 0xDBFF && i + 1 < input.length) {
+	        const low = input.charCodeAt(i + 1);
+	        if (low >= 0xDC00 && low <= 0xDFFF) {
+	          output += percentEncodeNonAscii(0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00));
+	          i++;
+	        } else {
+	          output += percentEncodeNonAscii(0xFFFD);
+	        }
+	      } else {
+	        output += percentEncodeNonAscii(0xFFFD);
+	      }
+	    }
+	  }
+
+	  return output
+	}
+
+	/**
+	 * Percent-encodes a URI component using its RFC 3986 literal character set.
+	 * Existing valid escapes are preserved and normalized to uppercase hex.
+	 *
+	 * @param {string} input
+	 * @param {(value: string) => boolean} isAllowed
+	 * @returns {string}
+	 */
+	function encodeComponent (input, isAllowed) {
+	  let output = '';
+
+	  for (let i = 0; i < input.length; i++) {
+	    const ch = input[i];
+	    if (ch === '%' && i + 2 < input.length) {
+	      const hex = input.slice(i + 1, i + 3);
+	      if (isHexPair(hex)) {
+	        output += '%' + hex.toUpperCase();
+	        i += 2;
+	        continue
+	      }
+	    }
+
+	    if (isAllowed(ch)) {
+	      output += ch;
+	    } else {
+	      const code = input.charCodeAt(i);
+	      if (code < 0x80) {
+	        output += BYTE_HEX[code];
+	      } else if (code < 0xD800 || code > 0xDFFF) {
+	        output += percentEncodeNonAscii(code);
+	      } else if (code <= 0xDBFF && i + 1 < input.length) {
+	        const low = input.charCodeAt(i + 1);
+	        if (low >= 0xDC00 && low <= 0xDFFF) {
+	          output += percentEncodeNonAscii(0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00));
+	          i++;
+	        } else {
+	          output += percentEncodeNonAscii(0xFFFD);
+	        }
+	      } else {
+	        output += percentEncodeNonAscii(0xFFFD);
+	      }
+	    }
+	  }
+
+	  return output
+	}
+
+	/**
+	 * Encodes userinfo while preserving its RFC 3986 §3.2.1 literal characters.
+	 * In particular, authority delimiters such as `@`, `/`, `?`, and `#` are data.
+	 *
+	 * @param {string} input
+	 * @returns {string}
+	 */
+	function encodeUserinfo (input) {
+	  return encodeComponent(input, isUserinfoCharacter)
+	}
+
+	/**
+	 * Encodes query data using the RFC 3986 §3.4 grammar. A literal `#` must be
+	 * escaped because it would otherwise begin the fragment component.
+	 *
+	 * @param {string} input
+	 * @returns {string}
+	 */
+	function encodeQuery (input) {
+	  return encodeComponent(input, isQueryFragmentCharacter)
+	}
+
+	/**
+	 * Encodes fragment data using the RFC 3986 §3.5 grammar.
+	 *
+	 * @param {string} input
+	 * @returns {string}
+	 */
+	function encodeFragment (input) {
+	  return encodeComponent(input, isQueryFragmentCharacter)
+	}
+
+	function isEscapeSafe (cp) {
+	  return (
+	    (cp >= 0x30 && cp <= 0x39) ||
+	    (cp >= 0x41 && cp <= 0x5A) ||
+	    (cp >= 0x61 && cp <= 0x7A) ||
+	    cp === 0x2A || cp === 0x2B || cp === 0x2D || cp === 0x2E ||
+	    cp === 0x2F || cp === 0x40 || cp === 0x5F
+	  )
+	}
+
+	/**
+	 * Normalizes the percent-encoding of a query or fragment component.
+	 *
+	 * Like `normalizePathEncoding`, but uses the query/fragment character set
+	 * (which additionally allows `?`) and decodes `.` since it has no dot-segment
+	 * meaning outside of a path.
+	 *
+	 * @param {string} input
+	 * @returns {string}
+	 */
+	function normalizeQueryFragmentEncoding (input) {
+	  let output = '';
+
+	  for (let i = 0; i < input.length; i++) {
+	    const ch = input[i];
+	    if (ch === '%' && i + 2 < input.length) {
+	      const hex = input.slice(i + 1, i + 3);
+	      if (isHexPair(hex)) {
+	        const normalizedHex = hex.toUpperCase();
+	        const decoded = String.fromCharCode(parseInt(normalizedHex, 16));
+
+	        if (isUnreserved(decoded)) {
+	          output += decoded;
+	        } else {
+	          output += '%' + normalizedHex;
+	        }
+
+	        i += 2;
+	        continue
+	      }
+	    }
+
+	    if (isQueryFragmentCharacter(ch)) {
+	      output += ch;
+	    } else {
+	      const code = input.charCodeAt(i);
+	      if (code < 0x80) {
+	        output += isEscapeSafe(code) ? ch : BYTE_HEX[code];
+	      } else if (code < 0xD800 || code > 0xDFFF) {
+	        output += percentEncodeNonAscii(code);
+	      } else if (code <= 0xDBFF && i + 1 < input.length) {
+	        const low = input.charCodeAt(i + 1);
+	        if (low >= 0xDC00 && low <= 0xDFFF) {
+	          output += percentEncodeNonAscii(0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00));
+	          i++;
+	        } else {
+	          output += percentEncodeNonAscii(0xFFFD);
+	        }
+	      } else {
+	        output += percentEncodeNonAscii(0xFFFD);
+	      }
 	    }
 	  }
 
@@ -14485,15 +14969,21 @@ function requireUtils () {
 	  const uriTokens = [];
 
 	  if (component.userinfo !== undefined) {
-	    uriTokens.push(component.userinfo);
+	    uriTokens.push(encodeUserinfo(component.userinfo));
 	    uriTokens.push('@');
 	  }
 
 	  if (component.host !== undefined) {
-	    let host = unescape(component.host);
+	    let host = component.host;
 	    if (!isIPv4(host)) {
-	      const ipV6res = normalizeIPv6(host);
-	      if (ipV6res.isIPV6 === true) {
+	      let ipV6res = normalizeIPv6(host);
+	      if (ipV6res.isIPV6 !== true && ipV6res.isIPVFuture !== true) {
+	        // Decode only unreserved bytes, once. In particular, keep %25 encoded
+	        // so it cannot introduce a second escape during recomposition.
+	        host = normalizePercentEncoding(host, true);
+	        ipV6res = normalizeIPv6(host);
+	      }
+	      if (ipV6res.isIPV6 === true || ipV6res.isIPVFuture === true) {
 	        host = `[${ipV6res.escapedHost}]`;
 	      } else {
 	        host = reescapeHostDelimiters(host, false);
@@ -14503,8 +14993,12 @@ function requireUtils () {
 	  }
 
 	  if (typeof component.port === 'number' || typeof component.port === 'string') {
+	    const port = String(component.port);
+	    if (!isPort(port)) {
+	      throw new TypeError('URI port is malformed.')
+	    }
 	    uriTokens.push(':');
-	    uriTokens.push(String(component.port));
+	    uriTokens.push(port);
 	  }
 
 	  return uriTokens.length ? uriTokens.join('') : undefined
@@ -14515,6 +15009,11 @@ function requireUtils () {
 	  reescapeHostDelimiters,
 	  normalizePercentEncoding,
 	  normalizePathEncoding,
+	  serializePathEncoding,
+	  normalizeQueryFragmentEncoding,
+	  encodeUserinfo,
+	  encodeQuery,
+	  encodeFragment,
 	  escapePreservingEscapes,
 	  removeDotSegments,
 	  isIPv4,
@@ -14533,7 +15032,7 @@ function requireSchemes () {
 	hasRequiredSchemes = 1;
 
 	const { isUUID } = requireUtils();
-	const URN_REG = /([\da-z][\d\-a-z]{0,31}):((?:[\w!$'()*+,\-.:;=@]|%[\da-f]{2})+)/iu;
+	const URN_REG = /^([\da-z][\d\-a-z]{0,31}):((?:[\w!$'()*+,\-./:;=@]|%[\da-f]{2})+)$/iu;
 
 	const supportedSchemeNames = /** @type {const} */ (['http', 'https', 'ws',
 	  'wss', 'urn', 'urn:uuid']);
@@ -14645,9 +15144,14 @@ function requireSchemes () {
 
 	  // reconstruct path from resource name
 	  if (wsComponent.resourceName) {
-	    const [path, query] = wsComponent.resourceName.split('?');
+	    const queryIndex = wsComponent.resourceName.indexOf('?');
+	    const path = queryIndex === -1
+	      ? wsComponent.resourceName
+	      : wsComponent.resourceName.slice(0, queryIndex);
 	    wsComponent.path = (path && path !== '/' ? path : undefined);
-	    wsComponent.query = query;
+	    wsComponent.query = queryIndex === -1
+	      ? undefined
+	      : wsComponent.resourceName.slice(queryIndex + 1);
 	    wsComponent.resourceName = undefined;
 	  }
 
@@ -14664,7 +15168,7 @@ function requireSchemes () {
 	    return urnComponent
 	  }
 	  const matches = urnComponent.path.match(URN_REG);
-	  if (matches) {
+	  if (matches && matches[0] === urnComponent.path) {
 	    const scheme = options.scheme || urnComponent.scheme || 'urn';
 	    urnComponent.nid = matches[1].toLowerCase();
 	    urnComponent.nss = matches[2];
@@ -14806,8 +15310,23 @@ function requireFastUri () {
 	if (hasRequiredFastUri) return fastUri.exports;
 	hasRequiredFastUri = 1;
 
-	const { normalizeIPv6, removeDotSegments, recomposeAuthority, normalizePercentEncoding, normalizePathEncoding, escapePreservingEscapes, reescapeHostDelimiters, isIPv4, nonSimpleDomain } = requireUtils();
+	const { normalizeIPv6, removeDotSegments, recomposeAuthority, normalizePercentEncoding, normalizePathEncoding, serializePathEncoding, normalizeQueryFragmentEncoding, encodeQuery, encodeFragment, reescapeHostDelimiters, isIPv4, nonSimpleDomain } = requireUtils();
 	const { SCHEMES, getSchemeHandler } = requireSchemes();
+
+	const VALID_SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*$/u;
+	const MALFORMED_SCHEME_ERROR = 'URI scheme is malformed.';
+
+	/**
+	 * @param {string} scheme
+	 * @returns {string}
+	 */
+	function decodeValidScheme (scheme) {
+	  const decodedScheme = unescape(String(scheme));
+	  if (!VALID_SCHEME.test(decodedScheme)) {
+	    throw new TypeError(MALFORMED_SCHEME_ERROR)
+	  }
+	  return decodedScheme
+	}
 
 	/**
 	 * @template {import('./types/index').URIComponent|string} T
@@ -14832,7 +15351,50 @@ function requireFastUri () {
 	 */
 	function resolve (baseURI, relativeURI, options) {
 	  const schemelessOptions = options ? Object.assign({ scheme: 'null' }, options) : { scheme: 'null' };
-	  const resolved = resolveComponent(parse(baseURI, schemelessOptions), parse(relativeURI, schemelessOptions), schemelessOptions, true);
+	  const {
+	    parsed: baseParsed,
+	    malformedAuthorityOrPort: baseMalformed,
+	    malformedPercentEncoding: baseMalformedPercentEncoding,
+	    malformedSchemeSpecific: baseMalformedSchemeSpecific,
+	    malformedHost: baseMalformedHost,
+	    malformedScheme: baseMalformedScheme
+	  } = parseWithStatus(baseURI, schemelessOptions);
+	  const {
+	    parsed: relativeParsed,
+	    malformedAuthorityOrPort: relativeMalformed,
+	    malformedPercentEncoding: relativeMalformedPercentEncoding,
+	    malformedSchemeSpecific: relativeMalformedSchemeSpecific,
+	    malformedHost: relativeMalformedHost,
+	    malformedScheme: relativeMalformedScheme
+	  } = parseWithStatus(relativeURI, schemelessOptions);
+	  if (
+	    baseMalformed ||
+	    relativeMalformed ||
+	    baseMalformedPercentEncoding ||
+	    relativeMalformedPercentEncoding ||
+	    baseMalformedSchemeSpecific ||
+	    relativeMalformedSchemeSpecific ||
+	    baseMalformedHost ||
+	    relativeMalformedHost ||
+	    baseMalformedScheme ||
+	    relativeMalformedScheme
+	  ) {
+	    throw new Error(baseParsed.error || relativeParsed.error || 'URI is malformed.')
+	  }
+	  const resolved = resolveComponent(baseParsed, relativeParsed, schemelessOptions, true);
+	  const resolvedSchemeHandler = getSchemeHandler((options && options.scheme) || resolved.scheme);
+	  const resolvedHost = resolved.host;
+	  const resolvedHostIsIP = resolvedHost !== undefined && resolvedHost !== '' &&
+	    (isIPv4(resolvedHost) || normalizeIPv6(resolvedHost).isIPV6);
+	  canonicalizeHost(resolved, options || {}, resolvedSchemeHandler, resolvedHostIsIP);
+	  // Percent escapes in an ASCII reg-name are encoded data. The WHATWG hostname
+	  // parser can reject them even though fast-uri preserves them safely as RFC
+	  // 3986 data. A raw non-ASCII host must still fail closed if conversion fails.
+	  const encodedASCIIHost = resolvedHost && resolvedHost.indexOf('%') !== -1 &&
+	    !/\P{ASCII}/u.test(resolvedHost);
+	  if (resolved.error && !encodedASCIIHost) {
+	    throw new Error(resolved.error)
+	  }
 	  schemelessOptions.skipEscape = true;
 	  return serialize(resolved, schemelessOptions)
 	}
@@ -14915,7 +15477,7 @@ function requireFastUri () {
 	  const normalizedA = normalizeComparableURI(uriA, options);
 	  const normalizedB = normalizeComparableURI(uriB, options);
 
-	  return normalizedA !== undefined && normalizedB !== undefined && normalizedA.toLowerCase() === normalizedB.toLowerCase()
+	  return normalizedA !== undefined && normalizedB !== undefined && normalizedA === normalizedB
 	}
 
 	/**
@@ -14943,25 +15505,30 @@ function requireFastUri () {
 	  const options = Object.assign({}, opts);
 	  const uriTokens = [];
 
+	  if (component.scheme) {
+	    component.scheme = decodeValidScheme(component.scheme);
+	  }
+
 	  // find scheme handler
 	  const schemeHandler = getSchemeHandler(options.scheme || component.scheme);
 
 	  // perform scheme specific serialization
 	  if (schemeHandler && schemeHandler.serialize) schemeHandler.serialize(component, options);
 
+	  const hasAuthority = component.userinfo !== undefined || component.host !== undefined || component.port !== undefined;
+	  const pathNoScheme = !options.skipEscape && component.scheme === undefined && !hasAuthority;
+
 	  if (component.path !== undefined) {
 	    if (!options.skipEscape) {
-	      component.path = escapePreservingEscapes(component.path);
-
-	      if (component.scheme !== undefined) {
-	        component.path = component.path.split('%3A').join(':');
-	      }
+	      component.path = serializePathEncoding(component.path, pathNoScheme);
 	    } else {
 	      component.path = normalizePercentEncoding(component.path);
 	    }
 	  }
 
 	  if (options.reference !== 'suffix' && component.scheme) {
+	    // Scheme handlers may replace the scheme during serialization.
+	    component.scheme = decodeValidScheme(component.scheme);
 	    uriTokens.push(component.scheme, ':');
 	  }
 
@@ -14984,6 +15551,13 @@ function requireFastUri () {
 	      s = removeDotSegments(s);
 	    }
 
+	    // Dot-segment removal can expose a colon that was not originally in the
+	    // first segment (for example, "./a:b"). Reapply path-noscheme encoding so
+	    // the serialized relative reference cannot be reparsed as a URI scheme.
+	    if (pathNoScheme) {
+	      s = serializePathEncoding(s, true);
+	    }
+
 	    if (
 	      authority === undefined &&
 	      s[0] === '/' &&
@@ -14997,16 +15571,29 @@ function requireFastUri () {
 	  }
 
 	  if (component.query !== undefined) {
-	    uriTokens.push('?', component.query);
+	    uriTokens.push('?', encodeQuery(component.query));
 	  }
 
 	  if (component.fragment !== undefined) {
-	    uriTokens.push('#', component.fragment);
+	    uriTokens.push('#', encodeFragment(component.fragment));
 	  }
 	  return uriTokens.join('')
 	}
 
 	const URI_PARSE = /^(?:([^#/:?]+):)?(?:\/\/((?:([^#/?@]*)@)?(\[[^#/?\]]+\]|[^#/:?]*)(?::(\d*))?))?([^#?]*)(?:\?([^#]*))?(?:#((?:.|[\n\r])*))?/u;
+
+	// Captures the authority component (between "//" and the next "/", "?" or "#"),
+	// with or without a scheme prefix, for the literal-backslash rejection below.
+	const AUTHORITY_PREFIX = /^(?:[^#/:?]+:)?\/\/([^/?#]*)/;
+
+	// Captures the leading authority-introducer region after an optional scheme: a
+	// run of forward slashes, backslashes, and the characters the WHATWG URL parser
+	// removes before parsing (TAB U+0009, LF U+000A, CR U+000D). A valid introducer
+	// is exactly "//". Node treats "\" as "/" on special schemes and strips those
+	// characters first, so forms like "\\", "/\", "\/", "/<TAB>/", or a leading
+	// "<TAB>//" reach an authority in Node while fast-uri's URI_PARSE folds them into
+	// the path group (host confusion / SSRF / redirect bypass).
+	const AUTHORITY_INTRODUCER_REGION = /^(?:[^#/:?]+:)?([/\\\t\n\r]*)/;
 
 	/**
 	 * @param {import('./types/index').URIComponent} parsed
@@ -15026,9 +15613,85 @@ function requireFastUri () {
 	}
 
 	/**
+	 * Checks percent syntax without decoding the represented octets. RFC 3986
+	 * percent-encoding is byte-oriented, so sequences such as `%FF` are valid even
+	 * though they are not independently valid UTF-8.
+	 *
+	 * @param {string|undefined} component
+	 * @returns {boolean}
+	 */
+	function hasMalformedPercentEncoding (component) {
+	  if (component === undefined) return false
+
+	  let percent = component.indexOf('%');
+	  while (percent !== -1) {
+	    if (percent + 2 >= component.length || !/^[\da-f]{2}$/iu.test(component.slice(percent + 1, percent + 3))) {
+	      return true
+	    }
+	    percent = component.indexOf('%', percent + 3);
+	  }
+
+	  return false
+	}
+
+	/**
+	 * Whether the host is a bracketed IP literal (RFC 3986 `IP-literal`).
+	 * An unterminated `[` is not a literal, so it must still be validated as a
+	 * reg-name instead of being waved through as an IP.
+	 *
+	 * @param {string} host
+	 * @returns {boolean}
+	 */
+	function isIPLiteral (host) {
+	  return host[0] === '[' && host[host.length - 1] === ']'
+	}
+
+	/**
+	 * @param {RegExpMatchArray} matches
+	 * @returns {boolean}
+	 */
+	function hasMalformedComponentPercentEncoding (matches) {
+	  // Bracketed IP literals use a raw "%" as the zone separator for historical
+	  // compatibility. Their parsing is intentionally left to normalizeIPv6.
+	  const host = matches[4];
+	  return hasMalformedPercentEncoding(matches[3]) ||
+	    (host !== undefined && !isIPLiteral(host) && hasMalformedPercentEncoding(host)) ||
+	    hasMalformedPercentEncoding(matches[6]) ||
+	    hasMalformedPercentEncoding(matches[7]) ||
+	    hasMalformedPercentEncoding(matches[8])
+	}
+
+	/**
+	 * @param {import('./types/index').URIComponent} parsed
+	 * @param {import('./types/index').Options} options
+	 * @param {{ domainHost?: boolean, unicodeSupport?: boolean }|undefined} schemeHandler
+	 * @param {boolean} isIP
+	 * @returns {boolean} whether host conversion failed
+	 */
+	function canonicalizeHost (parsed, options, schemeHandler, isIP) {
+	  if (
+	    !options.unicodeSupport &&
+	    (!schemeHandler || !schemeHandler.unicodeSupport) &&
+	    parsed.host &&
+	    !isIPLiteral(parsed.host) &&
+	    (options.domainHost || (schemeHandler && schemeHandler.domainHost)) &&
+	    isIP === false &&
+	    nonSimpleDomain(parsed.host)
+	  ) {
+	    try {
+	      parsed.host = new URL('http://' + parsed.host).hostname;
+	    } catch (e) {
+	      parsed.error = parsed.error || "Host's domain name can not be converted to ASCII: " + e;
+	      return true
+	    }
+	  }
+	  return false
+	}
+
+	/**
 	 * @param {string} uri
 	 * @param {import('./types/index').Options} [opts]
-	 * @returns {{ parsed: import('./types/index').URIComponent, malformedAuthorityOrPort: boolean }}
+	 * @returns {{ parsed: import('./types/index').URIComponent, malformedAuthorityOrPort: boolean, malformedPercentEncoding: boolean, malformedSchemeSpecific: boolean, malformedHost: boolean, malformedScheme: boolean }}
 	 */
 	function parseWithStatus (uri, opts) {
 	  const options = Object.assign({}, opts);
@@ -15044,6 +15707,11 @@ function requireFastUri () {
 	  };
 
 	  let malformedAuthorityOrPort = false;
+	  let malformedPercentEncoding = false;
+	  let malformedSchemeSpecific = false;
+	  let malformedHost = false;
+	  let malformedIPLiteral = false;
+	  let malformedScheme = false;
 
 	  let isIP = false;
 	  if (options.reference === 'suffix') {
@@ -15051,6 +15719,41 @@ function requireFastUri () {
 	      uri = options.scheme + ':' + uri;
 	    } else {
 	      uri = '//' + uri;
+	    }
+	  }
+
+	  // A literal backslash (U+005C) is not a valid RFC 3986 URI character and is
+	  // not an authority delimiter. Reject it in the authority rather than
+	  // rewriting it: normalizing "\" -> "/" (WHATWG error recovery) could silently
+	  // change the resource identified by an otherwise-invalid input, and lets "\"
+	  // act as a host delimiter here while Node's native URL parses a different
+	  // host (SSRF / redirect / origin-allowlist bypass). Percent-encoded %5C is
+	  // untouched and remains valid encoded data.
+	  const authorityMatch = uri.match(AUTHORITY_PREFIX);
+	  if (authorityMatch !== null && authorityMatch[1].indexOf('\\') !== -1) {
+	    parsed.error = 'URI authority must not contain a literal backslash.';
+	    malformedAuthorityOrPort = true;
+	  }
+
+	  // Reject a malformed or whitespace-smuggled authority introducer. fast-uri
+	  // only recognizes a literal "//"; anything else in the leading separator run
+	  // (a backslash, or a "//" that appears only after removing the TAB/LF/CR that
+	  // Node strips) means the authority fast-uri parses differs from the one Node's
+	  // URL resolves. Reject rather than rewrite, mirroring the literal-backslash
+	  // guard above. Percent-encoded forms (%5C, %09) are untouched, valid data.
+	  const introducerMatch = uri.match(AUTHORITY_INTRODUCER_REGION);
+	  if (introducerMatch !== null) {
+	    const region = introducerMatch[1];
+	    const normalizedRegion = region.replace(/[\t\n\r]/g, '');
+	    // Two or more leading separators introduce an authority.
+	    if (normalizedRegion.length >= 2) {
+	      if (normalizedRegion.slice(0, 2) !== '//') {
+	        parsed.error = parsed.error || 'URI authority must not contain a literal backslash.';
+	        malformedAuthorityOrPort = true;
+	      } else if (region.length !== normalizedRegion.length) {
+	        parsed.error = parsed.error || 'URI authority introducer must not contain whitespace.';
+	        malformedAuthorityOrPort = true;
+	      }
 	    }
 	  }
 
@@ -15066,6 +15769,21 @@ function requireFastUri () {
 	    parsed.query = matches[7];
 	    parsed.fragment = matches[8];
 
+	    if (parsed.scheme !== undefined) {
+	      const decodedScheme = unescape(parsed.scheme);
+	      if (VALID_SCHEME.test(decodedScheme)) {
+	        parsed.scheme = decodedScheme.toLowerCase();
+	      } else {
+	        parsed.error = parsed.error || MALFORMED_SCHEME_ERROR;
+	        malformedScheme = true;
+	      }
+	    }
+
+	    malformedPercentEncoding = hasMalformedComponentPercentEncoding(matches);
+	    if (malformedPercentEncoding) {
+	      parsed.error = parsed.error || 'URI contains malformed percent-encoding.';
+	    }
+
 	    // fix port number
 	    if (isNaN(parsed.port)) {
 	      parsed.port = matches[5];
@@ -15080,9 +15798,17 @@ function requireFastUri () {
 	    if (parsed.host) {
 	      const ipv4result = isIPv4(parsed.host);
 	      if (ipv4result === false) {
+	        const bracketedIPLiteral = isIPLiteral(parsed.host);
+	        const hasIPLiteralBracket = parsed.host.indexOf('[') !== -1 || parsed.host.indexOf(']') !== -1;
 	        const ipv6result = normalizeIPv6(parsed.host);
-	        parsed.host = ipv6result.host.toLowerCase();
-	        isIP = ipv6result.isIPV6;
+	        isIP = ipv6result.isIPV6 || ipv6result.isIPVFuture === true;
+	        malformedIPLiteral = hasIPLiteralBracket && (!bracketedIPLiteral || ipv6result.error === true);
+	        parsed.host = isIP ? ipv6result.host : ipv6result.host.toLowerCase();
+
+	        if (malformedIPLiteral) {
+	          parsed.error = parsed.error || 'URI host is malformed.';
+	          malformedAuthorityOrPort = true;
+	        }
 	      } else {
 	        isIP = true;
 	      }
@@ -15105,49 +15831,40 @@ function requireFastUri () {
 	    // find scheme handler
 	    const schemeHandler = getSchemeHandler(options.scheme || parsed.scheme);
 
-	    // check if scheme can't handle IRIs
-	    if (!options.unicodeSupport && (!schemeHandler || !schemeHandler.unicodeSupport)) {
-	      // if host component is a domain name
-	      if (parsed.host && (options.domainHost || (schemeHandler && schemeHandler.domainHost)) && isIP === false && nonSimpleDomain(parsed.host)) {
-	        // convert Unicode IDN -> ASCII IDN
-	        try {
-	          parsed.host = URL.domainToASCII(parsed.host.toLowerCase());
-	        } catch (e) {
-	          parsed.error = parsed.error || "Host's domain name can not be converted to ASCII: " + e;
-	        }
-	      }
-	      // convert IRI -> URI
+	    // convert Unicode IDN -> ASCII IDN when the effective scheme uses domain hosts
+	    if (!malformedIPLiteral) {
+	      malformedHost = canonicalizeHost(parsed, options, schemeHandler, isIP);
 	    }
 
 	    if (!schemeHandler || (schemeHandler && !schemeHandler.skipNormalize)) {
 	      if (uri.indexOf('%') !== -1) {
-	        if (parsed.scheme !== undefined) {
-	          parsed.scheme = unescape(parsed.scheme);
-	        }
-	        if (parsed.host !== undefined) {
-	          parsed.host = reescapeHostDelimiters(unescape(parsed.host), isIP);
+	        if (parsed.host !== undefined && !malformedIPLiteral) {
+	          const host = isIP ? parsed.host : normalizePercentEncoding(parsed.host, true);
+	          parsed.host = reescapeHostDelimiters(host, isIP);
 	        }
 	      }
 	      if (parsed.path) {
 	        parsed.path = normalizePathEncoding(parsed.path);
 	      }
+	      if (parsed.query) {
+	        parsed.query = normalizeQueryFragmentEncoding(parsed.query);
+	      }
 	      if (parsed.fragment) {
-	        try {
-	          parsed.fragment = encodeURI(decodeURIComponent(parsed.fragment));
-	        } catch {
-	          parsed.error = parsed.error || 'URI malformed';
-	        }
+	        parsed.fragment = normalizeQueryFragmentEncoding(parsed.fragment);
 	      }
 	    }
 
 	    // perform scheme specific parsing
 	    if (schemeHandler && schemeHandler.parse) {
 	      schemeHandler.parse(parsed, options);
+	      if (schemeHandler === SCHEMES.urn && parsed.nid === undefined) {
+	        malformedSchemeSpecific = true;
+	      }
 	    }
 	  } else {
 	    parsed.error = parsed.error || 'URI can not be parsed.';
 	  }
-	  return { parsed, malformedAuthorityOrPort }
+	  return { parsed, malformedAuthorityOrPort, malformedPercentEncoding, malformedSchemeSpecific, malformedHost, malformedScheme }
 	}
 
 	/**
@@ -15171,13 +15888,17 @@ function requireFastUri () {
 	/**
 	 * @param {string} uri
 	 * @param {import('./types/index').Options} [opts]
-	 * @returns {{ normalized: string, malformedAuthorityOrPort: boolean }}
+	 * @returns {{ normalized: string, malformedAuthorityOrPort: boolean, malformedPercentEncoding: boolean, malformedSchemeSpecific: boolean, malformedHost: boolean, malformedScheme: boolean }}
 	 */
 	function normalizeStringWithStatus (uri, opts) {
-	  const { parsed, malformedAuthorityOrPort } = parseWithStatus(uri, opts);
+	  const { parsed, malformedAuthorityOrPort, malformedPercentEncoding, malformedSchemeSpecific, malformedHost, malformedScheme } = parseWithStatus(uri, opts);
 	  return {
-	    normalized: malformedAuthorityOrPort ? uri : serialize(parsed, opts),
-	    malformedAuthorityOrPort
+	    normalized: malformedAuthorityOrPort || malformedPercentEncoding || malformedSchemeSpecific || malformedHost || malformedScheme ? uri : serialize(parsed, opts),
+	    malformedAuthorityOrPort,
+	    malformedPercentEncoding,
+	    malformedSchemeSpecific,
+	    malformedHost,
+	    malformedScheme
 	  }
 	}
 
@@ -15187,14 +15908,18 @@ function requireFastUri () {
 	 * @returns {string|undefined}
 	 */
 	function normalizeComparableURI (uri, opts) {
-	  if (typeof uri === 'string') {
-	    const { normalized, malformedAuthorityOrPort } = normalizeStringWithStatus(uri, opts);
-	    return malformedAuthorityOrPort ? undefined : normalized
+	  if (typeof uri !== 'string' && typeof uri !== 'object') {
+	    return undefined
 	  }
 
-	  if (typeof uri === 'object') {
-	    return serialize(uri, opts)
+	  let value;
+	  try {
+	    value = typeof uri === 'string' ? uri : serialize(uri, opts);
+	  } catch {
+	    return undefined
 	  }
+	  const { normalized, malformedAuthorityOrPort, malformedPercentEncoding, malformedSchemeSpecific, malformedHost, malformedScheme } = normalizeStringWithStatus(value, opts);
+	  return malformedAuthorityOrPort || malformedPercentEncoding || malformedSchemeSpecific || malformedHost || malformedScheme ? undefined : normalized
 	}
 
 	const fastUri$1 = {
@@ -15327,7 +16052,7 @@ function requireCore$1 () {
 		    constructor(opts = {}) {
 		        this.schemas = {};
 		        this.refs = {};
-		        this.formats = Object.create(null);
+		        this.formats = {};
 		        this._compilations = new Set();
 		        this._loading = {};
 		        this._cache = new Map();
@@ -33229,6 +33954,7 @@ function requireSyncWorkerHandler () {
 		let autoStarted = false;
 		let clientReady = false;
 		let stopped = false;
+		let closing;
 		let hasPendingInitialReady = false;
 		let pendingInitialReady;
 		const postMessage = options.postMessage || ((message) => {
@@ -33267,6 +33993,15 @@ function requireSyncWorkerHandler () {
 			}
 			if (message.type !== 'orange-sync-worker-request')
 				return;
+			if (message.method === 'close') {
+				try { await stop(); postResponse(message.id); }
+				catch (error) { postResponse(message.id, undefined, error); }
+				return;
+			}
+			if (stopped) {
+				postResponse(message.id, undefined, new Error('Sync worker handler closed.'));
+				return;
+			}
 			if (message.method === 'sync')
 				restartPendingRequestInterceptors();
 			const controller = createSyncAbortController();
@@ -33330,22 +34065,34 @@ function requireSyncWorkerHandler () {
 			syncEventUnsubscribers.delete(event);
 		}
 
-		async function stop() {
+		function stop() {
+			if (closing) return closing;
 			stopped = true;
+			closing = stopCore();
+			return closing;
+		}
+
+		async function stopCore() {
 			for (const controller of requestControllers.values())
 				controller.abort(syncAbortError(undefined, 'Sync worker handler stopped.'));
 			requestControllers.clear();
-			if (options.stopSyncClient !== false && typeof syncClient.stop === 'function')
-				await syncClient.stop();
-			for (const eject of interceptorEjectors)
-				eject();
-			interceptorEjectors.length = 0;
-			for (const entry of new Set(pendingInterceptorRequests.values()))
-				settleInterceptorRequest(entry, entry.reject, new Error('Sync worker interceptor bridge stopped.'));
-			pendingInterceptorRequests.clear();
-			for (const unsubscribe of syncEventUnsubscribers.values())
-				unsubscribe();
-			syncEventUnsubscribers.clear();
+			try {
+				if (options.stopSyncClient !== false) {
+					if (typeof syncClient.close === 'function') await syncClient.close();
+					else if (typeof syncClient.stop === 'function') await syncClient.stop();
+				}
+			}
+			finally {
+				for (const eject of interceptorEjectors)
+					eject();
+				interceptorEjectors.length = 0;
+				for (const entry of new Set(pendingInterceptorRequests.values()))
+					settleInterceptorRequest(entry, entry.reject, new Error('Sync worker interceptor bridge stopped.'));
+				pendingInterceptorRequests.clear();
+				for (const unsubscribe of syncEventUnsubscribers.values())
+					unsubscribe();
+				syncEventUnsubscribers.clear();
+			}
 		}
 
 		function handleClientReady() {
@@ -33375,6 +34122,7 @@ function requireSyncWorkerHandler () {
 		}
 
 		function postEvent(event, payload) {
+			if (stopped) return;
 			postMessage({
 				type: 'orange-sync-worker-event',
 				event,
@@ -35316,6 +36064,7 @@ function requireWorkerClient () {
 	const createInlineSqliteOPFSWorker = requireInlineWorker();
 	const connectWorkerPort = requireConnectWorkerPort();
 	const normalizeOpfsSahPoolOptions = requireNormalizeOpfsSahPoolOptions();
+	const ownedWorkerUrls = new WeakMap();
 
 	function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 		const requestedVfs = normalizeVfs(options.vfs);
@@ -35325,6 +36074,7 @@ function requireWorkerClient () {
 		const readonly = !!options.readonly;
 		const lane = readonly ? 'reader' : 'writer';
 		let closed = false;
+		let closing;
 		let openPromise;
 		let openInfo;
 
@@ -35545,13 +36295,12 @@ function requireWorkerClient () {
 		}
 
 		function close() {
-			if (closed)
-				return Promise.resolve();
+			if (closing) return closing;
 			closed = true;
 			const closeRequest = options.closeDbOnClose === false
 				? Promise.resolve()
 				: withTimeout(request('close'), 1000).catch(() => {});
-			return closeRequest.finally(() => {
+			closing = closeRequest.finally(() => {
 				worker.removeEventListener('message', onMessage);
 				worker.removeEventListener('error', onWorkerError);
 				worker.removeEventListener('messageerror', onWorkerError);
@@ -35560,7 +36309,10 @@ function requireWorkerClient () {
 					worker.terminate();
 				else if (typeof worker.close === 'function')
 					worker.close();
+				const url = ownedWorkerUrls.get(worker);
+				if (url) { URL.revokeObjectURL(url); ownedWorkerUrls.delete(worker); }
 			});
+			return closing;
 		}
 
 		function reset() {
@@ -35643,7 +36395,12 @@ function requireWorkerClient () {
 				const source = createWorkerSource(options.sqliteModuleUrl || getDefaultSqliteModuleUrl() || '@sqlite.org/sqlite-wasm');
 				const blob = new Blob([source], { type: 'text/javascript' });
 				const url = URL.createObjectURL(blob);
-				return new Worker(url, { type: 'module' });
+				try {
+					const worker = new Worker(url, { type: 'module' });
+					ownedWorkerUrls.set(worker, url);
+					return worker;
+				}
+				catch (error) { URL.revokeObjectURL(url); throw error; }
 			}
 			catch (e) {
 				throw new Error(`sqliteOPFS could not create its worker automatically: ${e.message}`);
@@ -36108,6 +36865,8 @@ function requireNewPool () {
 		let readClient;
 		let c = {};
 		let ended = false;
+		let closing;
+		let prewarmTimer;
 		let writerBusy = false;
 		const writerQueue = [];
 		let nextWriterQueueSeq = 1;
@@ -36141,6 +36900,7 @@ function requireNewPool () {
 		};
 
 		c.connectRead = function(cb, priority) {
+			if (ended) return cb(new Error('sqliteOPFS pool is closed.'), null, noop);
 			if (singleWorker)
 				return c.connect(cb, priority);
 			ensureReadClient();
@@ -36151,7 +36911,9 @@ function requireNewPool () {
 		};
 
 		c.end = function() {
+			if (closing) return closing;
 			ended = true;
+			clearTimeout(prewarmTimer);
 			rejectQueuedWriters();
 			const closes = [];
 			if (client.close)
@@ -36159,7 +36921,8 @@ function requireNewPool () {
 			if (readClient && readClient.close)
 				closes.push(readClient.close());
 			delete pools[id];
-			return Promise.all(closes).then(() => undefined);
+			closing = Promise.all(closes).then(() => undefined);
+			return closing;
 		};
 
 		pools[id] = c;
@@ -36170,7 +36933,8 @@ function requireNewPool () {
 				return;
 			if (poolOptions && poolOptions.prewarmRead === false)
 				return;
-			setTimeout(() => {
+			prewarmTimer = setTimeout(() => {
+				if (ended) return;
 				try {
 					ensureReadClient();
 					if (readClient.ready && typeof readClient.ready.catch === 'function')
@@ -36481,6 +37245,7 @@ function requireSyncWorkerClient () {
 	if (hasRequiredSyncWorkerClient) return syncWorkerClient;
 	hasRequiredSyncWorkerClient = 1;
 	const {
+		clearSyncOperationMemory,
 		finalizeSyncOperationMemory,
 		withSyncOperationMemory
 	} = requireOperationContext();
@@ -36504,6 +37269,7 @@ function requireSyncWorkerClient () {
 		let hasInitialReady = false;
 		let lastInitialReady;
 		let closed = false;
+		let closing;
 		let terminalError;
 
 		worker.addEventListener('message', onMessage);
@@ -36532,7 +37298,7 @@ function requireSyncWorkerClient () {
 		return client;
 
 		function request(method, ...args) {
-			if (closed)
+			if (closed && method !== 'close')
 				return Promise.reject(new Error('Sync worker client closed.'));
 			if (terminalError)
 				return Promise.reject(terminalError);
@@ -36568,6 +37334,7 @@ function requireSyncWorkerClient () {
 		}
 
 		function on(event, listener) {
+			if (closed) throw new Error('Sync worker client closed.');
 			if (typeof event !== 'string' || typeof listener !== 'function')
 				return () => {};
 			let eventListeners = listeners.get(event);
@@ -36611,27 +37378,30 @@ function requireSyncWorkerClient () {
 		}
 
 		function close() {
-			if (closed)
-				return;
+			if (closing) return closing;
 			closed = true;
+			clearSyncOperationMemory(client);
 			const closeError = new Error('Sync worker client closed.');
-			worker.removeEventListener('message', onMessage);
-			worker.removeEventListener('error', onWorkerError);
-			worker.removeEventListener('messageerror', onWorkerError);
 			for (const [id, entry] of pending) {
 				postCancel(id);
-				if (entry.timeoutId)
-					clearTimeout(entry.timeoutId);
+				if (entry.timeoutId) clearTimeout(entry.timeoutId);
 				entry.reject(closeError);
 			}
 			pending.clear();
 			listeners.clear();
 			hasInitialReady = false;
 			lastInitialReady = undefined;
-			if (typeof worker.terminate === 'function')
-				worker.terminate();
-			else if (typeof worker.close === 'function')
-				worker.close();
+			// Wait for rollback/storage work in the worker before terminating it.
+			closing = request('close').finally(() => {
+				worker.removeEventListener('message', onMessage);
+				worker.removeEventListener('error', onWorkerError);
+				worker.removeEventListener('messageerror', onWorkerError);
+				if (typeof worker.terminate === 'function') worker.terminate();
+				else if (typeof worker.close === 'function') worker.close();
+			});
+			// Older callers may ignore close's return value. Awaiting it still reports failure.
+			closing.catch(() => {});
+			return closing;
 		}
 
 		function onMessage(event) {
@@ -36639,10 +37409,12 @@ function requireSyncWorkerClient () {
 			if (!message || message.type === undefined)
 				return;
 			if (message.type === 'orange-sync-worker-interceptor-request') {
+				if (closed) return;
 				void handleInterceptorRequest(message);
 				return;
 			}
 			if (message.type === 'orange-sync-worker-event') {
+				if (closed) return;
 				const payload = deserializeEventPayload(message.payload);
 				if (message.event === 'initial-ready') {
 					hasInitialReady = true;
@@ -36688,24 +37460,24 @@ function requireSyncWorkerClient () {
 
 		function emit(event, payload) {
 			if (event === 'operation') {
-				payload = withSyncOperationMemory(payload);
+				payload = withSyncOperationMemory(payload, client);
 				try {
 					emitToListeners('operation', payload);
 					if (payload && typeof payload.operation === 'string')
 						emitToListeners(`operation:${payload.operation}`, payload);
 				}
 				finally {
-					finalizeSyncOperationMemory(payload);
+					finalizeSyncOperationMemory(payload, client);
 				}
 				return;
 			}
 			if (event && event.startsWith && event.startsWith('operation:')) {
-				payload = withSyncOperationMemory(payload);
+				payload = withSyncOperationMemory(payload, client);
 				try {
 					emitToListeners(event, payload);
 				}
 				finally {
-					finalizeSyncOperationMemory(payload);
+					finalizeSyncOperationMemory(payload, client);
 				}
 				return;
 			}
@@ -36713,11 +37485,14 @@ function requireSyncWorkerClient () {
 		}
 
 		function emitToListeners(event, payload) {
+			if (closed) return;
 			const eventListeners = listeners.get(event);
 			if (!eventListeners)
 				return;
-			for (const listener of Array.from(eventListeners))
+			for (const listener of Array.from(eventListeners)) {
+				if (closed) break;
 				callListener(listener, payload);
+			}
 		}
 
 		function callListener(listener, payload) {
@@ -36943,6 +37718,8 @@ var hasRequiredDualSyncDatabase;
 function requireDualSyncDatabase () {
 	if (hasRequiredDualSyncDatabase) return dualSyncDatabase.exports;
 	hasRequiredDualSyncDatabase = 1;
+	const { clearSyncOperationMemory } = requireOperationContext();
+	const createSyncLifecycle = requireSyncLifecycle();
 	const hostLocal = requireHostLocal();
 	const express = requireHostExpress();
 	const hono = requireHostHono();
@@ -36954,6 +37731,9 @@ function requireDualSyncDatabase () {
 	const { createSyncAuto, syncAutoStartSymbol } = requireSyncAuto();
 	const {
 		awaitWithSyncAbort,
+		awaitSyncWork,
+		trackSyncWork,
+		syncAbortError,
 		isSyncAbortError,
 		syncAbortSignalSymbol,
 		throwIfSyncAborted
@@ -37003,6 +37783,10 @@ function requireDualSyncDatabase () {
 		: '__orangeOrmDualSyncFaultInjector';
 
 	function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase) {
+		const lifecycle = createSyncLifecycle();
+		let syncAuto;
+		let closing;
+		const roleUnsubscribers = new Set();
 		const roleConnectionStrings = {
 			[roleA]: connectionString,
 			[roleB]: appendRoleSuffix(connectionString, 'b')
@@ -37076,6 +37860,7 @@ function requireDualSyncDatabase () {
 		return router;
 
 		function transaction(options, fn) {
+			lifecycle.assertOpen();
 			if ((arguments.length === 1) && (typeof options === 'function')) {
 				fn = options;
 				options = undefined;
@@ -37087,6 +37872,7 @@ function requireDualSyncDatabase () {
 		}
 
 		function createTransaction(options) {
+			lifecycle.assertOpen();
 			let releaseRead = () => {};
 			let readReleased = false;
 			const transactionPromise = Promise.resolve()
@@ -37125,40 +37911,35 @@ function requireDualSyncDatabase () {
 		}
 
 		function query(sql, options) {
+			lifecycle.assertOpen();
 			return runSyncRead(router,
 				() => getActiveReadyDb().then(db => db.query(sql, options))
 			);
 		}
 
 		function sqliteFunction(...args) {
+			lifecycle.assertOpen();
 			return runSyncRead(router,
 				() => getActiveReadyDb().then(db => db.sqliteFunction(...args))
 			);
 		}
 
-		async function end() {
-			if (managedSyncClient) {
-				try {
-					await managedSyncClient.stop();
-				}
-				catch (_e) {
-					// Continue closing the SQLite workers after a failed or already closed sync worker.
-				}
-				if (typeof managedSyncClient.close === 'function')
-					managedSyncClient.close();
-			}
-			const closes = [];
-			for (const db of dbByRole.values()) {
-				if (db && typeof db.end === 'function')
-					closes.push(db.end());
-			}
-			if (cacheDb && typeof cacheDb.end === 'function')
-				closes.push(cacheDb.end());
-			if (externalSyncUnsubscribe)
-				externalSyncUnsubscribe();
-			if (manifestChannel && typeof manifestChannel.close === 'function')
-				manifestChannel.close();
-			await Promise.all(closes);
+		function end() {
+			if (closing) return closing;
+			const stopped = lifecycle.close(() => syncAuto && syncAuto.stop());
+			eventListeners.clear();
+			if (externalSyncClient) clearSyncOperationMemory(externalSyncClient);
+			closing = (async () => {
+				await stopped;
+				if (managedSyncClient) await managedSyncClient.close();
+				for (const unsubscribe of roleUnsubscribers) unsubscribe();
+				roleUnsubscribers.clear();
+				for (const client of clientByRole.values()) await client.syncClient.close();
+				if (externalSyncUnsubscribe) externalSyncUnsubscribe();
+				if (manifestChannel) manifestChannel.close();
+				await Promise.all([...dbByRole.values(), cacheDb].filter(Boolean).map(db => db.end()));
+			})();
+			return closing;
 		}
 
 		function accept(caller) {
@@ -37166,6 +37947,7 @@ function requireDualSyncDatabase () {
 		}
 
 		function __createSyncClient(rootClient, _getDb, httpInterceptor) {
+			lifecycle.assertOpen();
 			if (isManagedSyncWorkerEnabled(poolOptions && poolOptions.sync)) {
 				if (!managedSyncClient) {
 					managedSyncClient = createManagedSyncWorkerClient({
@@ -37184,26 +37966,27 @@ function requireDualSyncDatabase () {
 			}
 			roleClientFactory = rootClient;
 			roleHttpInterceptor = httpInterceptor;
-			const auto = createSyncAuto(
+			const auto = syncAuto = createSyncAuto(
 				{ sync: syncObserved },
 				async () => router.__sqliteSync,
 				{ runSync: syncAutomatic }
 			);
 			const syncClient = {
 				sync: syncObserved,
-				ensureLocalSchema,
-				resetLocal,
-				start: auto.start,
-				stop: auto.stop,
+				ensureLocalSchema: options => lifecycle.run(ensureLocalSchema, options, true),
+				resetLocal: options => lifecycle.run(resetLocal, options, true),
+				start: options => lifecycle.start(auto.start, options),
+				stop: () => lifecycle.stop(auto.stop),
+				close: end,
 				isRunning: auto.isRunning,
 				on,
 				off,
 				once,
-				waitForInitialSync,
+				waitForInitialSync: options => lifecycle.run(waitForInitialSync, options),
 				interceptors: syncInterceptors
 			};
 			Object.defineProperty(syncClient, syncAutoStartSymbol, {
-				value: auto.startFromConfig
+				value: options => lifecycle.run(auto.startFromConfig, options)
 			});
 			Object.defineProperty(syncClient, ensureLocalSchemaReadySymbol, {
 				value: ensureActiveLocalSchemaReady
@@ -37212,13 +37995,13 @@ function requireDualSyncDatabase () {
 		}
 
 		function syncObserved(options = {}) {
-			return coalesceSync(normalizeSyncOptions(options));
+			return lifecycle.run(bound => coalesceSync(normalizeSyncOptions(bound)), options);
 		}
 
 		function syncAutomatic(config, syncOptions) {
-			return coalesceSync(normalizeSyncOptions(syncOptions), {
+			return lifecycle.run(bound => coalesceSync(normalizeSyncOptions(bound), {
 				minimumIntervalMs: normalizeAutoSyncIntervalMs(config && config.intervalMs)
-			});
+			}), syncOptions);
 		}
 
 		function coalesceSync(normalizedOptions, schedule = {}) {
@@ -37252,6 +38035,10 @@ function requireDualSyncDatabase () {
 			pendingSyncRequest = null;
 			if (!pending)
 				return;
+			if (!lifecycle.active) {
+				pending.reject(syncAbortError());
+				return;
+			}
 			const nextRun = startSyncRun(pending.normalizedOptions, pending.schedule);
 			nextRun.then(pending.resolve, pending.reject);
 		}
@@ -37278,9 +38065,7 @@ function requireDualSyncDatabase () {
 			const timeoutMs = Math.max(pendingTimeoutMs || 0, requestedTimeoutMs || 0);
 			const pendingSignal = pending.normalizedOptions[syncAbortSignalSymbol];
 			const requestedSignal = normalizedOptions[syncAbortSignalSymbol];
-			const signal = pendingSignal && pendingSignal === requestedSignal
-				? pendingSignal
-				: undefined;
+			const signal = pendingSignal || requestedSignal;
 			pending.normalizedOptions = timeoutMs > 0 ? { timeoutMs } : {};
 			if (signal)
 				pending.normalizedOptions[syncAbortSignalSymbol] = signal;
@@ -37297,7 +38082,7 @@ function requireDualSyncDatabase () {
 				leftQueue = true;
 				queuedSyncCount = Math.max(0, queuedSyncCount - 1);
 				emitSyncProgress('waiting-for-sync-lock', { queueDepth: queuedSyncCount });
-				return awaitWithSyncAbort(observe('sync', () => runWithCrossTabLock(
+				return awaitSyncWork(observe('sync', () => runWithCrossTabLock(
 					dualSyncLockName,
 					toDualSyncLockConfig(poolOptions && poolOptions.sync, normalizedOptions),
 					() => {
@@ -37439,7 +38224,7 @@ function requireDualSyncDatabase () {
 			let deferred;
 
 			emitSyncProgress('waiting-for-write-barrier', { activeRole, stagingRole });
-			await awaitWithSyncAbort(runSyncSwap(router, async () => {
+			await awaitSyncWork(runSyncSwap(router, async () => {
 				throwIfSyncAborted(signal);
 				const currentManifest = await getManifest(true);
 				assertExpectedManifest(currentManifest, manifest);
@@ -37568,7 +38353,7 @@ function requireDualSyncDatabase () {
 			let replayKind = recovery && recovery.replayKind;
 			let publishedManifest;
 			emitSyncProgress('publishing-data-ready', { activeRole, stagingRole });
-			await awaitWithSyncAbort(runSyncSwap(router, async () => {
+			await awaitSyncWork(runSyncSwap(router, async () => {
 				throwIfSyncAborted(signal);
 				const currentManifest = await getManifest(true);
 				assertExpectedManifest(currentManifest, manifest);
@@ -37740,7 +38525,7 @@ function requireDualSyncDatabase () {
 			throwIfSyncAborted(signal);
 
 			let readyManifest;
-			await awaitWithSyncAbort(runSyncSwap(router, async () => {
+			await awaitSyncWork(runSyncSwap(router, async () => {
 				throwIfSyncAborted(signal);
 				const currentManifest = await getManifest(true);
 				if (currentManifest.activeRole !== activeRole
@@ -38130,7 +38915,7 @@ function requireDualSyncDatabase () {
 
 			let publishedManifest;
 			let cloneMs = 0;
-			await awaitWithSyncAbort(runSyncSwap(router, async () => {
+			await awaitSyncWork(runSyncSwap(router, async () => {
 				throwIfSyncAborted(signal);
 				const currentManifest = await getManifest(true);
 				assertExpectedManifest(currentManifest, manifest);
@@ -38420,26 +39205,27 @@ function requireDualSyncDatabase () {
 			return { reset: true, ...manifest };
 		}
 
-		async function waitForInitialSync() {
+		async function waitForInitialSync(options = {}) {
+			const signal = options[syncAbortSignalSymbol];
 			const manifest = await getManifest();
-			if (await roleIsInitialReady(manifest.activeRole))
-				return;
-			return new Promise((resolve) => {
-				const unsubscribe = once('initial-ready', () => {
-					unsubscribe();
-					resolve();
-				});
-				void Promise.resolve().then(async () => {
-					const current = await getManifest(true);
-					if (!await roleIsInitialReady(current.activeRole))
-						return;
-					unsubscribe();
-					resolve();
-				}).catch(() => {});
-			});
+			if (await roleIsInitialReady(manifest.activeRole)) return;
+			throwIfSyncAborted(signal);
+			let unsubscribe;
+			try {
+				return await awaitWithSyncAbort(new Promise(resolve => {
+					unsubscribe = once('initial-ready', resolve);
+					trackSyncWork(Promise.resolve().then(async () => {
+						throwIfSyncAborted(signal);
+						const current = await getManifest(true);
+						if (await roleIsInitialReady(current.activeRole)) resolve();
+					}).catch(() => {}), signal);
+				}), signal);
+			}
+			finally { if (unsubscribe) unsubscribe(); }
 		}
 
 		function on(event, listener) {
+			lifecycle.assertOpen();
 			if (typeof event !== 'string' || typeof listener !== 'function')
 				return () => {};
 			let listeners = eventListeners.get(event);
@@ -38450,7 +39236,7 @@ function requireDualSyncDatabase () {
 			}
 			listeners.add(listener);
 			if (event === 'initial-ready')
-				void maybeEmitInitialReadyFromActive();
+				void lifecycle.run(maybeEmitInitialReadyFromActive).catch(() => {});
 			return () => off(event, listener);
 		}
 
@@ -38495,10 +39281,12 @@ function requireDualSyncDatabase () {
 		}
 
 		function emit(event, payload) {
+			if (!lifecycle.active) return;
 			const listeners = eventListeners.get(event);
 			if (!listeners)
 				return;
 			for (const listener of Array.from(listeners)) {
+				if (!lifecycle.active) break;
 				try {
 					listener(payload);
 				}
@@ -38517,7 +39305,7 @@ function requireDualSyncDatabase () {
 					continue;
 				const syncClient = clientByRole.get(role)?.syncClient;
 				if (syncClient && typeof syncClient.on === 'function') {
-					syncClient.on(event, payload => emit(event, payload));
+					roleUnsubscribers.add(syncClient.on(event, payload => emit(event, payload)));
 					roleEventSubscriptions.add(key);
 				}
 			}
@@ -38767,7 +39555,7 @@ function requireDualSyncDatabase () {
 					getDb,
 					roleHttpInterceptor,
 					syncInterceptors,
-					{ fileSnapshotRollback: true }
+					{ fileSnapshotRollback: true, operationMemoryScope: externalSyncClient }
 				);
 				clientByRole.set(role, roleClient);
 				for (const event of eventListeners.keys())
@@ -38777,7 +39565,7 @@ function requireDualSyncDatabase () {
 		}
 
 		function warmManifest() {
-			return getManifest().catch(() => {});
+			return lifecycle.run(() => getManifest(), {}, true).catch(() => {});
 		}
 
 		function attachExternalSyncClient(syncClient, rootClient, httpInterceptor) {
@@ -39710,7 +40498,7 @@ function requireDualSyncDatabase () {
 		const configured = sync && sync === Object(sync) && !Array.isArray(sync)
 			? sync.crossTabLock
 			: undefined;
-		const config = normalizeCrossTabLockConfig(configured);
+		const config = { ...normalizeCrossTabLockConfig(configured), signal: options && options[syncAbortSignalSymbol] };
 		const timeoutMs = normalizeTimeoutMs(options && options.timeoutMs);
 		if (!timeoutMs || config.timeoutMs)
 			return config;

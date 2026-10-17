@@ -2,6 +2,17 @@ const syncAbortSignalSymbol = typeof Symbol === 'function'
 	? Symbol.for('orange-orm.syncClient.abortSignal')
 	: '__orangeOrmSyncClientAbortSignal';
 const syncAbortCode = 'ORANGE_SYNC_ABORT';
+const syncWorkTrackerSymbol = Symbol('syncWorkTracker');
+
+function trackSyncWork(value, signal) {
+	return signal && signal[syncWorkTrackerSymbol]
+		? signal[syncWorkTrackerSymbol](value)
+		: Promise.resolve(value);
+}
+
+function awaitSyncWork(value, signal) {
+	return awaitWithSyncAbort(trackSyncWork(value, signal), signal);
+}
 
 function createSyncAbortController() {
 	if (typeof AbortController === 'function')
@@ -35,7 +46,7 @@ function createSyncAbortController() {
 }
 
 function syncAbortError(reason, fallbackMessage = 'Sync stopped.') {
-	const error = reason instanceof Error
+	let error = reason instanceof Error
 		? reason
 		: new Error(typeof reason === 'string' && reason.length > 0 ? reason : fallbackMessage);
 	if (!(reason instanceof Error))
@@ -44,7 +55,14 @@ function syncAbortError(reason, fallbackMessage = 'Sync stopped.') {
 		error.code = syncAbortCode;
 	}
 	catch (_error) {
-		// Built-in error objects are writable in supported runtimes; retain the AbortError fallback otherwise.
+		// DOMException.code is read-only; preserve it as the cause, not our marker.
+	}
+	if (error.code !== syncAbortCode) {
+		const cause = error;
+		error = new Error(cause.message);
+		error.name = 'AbortError';
+		error.code = syncAbortCode;
+		error.cause = cause;
 	}
 	return error;
 }
@@ -81,6 +99,9 @@ function isSyncAbortError(error) {
 }
 
 module.exports = {
+	awaitSyncWork,
+	trackSyncWork,
+	syncWorkTrackerSymbol,
 	awaitWithSyncAbort,
 	createSyncAbortController,
 	isSyncAbortError,

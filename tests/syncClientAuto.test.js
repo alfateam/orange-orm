@@ -231,7 +231,6 @@ describe('sync client auto start', () => {
 		const db = { __sqliteSync: { url: '/rdb', auto: false, tables: ['customer'] } };
 		const client = newSyncClient({}, async () => db, {});
 		await new Promise((resolve) => setTimeout(resolve, 0));
-		await client.stop();
 		const events = [];
 		client.on('error', (payload) => events.push(['error', payload.method, payload.error.message]));
 		client.once('sync-error', (payload) => events.push(['sync-error', payload.method, payload.error.message]));

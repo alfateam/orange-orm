@@ -46,6 +46,53 @@ afterEach(async () => {
 });
 
 describe('sqliteOPFS dual sync integration', () => {
+	test('switches accounts with isolated snapshots, checkpoints and a preserved offline outbox', async () => {
+		const fixture = await createDualIntegrationFixture('accounts', [
+			{ id: 'a-old', title: 'A private' }, { id: 'b-old', title: 'B private' }
+		], {}, true);
+		const a = fixture.openLocal('a');
+		await a.localDb.syncClient.sync();
+		expect((await a.localDb.project.getMany()).map(x => x.id)).toEqual(['a-old']);
+		await a.localDb.project.insert({ id: 'a-draft', title: 'A offline draft' });
+		const checkpointA = await a.localDb.query('SELECT * FROM orange_sync_state');
+		const entered = deferred(), release = deferred();
+		let eventsA = 0;
+		a.localDb.syncClient.on('sync', () => { eventsA++; });
+		a.localDb.syncClient.interceptors.request.use(async config => {
+			entered.resolve();
+			await release.promise;
+			return config;
+		});
+		const active = a.localDb.syncClient.sync();
+		await entered.promise;
+		const outcomes = Promise.allSettled([active, a.localDb.syncClient.sync(), a.localDb.syncClient.sync()]);
+		await a.close();
+		expect((await outcomes).every(x => x.status === 'rejected')).toBe(true);
+		await expect(a.localDb.syncClient.sync()).rejects.toThrow('closed');
+		await expect(a.localDb.project.getMany()).rejects.toThrow(/closed/);
+
+		const b = fixture.openLocal('b');
+		await b.localDb.syncClient.sync();
+		// B's row predates A's checkpoint; B must bootstrap rather than inherit it.
+		expect((await b.localDb.project.getMany()).map(x => x.id)).toEqual(['b-old']);
+		expect(await fixture.remoteDb.project.getById('a-draft')).toBeUndefined();
+		release.resolve();
+		await new Promise(resolve => setImmediate(resolve));
+		expect(eventsA).toBe(0);
+		await b.close();
+
+		const reopenedA = fixture.openLocal('a');
+		expect(await reopenedA.localDb.query('SELECT * FROM orange_sync_state')).toEqual(checkpointA);
+		expect((await reopenedA.localDb.project.getMany()).map(x => x.id).sort()).toEqual(['a-draft', 'a-old']);
+		expect(await reopenedA.localDb.query('SELECT mutation_id FROM orange_sync_outbox WHERE status = \'pending\'')).toHaveLength(1);
+		await reopenedA.localDb.syncClient.sync();
+		expect((await fixture.remoteDb.project.getById('a-draft')).title).toBe('A offline draft');
+		expect((await reopenedA.localDb.project.getMany()).map(x => x.id).sort()).toEqual(['a-draft', 'a-old']);
+		await reopenedA.close();
+		const reopenedB = fixture.openLocal('b');
+		expect((await reopenedB.localDb.project.getMany()).map(x => x.id)).toEqual(['b-old']);
+	}, 30000);
+
 	test('publishes complete data before building the inactive data-first replica', async () => {
 		const rows = Array.from({ length: 1205 }, (_item, index) => ({
 			id: `data-first-${String(index + 1).padStart(4, '0')}`,
@@ -712,7 +759,9 @@ describe('sqliteOPFS dual sync integration', () => {
 
 			expect(automaticRequests).toBe(0);
 
+			await secondLocalDb.syncClient.start();
 			await secondLocalDb.syncClient.sync();
+			await secondLocalDb.syncClient.stop();
 			expect(automaticRequests).toBeGreaterThan(0);
 			const completionRows = await deltaDb.query(
 				'SELECT "last_successful_sync_at_ms" FROM "orange_sync_dual_manifest" WHERE "id" = \'default\''
@@ -1021,7 +1070,7 @@ describe('sqliteOPFS dual sync integration', () => {
 	}, 30000);
 });
 
-async function createDualIntegrationFixture(name, rows, syncOverrides = {}) {
+async function createDualIntegrationFixture(name, rows, syncOverrides = {}, accounts = false) {
 	const remoteDb = map({
 		db: con => con.pglite(undefined, { size: 1 })
 	});
@@ -1040,7 +1089,10 @@ async function createDualIntegrationFixture(name, rows, syncOverrides = {}) {
 			keyRequests.push(request.body.token || null);
 		next();
 	});
-	app.use('/rdb', remoteDb.express({ sync: true }));
+	app.use('/rdb', remoteDb.express(accounts ? {
+		project: { baseFilter: (db, req) => db.project.id.startsWith(`${req.headers['x-account']}-`) },
+		sync: true
+	} : { sync: true }));
 	const server = await listen(app);
 	closeTasks.push(() => closeServer(server));
 	const directory = fs.mkdtempSync(path.join(os.tmpdir(), `orange-dual-${name}-`));
@@ -1055,11 +1107,15 @@ async function createDualIntegrationFixture(name, rows, syncOverrides = {}) {
 	};
 	return { connectionString, keyRequests, openLocal, remoteDb, sync };
 
-	function openLocal() {
-		const dualDb = newDualSyncDatabase(connectionString, { sync }, (roleConnectionString, options) =>
+	function openLocal(account) {
+		const accountFile = account ? path.join(directory, `${account}.sqlite3`) : connectionString;
+		const dualDb = newDualSyncDatabase(accountFile, { sync }, (roleConnectionString, options) =>
 			newSqliteDatabase(roleConnectionString, { ...options, size: 1 })
 		);
 		const localDb = map({ db: () => dualDb });
+		if (account) localDb.syncClient.interceptors.request.use(config => ({
+			...config, headers: { ...config.headers, 'x-account': account }
+		}));
 		const close = onceAsync(() => localDb.close());
 		closeTasks.push(close);
 		return { close, dualDb, localDb };

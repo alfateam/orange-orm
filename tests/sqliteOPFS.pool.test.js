@@ -120,7 +120,12 @@ describe('sqliteOPFS pool', () => {
 			}
 		});
 
-		await pool.end();
+		const closing = pool.end();
+		expect(pool.end()).toBe(closing);
+		await closing;
+		let readError;
+		pool.connectRead(error => { readError = error; });
+		expect(readError.message).toContain('closed');
 
 		expect(messages.map(x => x.method)).toEqual(['open', 'close']);
 		expect(terminated).toBe(true);

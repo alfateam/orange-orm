@@ -5,7 +5,21 @@ const setSessionSingleton = require('../table/setSessionSingleton');
 
 const sessionKey = 'syncTransactionContext';
 const captureKey = 'syncOutboxCapture';
-const memoryByMutationId = new Map();
+const memoryByScope = new WeakMap();
+const defaultMemoryScope = {};
+
+function operationMemory(scope = defaultMemoryScope) {
+	let memory = memoryByScope.get(scope);
+	if (!memory) {
+		memory = new Map();
+		memoryByScope.set(scope, memory);
+	}
+	return memory;
+}
+
+function clearSyncOperationMemory(scope) {
+	memoryByScope.delete(scope);
+}
 
 function createSyncTransactionContext(context, memory) {
 	return {
@@ -101,27 +115,27 @@ function serializeSyncPayload(context) {
 	}
 }
 
-function registerSyncOperationMemory(mutationId, memory) {
+function registerSyncOperationMemory(mutationId, memory, scope) {
 	if (typeof mutationId !== 'string' || mutationId.length === 0 || memory === undefined)
 		return;
-	memoryByMutationId.set(mutationId, memory);
+	operationMemory(scope).set(mutationId, memory);
 }
 
-function getSyncOperationMemory(mutationId) {
+function getSyncOperationMemory(mutationId, scope) {
 	if (typeof mutationId !== 'string')
 		return undefined;
-	return memoryByMutationId.get(mutationId);
+	return operationMemory(scope).get(mutationId);
 }
 
-function deleteSyncOperationMemory(mutationId) {
+function deleteSyncOperationMemory(mutationId, scope) {
 	if (typeof mutationId === 'string')
-		memoryByMutationId.delete(mutationId);
+		operationMemory(scope).delete(mutationId);
 }
 
-function withSyncOperationMemory(event) {
+function withSyncOperationMemory(event, scope) {
 	if (!event || !event.mutationId || event.memory !== undefined)
 		return event;
-	const memory = getSyncOperationMemory(event.mutationId);
+	const memory = getSyncOperationMemory(event.mutationId, scope);
 	if (memory === undefined)
 		return event;
 	return {
@@ -130,11 +144,11 @@ function withSyncOperationMemory(event) {
 	};
 }
 
-function finalizeSyncOperationMemory(event) {
+function finalizeSyncOperationMemory(event, scope) {
 	if (!event || !event.mutationId)
 		return;
 	if (event.ok || event.retryable === false)
-		deleteSyncOperationMemory(event.mutationId);
+		deleteSyncOperationMemory(event.mutationId, scope);
 }
 
 async function updateOutboxOperationColumns(context, state, metadata) {
@@ -185,6 +199,7 @@ function sqlNullableStringLiteral(value) {
 }
 
 module.exports = {
+	clearSyncOperationMemory,
 	createSyncTransactionContext,
 	deleteSyncOperationMemory,
 	finalizeSyncOperationMemory,

@@ -24,6 +24,7 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 	let autoStarted = false;
 	let clientReady = false;
 	let stopped = false;
+	let closing;
 	let hasPendingInitialReady = false;
 	let pendingInitialReady;
 	const postMessage = options.postMessage || ((message) => {
@@ -62,6 +63,15 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 		}
 		if (message.type !== 'orange-sync-worker-request')
 			return;
+		if (message.method === 'close') {
+			try { await stop(); postResponse(message.id); }
+			catch (error) { postResponse(message.id, undefined, error); }
+			return;
+		}
+		if (stopped) {
+			postResponse(message.id, undefined, new Error('Sync worker handler closed.'));
+			return;
+		}
 		if (message.method === 'sync')
 			restartPendingRequestInterceptors();
 		const controller = createSyncAbortController();
@@ -125,22 +135,34 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 		syncEventUnsubscribers.delete(event);
 	}
 
-	async function stop() {
+	function stop() {
+		if (closing) return closing;
 		stopped = true;
+		closing = stopCore();
+		return closing;
+	}
+
+	async function stopCore() {
 		for (const controller of requestControllers.values())
 			controller.abort(syncAbortError(undefined, 'Sync worker handler stopped.'));
 		requestControllers.clear();
-		if (options.stopSyncClient !== false && typeof syncClient.stop === 'function')
-			await syncClient.stop();
-		for (const eject of interceptorEjectors)
-			eject();
-		interceptorEjectors.length = 0;
-		for (const entry of new Set(pendingInterceptorRequests.values()))
-			settleInterceptorRequest(entry, entry.reject, new Error('Sync worker interceptor bridge stopped.'));
-		pendingInterceptorRequests.clear();
-		for (const unsubscribe of syncEventUnsubscribers.values())
-			unsubscribe();
-		syncEventUnsubscribers.clear();
+		try {
+			if (options.stopSyncClient !== false) {
+				if (typeof syncClient.close === 'function') await syncClient.close();
+				else if (typeof syncClient.stop === 'function') await syncClient.stop();
+			}
+		}
+		finally {
+			for (const eject of interceptorEjectors)
+				eject();
+			interceptorEjectors.length = 0;
+			for (const entry of new Set(pendingInterceptorRequests.values()))
+				settleInterceptorRequest(entry, entry.reject, new Error('Sync worker interceptor bridge stopped.'));
+			pendingInterceptorRequests.clear();
+			for (const unsubscribe of syncEventUnsubscribers.values())
+				unsubscribe();
+			syncEventUnsubscribers.clear();
+		}
 	}
 
 	function handleClientReady() {
@@ -170,6 +192,7 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 	}
 
 	function postEvent(event, payload) {
+		if (stopped) return;
 		postMessage({
 			type: 'orange-sync-worker-event',
 			event,

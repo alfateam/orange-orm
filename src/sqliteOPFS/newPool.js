@@ -14,6 +14,8 @@ function newPool(connectionString, poolOptions) {
 	let readClient;
 	let c = {};
 	let ended = false;
+	let closing;
+	let prewarmTimer;
 	let writerBusy = false;
 	const writerQueue = [];
 	let nextWriterQueueSeq = 1;
@@ -47,6 +49,7 @@ function newPool(connectionString, poolOptions) {
 	};
 
 	c.connectRead = function(cb, priority) {
+		if (ended) return cb(new Error('sqliteOPFS pool is closed.'), null, noop);
 		if (singleWorker)
 			return c.connect(cb, priority);
 		ensureReadClient();
@@ -57,7 +60,9 @@ function newPool(connectionString, poolOptions) {
 	};
 
 	c.end = function() {
+		if (closing) return closing;
 		ended = true;
+		clearTimeout(prewarmTimer);
 		rejectQueuedWriters();
 		const closes = [];
 		if (client.close)
@@ -65,7 +70,8 @@ function newPool(connectionString, poolOptions) {
 		if (readClient && readClient.close)
 			closes.push(readClient.close());
 		delete pools[id];
-		return Promise.all(closes).then(() => undefined);
+		closing = Promise.all(closes).then(() => undefined);
+		return closing;
 	};
 
 	pools[id] = c;
@@ -76,7 +82,8 @@ function newPool(connectionString, poolOptions) {
 			return;
 		if (poolOptions && poolOptions.prewarmRead === false)
 			return;
-		setTimeout(() => {
+		prewarmTimer = setTimeout(() => {
+			if (ended) return;
 			try {
 				ensureReadClient();
 				if (readClient.ready && typeof readClient.ready.catch === 'function')
