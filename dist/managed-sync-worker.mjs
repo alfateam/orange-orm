@@ -2315,9 +2315,12 @@ function requireSyncSchema () {
 
 		await ensureSchemaStateTable(db);
 		const existing = await readSchemaState(db, scope);
+		// A table-set change creates a new checkpoint scope. It must not conceal a
+		// simultaneous column change in a table that already exists locally.
+		if (!existing) await checkPreviousTableSchemas(db, schema);
 		const shouldUpdateState = !existing || existing.checksum !== checksum;
 		if (existing && existing.checksum !== checksum && !isIndexOnlySchemaChange(existing.schemaJson, schema))
-			throw new Error('Local sync schema does not match current map. Reset the local sync database or run a migration before syncing.');
+			throw schemaMismatch();
 		if (existing && existing.checksum === checksum) {
 			markSchemaEnsured(db, ensuredKey);
 			return { scope, schema, checksum, sql: sql.statements };
@@ -2339,6 +2342,34 @@ function requireSyncSchema () {
 
 		markSchemaEnsured(db, ensuredKey);
 		return { scope, schema, checksum, sql: sql.statements };
+	}
+
+	function schemaMismatch() {
+		return Object.assign(new Error('Local sync schema does not match current map. Reset the local sync database or run a migration before syncing.'), {
+			code: 'ORANGE_SYNC_SCHEMA_MISMATCH'
+		});
+	}
+
+	async function checkPreviousTableSchemas(db, schema) {
+		const rows = await db.query(`SELECT "schema_json" FROM ${quoteIdent(schemaStateTable)} ORDER BY "updated_at_ms" DESC`);
+		const list = Array.isArray(rows) ? rows : rows && rows.rows || [];
+		const unchecked = new Map(schema.tables.map(table => [table.dbName, table]));
+		for (const row of list) {
+			let previous;
+			try { previous = JSON.parse(row.schema_json ?? row.SCHEMA_JSON); }
+			catch (_e) { throw schemaMismatch(); }
+			for (const table of previous.tables || []) {
+				const next = unchecked.get(table.dbName);
+				if (!next) continue;
+				// Relations can gain foreign keys when their target table joins the
+				// scope. Compare the table's own columns and key, not scope metadata.
+				for (const key of ['columns', 'primaryKey']) {
+					if (stableStringify(table[key]) !== stableStringify(next[key]))
+						throw schemaMismatch();
+				}
+				unchecked.delete(table.dbName);
+			}
+		}
 	}
 
 	function isSchemaEnsured(db, key) {
@@ -4229,6 +4260,9 @@ function requireSyncClient () {
 	const setClientIdSymbol = typeof Symbol === 'function'
 		? Symbol.for('orange-orm.syncClient.setClientId')
 		: '__orangeOrmSyncClientSetClientId';
+	const drainOutboxBeforeResetSymbol = typeof Symbol === 'function'
+		? Symbol.for('orange-orm.syncClient.drainOutboxBeforeReset')
+		: '__orangeOrmSyncClientDrainOutboxBeforeReset';
 
 	function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, internalOptions = {}) {
 		const lifecycle = createSyncLifecycle();
@@ -4257,6 +4291,7 @@ function requireSyncClient () {
 		const serializeSyncWork = createAsyncSerializer();
 		const queuedSync = serializeSyncWork(lockedSync);
 		const queuedEnsureLocalSchema = serializeSyncWork(lockedEnsureLocalSchema);
+		const queuedRecoverLocalSchema = serializeSyncWork(withCrossTabSyncLock(recoverLocalSchema));
 		const observedSync = observeSyncMethod('sync', queuedSync);
 		const auto = createSyncAuto({
 			sync: options => lifecycle.run(observedSync, options)
@@ -4266,6 +4301,7 @@ function requireSyncClient () {
 			sync: options => lifecycle.run(observedSync, options),
 			ensureLocalSchema: options => lifecycle.run(queuedEnsureLocalSchema, options, true),
 			resetLocal: options => lifecycle.run(lockedResetLocal, options, true),
+			recoverLocalSchema: options => lifecycle.run(queuedRecoverLocalSchema, options, true),
 			start: options => lifecycle.start(auto.start, options),
 			stop: () => lifecycle.stop(auto.stop),
 			close,
@@ -4305,6 +4341,9 @@ function requireSyncClient () {
 		});
 		Object.defineProperty(syncClientApi, setClientIdSymbol, {
 			value: setSharedClientId
+		});
+		Object.defineProperty(syncClientApi, drainOutboxBeforeResetSymbol, {
+			value: drainOutboxBeforeReset
 		});
 		return syncClientApi;
 
@@ -4700,7 +4739,75 @@ function requireSyncClient () {
 			return result;
 		}
 
+		async function recoverLocalSchema(options = {}) {
+			const db = toSyncDb(await getDb());
+			return runSyncMaintenance(db, async () => {
+				const drained = await drainOutboxBeforeReset(options);
+				throwIfSyncAborted(options[syncAbortSignalSymbol]);
+				const reset = await resetLocalCore(options);
+				return { ...reset, ...drained };
+			});
+		}
+
+		// Read the persisted wire payload, without interpreting it through the new map.
+		// Acknowledgements are durable before the next request. After interruption the
+		// original client/mutation IDs let the server deduplicate an uncertain send.
+		async function drainOutboxBeforeReset(options = {}) {
+			const signal = options[syncAbortSignalSymbol];
+			const db = toSyncDb(await getDb());
+			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
+			if (!syncConfig) throw new Error('Sync is not configured.');
+			const pushConfig = resolvePushConfig(syncConfig, options);
+			const clientId = options.clientId || await getClientId(db);
+			let sent = 0;
+			for (let i = 0; i <= maxPushBatchesPerSync; i++) {
+				throwIfSyncAborted(signal);
+				// One atomic mutation per request: a 409 must not reject unrelated rows.
+				const rows = await readPendingMutationRows(db, 1);
+				if (!rows.length) {
+					const counts = await db.query(`SELECT COUNT(*) AS "count" FROM "${syncOutboxTable}" WHERE "status" = 'failed'`);
+					return { sent, discarded: Number(counts[0].count) };
+				}
+				if (i === maxPushBatchesPerSync)
+					throw recoveryBlocked('Schema recovery reached its send limit. Retry to continue draining the saved outbox.');
+				const mutation = rowToMutation(rows[0]);
+				if (!mutation)
+					throw recoveryBlocked('Schema recovery found an unreadable outbox entry. Local data has been retained.');
+				let result;
+				try {
+					result = await sendPush(pushConfig, clientId, [mutation], options);
+					throwIfSyncAborted(signal);
+				}
+				catch (error) {
+					if (isSyncAbortError(error)) throw error;
+					if (options.discardConflicts === true && isConflictError(error)) {
+						await markFailedPushBatch(db, [mutation], error);
+						emitOperationErrors([mutation], error, false);
+						continue;
+					}
+					await markPendingMutationAttempts(db, [mutation], error);
+					throw error;
+				}
+				const accepted = acceptedMutationsForResult(result, [mutation]);
+				if (accepted.length !== 1)
+					throw recoveryBlocked('Server did not acknowledge the queued mutation. Local data has been retained.');
+				await markPushedMutations(db, {
+					...result, results: result.results.filter(item => item && item.id === mutation.id)
+				}, [mutation]);
+				sent++;
+			}
+		}
+
+		function recoveryBlocked(message) {
+			return Object.assign(new Error(message), { code: 'ORANGE_SYNC_RECOVERY_BLOCKED' });
+		}
+
 		async function resetLocal(options = {}) {
+			const db = toSyncDb(await getDb());
+			return runSyncMaintenance(db, () => resetLocalCore(options));
+		}
+
+		async function resetLocalCore(options = {}) {
 			throwIfSyncAborted(options[syncAbortSignalSymbol]);
 			clearLocalSchemaReady();
 			const db = toSyncDb(await getDb());
@@ -4711,27 +4818,25 @@ function requireSyncClient () {
 			const configuredTables = resolveSyncTables(db, normalizeConfiguredTables(options.tables) || syncConfig.tables, client);
 			if (!Array.isArray(configuredTables) || configuredTables.length === 0)
 				throw new Error('Sync resetLocal requires mapped tables or configured tables.');
-			return runSyncMaintenance(db, async () => {
-				throwIfSyncAborted(options[syncAbortSignalSymbol]);
-				const droppedTables = await dropLocalSyncTables(db, client, configuredTables);
-				await dropExistingBaseTables(db);
-				await db.query(`DROP TABLE IF EXISTS "${syncBaseTable}"`);
-				sinceByScope.clear();
-				ensuredInternalTables.delete(db);
-				clearEnsuredSyncSchema(db);
-				initialReadyEmitted = false;
-				const schemaResult = await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
-				await cleanupSyncStorage(db, configuredTables, fileSnapshotRollbackDefault);
-				return {
-					reset: true,
-					tables: configuredTables,
-					droppedTables,
-					schema: schemaResult && schemaResult.schema,
-					checksum: schemaResult && schemaResult.checksum,
-					scope: schemaResult && schemaResult.scope,
-					sql: schemaResult && schemaResult.sql
-				};
-			});
+			throwIfSyncAborted(options[syncAbortSignalSymbol]);
+			const droppedTables = await dropLocalSyncTables(db, client, configuredTables);
+			await dropExistingBaseTables(db);
+			await db.query(`DROP TABLE IF EXISTS "${syncBaseTable}"`);
+			sinceByScope.clear();
+			ensuredInternalTables.delete(db);
+			clearEnsuredSyncSchema(db);
+			initialReadyEmitted = false;
+			const schemaResult = await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
+			await cleanupSyncStorage(db, configuredTables, fileSnapshotRollbackDefault);
+			return {
+				reset: true,
+				tables: configuredTables,
+				droppedTables,
+				schema: schemaResult && schemaResult.schema,
+				checksum: schemaResult && schemaResult.checksum,
+				scope: schemaResult && schemaResult.scope,
+				sql: schemaResult && schemaResult.sql
+			};
 		}
 
 		async function readOutboxRowsForReplay(options = {}) {
@@ -8640,6 +8745,7 @@ function requireSyncClient () {
 	syncClient.exports.applyPullJournalSymbol = applyPullJournalSymbol;
 	syncClient.exports.pushPendingSymbol = pushPendingSymbol;
 	syncClient.exports.setClientIdSymbol = setClientIdSymbol;
+	syncClient.exports.drainOutboxBeforeResetSymbol = drainOutboxBeforeResetSymbol;
 	return syncClient.exports;
 }
 
@@ -34249,6 +34355,7 @@ function requireSyncWorkerHandler () {
 		return method === 'sync'
 			|| method === 'ensureLocalSchema'
 			|| method === 'resetLocal'
+			|| method === 'recoverLocalSchema'
 			|| method === 'start';
 	}
 
@@ -37285,6 +37392,7 @@ function requireSyncWorkerClient () {
 			sync: request.bind(null, 'sync'),
 			ensureLocalSchema: request.bind(null, 'ensureLocalSchema'),
 			resetLocal: request.bind(null, 'resetLocal'),
+			recoverLocalSchema: request.bind(null, 'recoverLocalSchema'),
 			start: request.bind(null, 'start'),
 			stop: request.bind(null, 'stop'),
 			isRunning: request.bind(null, 'isRunning'),
@@ -37575,7 +37683,7 @@ function requireSyncWorkerClient () {
 			return fallback;
 		if (method === 'on' || method === 'off' || method === 'isRunning')
 			return 10000;
-		if (method === 'ensureLocalSchema' || method === 'ensureLocalSchemaReady' || method === 'resetLocal')
+		if (method === 'ensureLocalSchema' || method === 'ensureLocalSchemaReady' || method === 'resetLocal' || method === 'recoverLocalSchema')
 			return 300000;
 		return undefined;
 	}
@@ -37761,7 +37869,8 @@ function requireDualSyncDatabase () {
 		applyOutboxRowsSymbol,
 		applyPullJournalSymbol,
 		pushPendingSymbol,
-		setClientIdSymbol
+		setClientIdSymbol,
+		drainOutboxBeforeResetSymbol
 	} = newSyncClient;
 
 	const manifestTable = 'orange_sync_dual_manifest';
@@ -37978,6 +38087,7 @@ function requireDualSyncDatabase () {
 				sync: syncObserved,
 				ensureLocalSchema: options => lifecycle.run(ensureLocalSchema, options, true),
 				resetLocal: options => lifecycle.run(resetLocal, options, true),
+				recoverLocalSchema: options => lifecycle.run(recoverLocalSchema, options, true),
 				start: options => lifecycle.start(auto.start, options),
 				stop: () => lifecycle.stop(auto.stop),
 				close: end,
@@ -39190,6 +39300,24 @@ function requireDualSyncDatabase () {
 			);
 		}
 
+		async function recoverLocalSchema(options = {}) {
+			return runWithCrossTabLock(
+				dualSyncLockName,
+				toDualSyncLockConfig(poolOptions && poolOptions.sync, options),
+				() => runSyncSwap(router, async () => {
+					const manifest = await getManifest(true);
+					const active = getRoleSyncClient(manifest.activeRole);
+					// Only the active replica owns the outgoing queue. The staging copy
+					// may lag behind acknowledgements and must never resend on its own.
+					const drained = await active[drainOutboxBeforeResetSymbol]({
+						...options, clientId: manifest.clientId
+					});
+					throwIfSyncAborted(options[syncAbortSignalSymbol]);
+					return { ...await resetLocalCore(options), ...drained };
+				})
+			);
+		}
+
 		async function resetLocalCore(options) {
 			const errors = [];
 			for (const role of [roleA, roleB]) {
@@ -39582,6 +39710,7 @@ function requireDualSyncDatabase () {
 			clearSchemaReadyRoles();
 			wrapExternalSyncMethod(syncClient, 'sync');
 			wrapExternalSyncMethod(syncClient, 'resetLocal');
+			wrapExternalSyncMethod(syncClient, 'recoverLocalSchema');
 			if (typeof syncClient.on !== 'function' || externalSyncUnsubscribe)
 				return;
 			const unsubscribes = [];
@@ -40165,8 +40294,8 @@ function requireDualSyncDatabase () {
 					.then(result => {
 						const info = extractDualSyncInfo(result);
 						if (info)
-							updateManifestCache(info, method === 'resetLocal');
-						if (method === 'resetLocal')
+							updateManifestCache(info, method === 'resetLocal' || method === 'recoverLocalSchema');
+						if (method === 'resetLocal' || method === 'recoverLocalSchema')
 							clearSchemaReadyRoles();
 						return result;
 					});

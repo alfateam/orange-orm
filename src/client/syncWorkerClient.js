@@ -36,6 +36,7 @@ function createSyncWorkerClient(worker, options = {}) {
 		sync: request.bind(null, 'sync'),
 		ensureLocalSchema: request.bind(null, 'ensureLocalSchema'),
 		resetLocal: request.bind(null, 'resetLocal'),
+		recoverLocalSchema: request.bind(null, 'recoverLocalSchema'),
 		start: request.bind(null, 'start'),
 		stop: request.bind(null, 'stop'),
 		isRunning: request.bind(null, 'isRunning'),
@@ -326,7 +327,7 @@ function resolveRequestTimeoutMs(method, options) {
 		return fallback;
 	if (method === 'on' || method === 'off' || method === 'isRunning')
 		return 10000;
-	if (method === 'ensureLocalSchema' || method === 'ensureLocalSchemaReady' || method === 'resetLocal')
+	if (method === 'ensureLocalSchema' || method === 'ensureLocalSchemaReady' || method === 'resetLocal' || method === 'recoverLocalSchema')
 		return 300000;
 	return undefined;
 }

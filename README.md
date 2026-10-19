@@ -365,6 +365,36 @@ Local separation does not replace server-side read and write authorization.
   accounts so the underlying storage closes as well. `on()` returns an unsubscribe
   function. No explicit worker/event cleanup is needed in the application.
 
+For an incompatible local mapping, stop automatic sync, then use the safe schema
+recovery API (available from `5.6.0-beta-5`):
+
+```ts
+await database.syncClient.stop();
+const result = await database.syncClient.recoverLocalSchema({
+  discardConflicts: true, // explicit policy: discard only atomic mutations rejected with HTTP 409
+  timeoutMs: 15000
+});
+// Report result.discarded to the user, then download the new snapshot.
+await database.syncClient.start();
+```
+
+This drains persisted old-schema payloads under the write gate before resetting.
+Acknowledgements and optional 409 rejections are saved after each request; retries
+reuse the original client/mutation IDs. A 409 cannot discard unrelated mutations.
+Other HTTP errors, network failure, cancellation, malformed entries and missing
+acknowledgements retain pending writes and reject recovery. Correct the cause and
+retry explicitly; do not repeatedly reset in an error handler. Each call processes
+at most 1,000 pending mutations; a bounded-pass error permits another call to
+continue from saved progress. `discarded` includes retained terminal failed entries
+from earlier attempts. `resetLocal()` is still an explicitly destructive API.
+Recovery is available on single/dual replicas and across worker RPC; only the active
+dual replica's queue is authoritative. Authentication and deciding when to offer
+login/retry are application responsibilities.
+
+Schema mismatch errors include `code: 'ORANGE_SYNC_SCHEMA_MISMATCH'`. Nullable
+column additions are structural changes too. A changed table set also checks
+previous overlapping table definitions; adding a table cannot hide a column change.
+
 Checkpoints (`orange_sync_state`), outgoing mutations (`orange_sync_outbox`),
 pull journals and dual-replica metadata are persisted in the database files.
 SQLite OPFS derives its second replica and delta files from the database identity.

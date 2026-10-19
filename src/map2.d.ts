@@ -1382,6 +1382,10 @@ export interface SyncClient<M extends Record<string, TableDefinition<M>> = any> 
   sync(options?: SyncOptions): Promise<void>;
   ensureLocalSchema(options?: SyncOptions): Promise<SyncLocalSchemaResult<M>>;
   resetLocal(options?: SyncResetLocalOptions<M>): Promise<SyncResetLocalResult<M>>;
+  /** Drain the old outbox before resetting the schema. Errors retain unresolved writes.
+   * HTTP 409 discards only the rejected atomic mutation when discardConflicts is true.
+   * Explicit resetLocal remains destructive; use this method for schema upgrades. */
+  recoverLocalSchema(options?: SyncOptions & { discardConflicts?: boolean }): Promise<SyncResetLocalResult<M> & { sent: number; discarded: number }>;
   start(): Promise<void>;
   /** Cancel and drain sync work. Keeps listeners and persisted outbox; start() resumes. */
   stop(): Promise<void>;

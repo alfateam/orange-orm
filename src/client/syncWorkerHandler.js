@@ -316,6 +316,7 @@ function methodAcceptsOptions(method) {
 	return method === 'sync'
 		|| method === 'ensureLocalSchema'
 		|| method === 'resetLocal'
+		|| method === 'recoverLocalSchema'
 		|| method === 'start';
 }
 

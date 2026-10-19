@@ -38,7 +38,8 @@ const {
 	applyOutboxRowsSymbol,
 	applyPullJournalSymbol,
 	pushPendingSymbol,
-	setClientIdSymbol
+	setClientIdSymbol,
+	drainOutboxBeforeResetSymbol
 } = newSyncClient;
 
 const manifestTable = 'orange_sync_dual_manifest';
@@ -255,6 +256,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			sync: syncObserved,
 			ensureLocalSchema: options => lifecycle.run(ensureLocalSchema, options, true),
 			resetLocal: options => lifecycle.run(resetLocal, options, true),
+			recoverLocalSchema: options => lifecycle.run(recoverLocalSchema, options, true),
 			start: options => lifecycle.start(auto.start, options),
 			stop: () => lifecycle.stop(auto.stop),
 			close: end,
@@ -1467,6 +1469,24 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		);
 	}
 
+	async function recoverLocalSchema(options = {}) {
+		return runWithCrossTabLock(
+			dualSyncLockName,
+			toDualSyncLockConfig(poolOptions && poolOptions.sync, options),
+			() => runSyncSwap(router, async () => {
+				const manifest = await getManifest(true);
+				const active = getRoleSyncClient(manifest.activeRole);
+				// Only the active replica owns the outgoing queue. The staging copy
+				// may lag behind acknowledgements and must never resend on its own.
+				const drained = await active[drainOutboxBeforeResetSymbol]({
+					...options, clientId: manifest.clientId
+				});
+				throwIfSyncAborted(options[syncAbortSignalSymbol]);
+				return { ...await resetLocalCore(options), ...drained };
+			})
+		);
+	}
+
 	async function resetLocalCore(options) {
 		const errors = [];
 		for (const role of [roleA, roleB]) {
@@ -1859,6 +1879,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		clearSchemaReadyRoles();
 		wrapExternalSyncMethod(syncClient, 'sync');
 		wrapExternalSyncMethod(syncClient, 'resetLocal');
+		wrapExternalSyncMethod(syncClient, 'recoverLocalSchema');
 		if (typeof syncClient.on !== 'function' || externalSyncUnsubscribe)
 			return;
 		const unsubscribes = [];
@@ -2442,8 +2463,8 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				.then(result => {
 					const info = extractDualSyncInfo(result);
 					if (info)
-						updateManifestCache(info, method === 'resetLocal');
-					if (method === 'resetLocal')
+						updateManifestCache(info, method === 'resetLocal' || method === 'recoverLocalSchema');
+					if (method === 'resetLocal' || method === 'recoverLocalSchema')
 						clearSchemaReadyRoles();
 					return result;
 				});

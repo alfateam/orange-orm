@@ -7,6 +7,22 @@ const { syncAbortSignalSymbol, syncAutoStartSymbol } = require('../src/client/sy
 const { registerSyncOperationMemory } = require('../src/sync/operationContext');
 
 describe('sync worker rpc', () => {
+	test('schema recovery forwards the conflict policy and preserves blocked HTTP status across RPC', async () => {
+		let call = 0;
+		const bridge = createBridge({
+			recoverLocalSchema: async options => {
+				expect(options.discardConflicts).toBe(true);
+				expect(options.timeoutMs).toBe(15000);
+				if (!call++) throw Object.assign(new Error('Sign in'), { status: 401 });
+				return { reset: true, sent: 1, discarded: 1 };
+			}, stop: async () => {}
+		}, { autoStart: false });
+		const client = rdb.createSyncWorkerClient(bridge.worker);
+		await expect(client.recoverLocalSchema({ discardConflicts: true, timeoutMs: 15000 })).rejects.toMatchObject({ status: 401 });
+		expect(await client.recoverLocalSchema({ discardConflicts: true, timeoutMs: 15000 })).toEqual({ reset: true, sent: 1, discarded: 1 });
+		await client.close();
+	});
+
 	test('removes worker subscriptions even when sync shutdown fails', async () => {
 		const subscriptions = new Set();
 		const bridge = createBridge({

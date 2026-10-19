@@ -24,9 +24,12 @@ async function ensureSyncSchema(db, client, tableNames, options = {}) {
 
 	await ensureSchemaStateTable(db);
 	const existing = await readSchemaState(db, scope);
+	// A table-set change creates a new checkpoint scope. It must not conceal a
+	// simultaneous column change in a table that already exists locally.
+	if (!existing) await checkPreviousTableSchemas(db, schema);
 	const shouldUpdateState = !existing || existing.checksum !== checksum;
 	if (existing && existing.checksum !== checksum && !isIndexOnlySchemaChange(existing.schemaJson, schema))
-		throw new Error('Local sync schema does not match current map. Reset the local sync database or run a migration before syncing.');
+		throw schemaMismatch();
 	if (existing && existing.checksum === checksum) {
 		markSchemaEnsured(db, ensuredKey);
 		return { scope, schema, checksum, sql: sql.statements };
@@ -48,6 +51,34 @@ async function ensureSyncSchema(db, client, tableNames, options = {}) {
 
 	markSchemaEnsured(db, ensuredKey);
 	return { scope, schema, checksum, sql: sql.statements };
+}
+
+function schemaMismatch() {
+	return Object.assign(new Error('Local sync schema does not match current map. Reset the local sync database or run a migration before syncing.'), {
+		code: 'ORANGE_SYNC_SCHEMA_MISMATCH'
+	});
+}
+
+async function checkPreviousTableSchemas(db, schema) {
+	const rows = await db.query(`SELECT "schema_json" FROM ${quoteIdent(schemaStateTable)} ORDER BY "updated_at_ms" DESC`);
+	const list = Array.isArray(rows) ? rows : rows && rows.rows || [];
+	const unchecked = new Map(schema.tables.map(table => [table.dbName, table]));
+	for (const row of list) {
+		let previous;
+		try { previous = JSON.parse(row.schema_json ?? row.SCHEMA_JSON); }
+		catch (_e) { throw schemaMismatch(); }
+		for (const table of previous.tables || []) {
+			const next = unchecked.get(table.dbName);
+			if (!next) continue;
+			// Relations can gain foreign keys when their target table joins the
+			// scope. Compare the table's own columns and key, not scope metadata.
+			for (const key of ['columns', 'primaryKey']) {
+				if (stableStringify(table[key]) !== stableStringify(next[key]))
+					throw schemaMismatch();
+			}
+			unchecked.delete(table.dbName);
+		}
+	}
 }
 
 function isSchemaEnsured(db, key) {

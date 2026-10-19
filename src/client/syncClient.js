@@ -64,6 +64,9 @@ const pushPendingSymbol = typeof Symbol === 'function'
 const setClientIdSymbol = typeof Symbol === 'function'
 	? Symbol.for('orange-orm.syncClient.setClientId')
 	: '__orangeOrmSyncClientSetClientId';
+const drainOutboxBeforeResetSymbol = typeof Symbol === 'function'
+	? Symbol.for('orange-orm.syncClient.drainOutboxBeforeReset')
+	: '__orangeOrmSyncClientDrainOutboxBeforeReset';
 
 function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, internalOptions = {}) {
 	const lifecycle = createSyncLifecycle();
@@ -92,6 +95,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 	const serializeSyncWork = createAsyncSerializer();
 	const queuedSync = serializeSyncWork(lockedSync);
 	const queuedEnsureLocalSchema = serializeSyncWork(lockedEnsureLocalSchema);
+	const queuedRecoverLocalSchema = serializeSyncWork(withCrossTabSyncLock(recoverLocalSchema));
 	const observedSync = observeSyncMethod('sync', queuedSync);
 	const auto = createSyncAuto({
 		sync: options => lifecycle.run(observedSync, options)
@@ -101,6 +105,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		sync: options => lifecycle.run(observedSync, options),
 		ensureLocalSchema: options => lifecycle.run(queuedEnsureLocalSchema, options, true),
 		resetLocal: options => lifecycle.run(lockedResetLocal, options, true),
+		recoverLocalSchema: options => lifecycle.run(queuedRecoverLocalSchema, options, true),
 		start: options => lifecycle.start(auto.start, options),
 		stop: () => lifecycle.stop(auto.stop),
 		close,
@@ -140,6 +145,9 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 	});
 	Object.defineProperty(syncClientApi, setClientIdSymbol, {
 		value: setSharedClientId
+	});
+	Object.defineProperty(syncClientApi, drainOutboxBeforeResetSymbol, {
+		value: drainOutboxBeforeReset
 	});
 	return syncClientApi;
 
@@ -535,7 +543,75 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		return result;
 	}
 
+	async function recoverLocalSchema(options = {}) {
+		const db = toSyncDb(await getDb());
+		return runSyncMaintenance(db, async () => {
+			const drained = await drainOutboxBeforeReset(options);
+			throwIfSyncAborted(options[syncAbortSignalSymbol]);
+			const reset = await resetLocalCore(options);
+			return { ...reset, ...drained };
+		});
+	}
+
+	// Read the persisted wire payload, without interpreting it through the new map.
+	// Acknowledgements are durable before the next request. After interruption the
+	// original client/mutation IDs let the server deduplicate an uncertain send.
+	async function drainOutboxBeforeReset(options = {}) {
+		const signal = options[syncAbortSignalSymbol];
+		const db = toSyncDb(await getDb());
+		const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
+		if (!syncConfig) throw new Error('Sync is not configured.');
+		const pushConfig = resolvePushConfig(syncConfig, options);
+		const clientId = options.clientId || await getClientId(db);
+		let sent = 0;
+		for (let i = 0; i <= maxPushBatchesPerSync; i++) {
+			throwIfSyncAborted(signal);
+			// One atomic mutation per request: a 409 must not reject unrelated rows.
+			const rows = await readPendingMutationRows(db, 1);
+			if (!rows.length) {
+				const counts = await db.query(`SELECT COUNT(*) AS "count" FROM "${syncOutboxTable}" WHERE "status" = 'failed'`);
+				return { sent, discarded: Number(counts[0].count) };
+			}
+			if (i === maxPushBatchesPerSync)
+				throw recoveryBlocked('Schema recovery reached its send limit. Retry to continue draining the saved outbox.');
+			const mutation = rowToMutation(rows[0]);
+			if (!mutation)
+				throw recoveryBlocked('Schema recovery found an unreadable outbox entry. Local data has been retained.');
+			let result;
+			try {
+				result = await sendPush(pushConfig, clientId, [mutation], options);
+				throwIfSyncAborted(signal);
+			}
+			catch (error) {
+				if (isSyncAbortError(error)) throw error;
+				if (options.discardConflicts === true && isConflictError(error)) {
+					await markFailedPushBatch(db, [mutation], error);
+					emitOperationErrors([mutation], error, false);
+					continue;
+				}
+				await markPendingMutationAttempts(db, [mutation], error);
+				throw error;
+			}
+			const accepted = acceptedMutationsForResult(result, [mutation]);
+			if (accepted.length !== 1)
+				throw recoveryBlocked('Server did not acknowledge the queued mutation. Local data has been retained.');
+			await markPushedMutations(db, {
+				...result, results: result.results.filter(item => item && item.id === mutation.id)
+			}, [mutation]);
+			sent++;
+		}
+	}
+
+	function recoveryBlocked(message) {
+		return Object.assign(new Error(message), { code: 'ORANGE_SYNC_RECOVERY_BLOCKED' });
+	}
+
 	async function resetLocal(options = {}) {
+		const db = toSyncDb(await getDb());
+		return runSyncMaintenance(db, () => resetLocalCore(options));
+	}
+
+	async function resetLocalCore(options = {}) {
 		throwIfSyncAborted(options[syncAbortSignalSymbol]);
 		clearLocalSchemaReady();
 		const db = toSyncDb(await getDb());
@@ -546,27 +622,25 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		const configuredTables = resolveSyncTables(db, normalizeConfiguredTables(options.tables) || syncConfig.tables, client);
 		if (!Array.isArray(configuredTables) || configuredTables.length === 0)
 			throw new Error('Sync resetLocal requires mapped tables or configured tables.');
-		return runSyncMaintenance(db, async () => {
-			throwIfSyncAborted(options[syncAbortSignalSymbol]);
-			const droppedTables = await dropLocalSyncTables(db, client, configuredTables);
-			await dropExistingBaseTables(db);
-			await db.query(`DROP TABLE IF EXISTS "${syncBaseTable}"`);
-			sinceByScope.clear();
-			ensuredInternalTables.delete(db);
-			clearEnsuredSyncSchema(db);
-			initialReadyEmitted = false;
-			const schemaResult = await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
-			await cleanupSyncStorage(db, configuredTables, fileSnapshotRollbackDefault);
-			return {
-				reset: true,
-				tables: configuredTables,
-				droppedTables,
-				schema: schemaResult && schemaResult.schema,
-				checksum: schemaResult && schemaResult.checksum,
-				scope: schemaResult && schemaResult.scope,
-				sql: schemaResult && schemaResult.sql
-			};
-		});
+		throwIfSyncAborted(options[syncAbortSignalSymbol]);
+		const droppedTables = await dropLocalSyncTables(db, client, configuredTables);
+		await dropExistingBaseTables(db);
+		await db.query(`DROP TABLE IF EXISTS "${syncBaseTable}"`);
+		sinceByScope.clear();
+		ensuredInternalTables.delete(db);
+		clearEnsuredSyncSchema(db);
+		initialReadyEmitted = false;
+		const schemaResult = await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
+		await cleanupSyncStorage(db, configuredTables, fileSnapshotRollbackDefault);
+		return {
+			reset: true,
+			tables: configuredTables,
+			droppedTables,
+			schema: schemaResult && schemaResult.schema,
+			checksum: schemaResult && schemaResult.checksum,
+			scope: schemaResult && schemaResult.scope,
+			sql: schemaResult && schemaResult.sql
+		};
 	}
 
 	async function readOutboxRowsForReplay(options = {}) {
@@ -4475,3 +4549,4 @@ module.exports.applyOutboxRowsSymbol = applyOutboxRowsSymbol;
 module.exports.applyPullJournalSymbol = applyPullJournalSymbol;
 module.exports.pushPendingSymbol = pushPendingSymbol;
 module.exports.setClientIdSymbol = setClientIdSymbol;
+module.exports.drainOutboxBeforeResetSymbol = drainOutboxBeforeResetSymbol;

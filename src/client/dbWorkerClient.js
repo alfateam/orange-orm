@@ -46,6 +46,7 @@ function createDbWorkerClient(worker) {
 			sync: syncRequest.bind(null, 'sync'),
 			ensureLocalSchema: syncRequest.bind(null, 'ensureLocalSchema'),
 			resetLocal: syncRequest.bind(null, 'resetLocal'),
+			recoverLocalSchema: syncRequest.bind(null, 'recoverLocalSchema'),
 			start: syncRequest.bind(null, 'start'),
 			stop: syncRequest.bind(null, 'stop'),
 			isRunning: syncRequest.bind(null, 'isRunning'),

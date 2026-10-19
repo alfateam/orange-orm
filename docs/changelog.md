@@ -1,11 +1,18 @@
 ## Changelog
-__Unreleased__
+__5.6.0-beta-5__
+Add `syncClient.recoverLocalSchema()` to drain persisted old-schema mutations before
+reset, with optional per-mutation HTTP 409 discard, durable acknowledgements,
+interruption-safe retry IDs and worker forwarding. Other errors block destructive
+reset. Detect column changes even when the mapped table set also changes.
+
+__5.6.0-beta-4__
 Keep sync transaction hooks and their snapshot/row reads in a real transaction.
 The transactionless `readonly` optimization previously discarded `SET LOCAL`
 and `set_config(..., true)` identity before PostgreSQL row-level-security reads,
 causing authenticated clients to receive no private rows. Reads without hooks
 retain the optimization; transaction-local identity is cleared at completion.
 
+__5.6.0-beta-3__
 Strengthen SQLite sync shutdown for isolated account databases. `stop()` now cancels
 manual/queued sync as well as automatic work, drains storage work and requires
 `start()` before further manual sync. Subscriptions and durable outboxes survive
