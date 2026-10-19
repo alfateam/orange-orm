@@ -22,7 +22,7 @@ beforeAll(async () => {
 	await db.query('GRANT USAGE ON SCHEMA public TO sync_reader');
 	await db.query('GRANT SELECT ON private_votes, orange_changes TO sync_reader');
 	await db.query('ALTER TABLE private_votes ENABLE ROW LEVEL SECURITY');
-	await db.query(`CREATE POLICY own_votes ON private_votes USING (owner_id::text = current_setting('test.owner', true))`);
+	await db.query('CREATE POLICY own_votes ON private_votes USING (owner_id::text = current_setting(\'test.owner\', true))');
 	// Stay on the restricted role, like a deployed pool. Switching roles only
 	// inside the hook would itself be lost by a transactionless read and let
 	// the owner connection bypass RLS, hiding the missing-identity bug.
@@ -30,7 +30,7 @@ beforeAll(async () => {
 	const app = express().use(express.json());
 	app.use('/rdb', db.express({ vote: {}, sync: {}, hooks: { transaction: {
 		afterBegin: async (tx, req) => {
-			await tx.query({ sql: "SELECT set_config('test.owner', ?, true)", parameters: [req.get('X-Owner') || ''] });
+			await tx.query({ sql: 'SELECT set_config(\'test.owner\', ?, true)', parameters: [req.get('X-Owner') || ''] });
 		}
 	} } }));
 	await new Promise(resolve => { server = app.listen(0, '127.0.0.1', resolve); });
