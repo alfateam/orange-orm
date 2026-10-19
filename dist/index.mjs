@@ -1005,7 +1005,10 @@ function requireSync () {
 					if (transactionHookFns.beforeCommit)
 						await transactionHookFns.beforeCommit(hookDb, request, response);
 					return value;
-				}, transactionOptions);
+				// readonly is a transactionless pool optimization, not BEGIN READ
+				// ONLY. Hooks may set transaction-local identity for RLS, so the
+				// hook and its reads must share a real transaction and connection.
+				}, { ...transactionOptions, readonly: false });
 			}
 			catch (e) {
 				if (transactionHookFns.afterRollback)

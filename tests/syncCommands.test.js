@@ -349,7 +349,7 @@ describe('sync commands', () => {
 			'afterCommit'
 		]);
 		expect(calls[2][1]).toEqual([{ id: 1 }]);
-		expect(transactionOptions).toEqual([{ readonly: true }]);
+		expect(transactionOptions).toEqual([{ readonly: false }]);
 		expect(jsonResult.items).toEqual([
 			{ table: 'project', pk: [1], key: { id: 1 }, row: { id: 1, name: 'Project 1' }, op: 'U' },
 			{ table: 'project', pk: [1], key: { id: 1 }, row: { id: 1, name: 'Project 1' }, op: 'U' }
@@ -400,7 +400,7 @@ describe('sync commands', () => {
 			'afterCommit'
 		]);
 		expect(calls.filter(x => x[0] === 'getMany').map(x => x[1])).toEqual(['id desc', 'id']);
-		expect(transactionOptions).toEqual([{ readonly: true }, { readonly: true }]);
+		expect(transactionOptions).toEqual([{ readonly: false }, { readonly: false }]);
 		expect(jsonResult.mode).toBe('snapshot');
 		expect(jsonResult.items).toEqual([
 			{ table: 'project', pk: [1], key: { id: 1 }, op: 'U' }

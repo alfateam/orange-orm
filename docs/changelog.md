@@ -1,5 +1,11 @@
 ## Changelog
 __Unreleased__
+Keep sync transaction hooks and their snapshot/row reads in a real transaction.
+The transactionless `readonly` optimization previously discarded `SET LOCAL`
+and `set_config(..., true)` identity before PostgreSQL row-level-security reads,
+causing authenticated clients to receive no private rows. Reads without hooks
+retain the optimization; transaction-local identity is cleared at completion.
+
 Strengthen SQLite sync shutdown for isolated account databases. `stop()` now cancels
 manual/queued sync as well as automatic work, drains storage work and requires
 `start()` before further manual sync. Subscriptions and durable outboxes survive
