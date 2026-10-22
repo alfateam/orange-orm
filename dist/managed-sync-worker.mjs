@@ -4392,7 +4392,7 @@ function requireSyncClient () {
 		}
 
 		async function sync(options = {}) {
-			await pull(normalizeSyncOptions(options));
+			return pull(normalizeSyncOptions(options));
 		}
 
 		async function syncAndCapturePullJournal(options = {}) {
@@ -4540,6 +4540,8 @@ function requireSyncClient () {
 				try {
 					const result = await fn(options);
 					const payload = result === undefined ? { method } : { method, result };
+					if (method === 'sync' && typeof result?.applied === 'number')
+						payload.changed = result.applied > 0;
 					emit(method, payload);
 					if (method !== 'sync')
 						emit('sync', payload);
@@ -5419,7 +5421,7 @@ function requireSyncClient () {
 						const deleteItems = batch.filter(x => x.op === 'D');
 						const upsertItems = batch.filter(x => x.op !== 'D' && x.row !== undefined);
 						if (deleteItems.length > 0) {
-							applied += await applyDeleteItemsOnTx(tx, deleteItems, defaultPatchOptions);
+							applied += await applyDeleteItemsOnTx(tx, deleteItems);
 							if (!fileSnapshotRollback)
 								await applyDeleteItemsToStableBase(tx, deleteItems);
 						}
@@ -5870,6 +5872,11 @@ function requireSyncClient () {
 
 				function acceptRowsPayload(batchState, currentItems, payload) {
 					const acceptedCount = getRowsAcceptedCount(payload, currentItems.length);
+					// A complete protocol response identifies the processed prefix. Holes
+					// within it are authoritative; only the truncated suffix needs fetching.
+					const completeResponse = payload.requested === currentItems.length
+						&& Number.isInteger(payload.limit) && payload.limit > 0
+						&& typeof payload.truncated === 'boolean';
 					const acceptedItems = acceptedCount < currentItems.length
 						? currentItems.slice(0, acceptedCount)
 						: currentItems;
@@ -5877,7 +5884,7 @@ function requireSyncClient () {
 					let finalMissingItems = [];
 					if (acceptedCount < currentItems.length) {
 						const deferredItems = currentItems.slice(acceptedCount);
-						const missingChunks = requeueMissingRowChunks(acceptedItems, missingItems);
+						const missingChunks = requeueMissingRowChunks(acceptedItems, missingItems, completeResponse);
 						if (!missingChunks.requeued)
 							finalMissingItems = missingItems;
 						const requeuedChunks = [];
@@ -5888,7 +5895,7 @@ function requireSyncClient () {
 						addRowJobsFront(batchState, requeuedChunks);
 					}
 					else {
-						const missingChunks = requeueMissingRowChunks(currentItems, missingItems);
+						const missingChunks = requeueMissingRowChunks(currentItems, missingItems, completeResponse);
 						if (!missingChunks.requeued)
 							finalMissingItems = missingItems;
 						addRowJobsFront(batchState, missingChunks.chunks);
@@ -5897,9 +5904,10 @@ function requireSyncClient () {
 					markMissingPullJournalRows(batchState.itemState, finalMissingItems);
 				}
 
-				function requeueMissingRowChunks(requestedItems, missingItems) {
+				function requeueMissingRowChunks(requestedItems, missingItems, completeResponse) {
 					const chunks = [];
-					const requeued = enqueueMissingRows(chunks, requestedItems, missingItems);
+					// Retain retries for legacy partial responses without batch metadata.
+					const requeued = !completeResponse && enqueueMissingRows(chunks, requestedItems, missingItems);
 					return { requeued, chunks };
 				}
 
@@ -6343,6 +6351,10 @@ function requireSyncClient () {
 					continue;
 				const state = states.shift();
 				state.ready = true;
+				// Only keys missing from completed row reads reach here (after retry
+				// for legacy responses). Withdraw rows through the normal pull delete
+				// path, including stable-base/journal handling, without an outbox write.
+				state.item = { ...state.item, op: 'D' };
 				state.rowItem = undefined;
 			}
 		}
@@ -7264,6 +7276,35 @@ function requireSyncClient () {
 			return new Map(entries.map(entry => [entry.name, entry]));
 		}
 
+		async function applyDeleteItemsOnTx(tx, items) {
+			const perTable = new Map();
+			for (const item of items) {
+				if (!item || typeof item.table !== 'string' || !Array.isArray(item.pk))
+					continue;
+				if (!perTable.has(item.table))
+					perTable.set(item.table, []);
+				perTable.get(item.table).push(item.pk);
+			}
+			let applied = 0;
+			for (const name of orderTablesByDependencies(client, Array.from(perTable.keys())).reverse()) {
+				const table = client.tables && client.tables[name];
+				const primaryColumns = getPrimaryColumns(table);
+				if (!table || primaryColumns.length === 0)
+					throw new Error(`Table "${name}" does not exist in this client`);
+				const keys = perTable.get(name);
+				// Replication deletes only the specified rows. Patch removal cascades
+				// through mapped relations, including tables outside the local replica.
+				for (let offset = 0; offset < keys.length; offset += maxStableBaseKeysPerStatement) {
+					const batch = keys.slice(offset, offset + maxStableBaseKeysPerStatement);
+					const where = primaryKeyWhereAnySql(primaryColumns, batch);
+					if (where)
+						await tx.query(`DELETE FROM ${quoteIdent(table._dbName || name)} WHERE ${where}`);
+				}
+				applied += keys.length;
+			}
+			return applied;
+		}
+
 		async function applyDeleteItemsToStableBase(db, items, knownBaseByName) {
 			const deletes = Array.isArray(items) ? items : [];
 			if (deletes.length === 0)
@@ -7320,7 +7361,7 @@ function requireSyncClient () {
 			let applied = 0;
 			if (deleteItems.length > 0) {
 				const dataApplyStartedAtMs = Date.now();
-				applied += await applyDeleteItemsOnTx(tx, deleteItems, patchOptions);
+				applied += await applyDeleteItemsOnTx(tx, deleteItems);
 				addPullTiming(timings, 'dataApplyMs', dataApplyStartedAtMs);
 				if (!deferStableBase) {
 					const stableBaseStartedAtMs = Date.now();
@@ -8296,34 +8337,6 @@ function requireSyncClient () {
 				return keyItem;
 			})
 		};
-	}
-
-	async function applyDeleteItemsOnTx(tx, items, patchOptions) {
-		const deletes = Array.isArray(items) ? items : [];
-		const perTable = new Map();
-		for (let i = 0; i < deletes.length; i++) {
-			const item = deletes[i];
-			if (!item || typeof item.table !== 'string' || !Array.isArray(item.pk))
-				continue;
-			if (!perTable.has(item.table))
-				perTable.set(item.table, []);
-			perTable.get(item.table).push({
-				op: 'remove',
-				path: `/${JSON.stringify(item.pk)}`
-			});
-		}
-
-		const tableNames = orderTablesByDependencies(tx, Array.from(perTable.keys())).reverse();
-		let applied = 0;
-		for (let i = 0; i < tableNames.length; i++) {
-			const table = tableNames[i];
-			if (!tx[table] || typeof tx[table].patch !== 'function')
-				throw new Error(`Table "${table}" does not exist in this client`);
-			const patch = perTable.get(table);
-			await tx[table].patch(patch, patchOptions);
-			applied += patch.length;
-		}
-		return applied;
 	}
 
 	async function applyRowsPayloadOnTx(tx, items, patchOptions) {
@@ -37348,6 +37361,76 @@ function requireNewPool () {
 
 var dualSyncDatabase = {exports: {}};
 
+var storageLayout;
+var hasRequiredStorageLayout;
+
+function requireStorageLayout () {
+	if (hasRequiredStorageLayout) return storageLayout;
+	hasRequiredStorageLayout = 1;
+	function toCachePoolOptions(poolOptions = {}, connectionString) {
+		const options = toSecondaryDataPoolOptions(poolOptions, connectionString);
+		delete options.sync;
+		return options;
+	}
+
+	function toSecondaryDataPoolOptions(poolOptions = {}, connectionString) {
+		let options = { ...poolOptions };
+		const hadProvidedWorker = !!options.worker;
+		delete options.worker;
+		if (hadProvidedWorker)
+			delete options.closeDbOnClose;
+		options = withIsolatedSahPool(options, connectionString);
+		return options;
+	}
+
+	function withIsolatedSahPool(poolOptions, connectionString) {
+		if (!usesSahPool(poolOptions))
+			return poolOptions;
+		const source = poolOptions.opfsSahPool || poolOptions.opfsSAHPool || poolOptions.sahPool || {};
+		const baseName = nonEmptyString(source.name) || 'opfs-sahpool';
+		const baseDirectory = nonEmptyString(source.directory) || `.${baseName}`;
+		const token = stableSahPoolToken(connectionString);
+		return {
+			...poolOptions,
+			opfsSahPool: {
+				...source,
+				name: `${baseName}-orange-${token}`,
+				directory: `${baseDirectory}-orange-${token}`
+			}
+		};
+	}
+
+	function usesSahPool(poolOptions) {
+		return poolOptions.vfs === 'opfs-sahpool';
+	}
+
+	function stableSahPoolToken(value) {
+		const text = String(value || 'default');
+		let hash = 2166136261;
+		for (let i = 0; i < text.length; i++) {
+			hash ^= text.charCodeAt(i);
+			hash = Math.imul(hash, 16777619);
+		}
+		return (hash >>> 0).toString(16).padStart(8, '0');
+	}
+
+	function appendRoleSuffix(connectionString, suffix) {
+		const value = String(connectionString);
+		if (value.endsWith('.sqlite3'))
+			return value.slice(0, -8) + `.__orange_sync_${suffix}.sqlite3`;
+		if (value.endsWith('.db'))
+			return value.slice(0, -3) + `.__orange_sync_${suffix}.db`;
+		return `${value}.__orange_sync_${suffix}.sqlite3`;
+	}
+
+	function nonEmptyString(value) {
+		return typeof value === 'string' && value.length > 0 ? value : undefined;
+	}
+
+	storageLayout = { appendRoleSuffix, toSecondaryDataPoolOptions, toCachePoolOptions };
+	return storageLayout;
+}
+
 var syncWorkerClient;
 var hasRequiredSyncWorkerClient;
 
@@ -37829,6 +37912,7 @@ var hasRequiredDualSyncDatabase;
 function requireDualSyncDatabase () {
 	if (hasRequiredDualSyncDatabase) return dualSyncDatabase.exports;
 	hasRequiredDualSyncDatabase = 1;
+	const { appendRoleSuffix, toSecondaryDataPoolOptions, toCachePoolOptions } = requireStorageLayout();
 	const { clearSyncOperationMemory } = requireOperationContext();
 	const createSyncLifecycle = requireSyncLifecycle();
 	const hostLocal = requireHostLocal();
@@ -38500,7 +38584,7 @@ function requireDualSyncDatabase () {
 			const emittedDataReadySync = await maybeEmitInitialReady(
 				publishedManifest.activeRole,
 				publishedManifest,
-				{ method: 'sync', result: dataReadyResult }
+				syncEventPayload('sync', dataReadyResult)
 			);
 			if (emittedDataReadySync && result && result === Object(result))
 				dataReadySyncResults.add(result);
@@ -39397,7 +39481,7 @@ function requireDualSyncDatabase () {
 					&& result && result === Object(result)
 					&& dataReadySyncResults.delete(result);
 				if (!dataReadySyncEmitted)
-					emit(method, { method, result });
+					emit(method, syncEventPayload(method, result));
 				if (method !== 'sync')
 					emit('sync', { method, result });
 				return result;
@@ -39409,6 +39493,14 @@ function requireDualSyncDatabase () {
 				emit('error', { method, error });
 				throw error;
 			}
+		}
+
+		function syncEventPayload(method, result) {
+			const payload = { method, result };
+			const swapped = result && result.__orangeDualSync && result.__orangeDualSync.swapped;
+			if (method === 'sync' && typeof swapped === 'boolean')
+				payload.changed = swapped;
+			return payload;
 		}
 
 		function emit(event, payload) {
@@ -40517,53 +40609,6 @@ function requireDualSyncDatabase () {
 		return options;
 	}
 
-	function toCachePoolOptions(poolOptions = {}, connectionString) {
-		const options = toSecondaryDataPoolOptions(poolOptions, connectionString);
-		delete options.sync;
-		return options;
-	}
-
-	function toSecondaryDataPoolOptions(poolOptions = {}, connectionString) {
-		let options = { ...poolOptions };
-		const hadProvidedWorker = !!options.worker;
-		delete options.worker;
-		if (hadProvidedWorker)
-			delete options.closeDbOnClose;
-		options = withIsolatedSahPool(options, connectionString);
-		return options;
-	}
-
-	function withIsolatedSahPool(poolOptions, connectionString) {
-		if (!usesSahPool(poolOptions))
-			return poolOptions;
-		const source = poolOptions.opfsSahPool || poolOptions.opfsSAHPool || poolOptions.sahPool || {};
-		const baseName = nonEmptyString(source.name) || 'opfs-sahpool';
-		const baseDirectory = nonEmptyString(source.directory) || `.${baseName}`;
-		const token = stableSahPoolToken(connectionString);
-		return {
-			...poolOptions,
-			opfsSahPool: {
-				...source,
-				name: `${baseName}-orange-${token}`,
-				directory: `${baseDirectory}-orange-${token}`
-			}
-		};
-	}
-
-	function usesSahPool(poolOptions) {
-		return poolOptions.vfs === 'opfs-sahpool';
-	}
-
-	function stableSahPoolToken(value) {
-		const text = String(value || 'default');
-		let hash = 2166136261;
-		for (let i = 0; i < text.length; i++) {
-			hash ^= text.charCodeAt(i);
-			hash = Math.imul(hash, 16777619);
-		}
-		return (hash >>> 0).toString(16).padStart(8, '0');
-	}
-
 	function nonEmptyString(value) {
 		return typeof value === 'string' && value.length > 0 ? value : undefined;
 	}
@@ -40580,15 +40625,6 @@ function requireDualSyncDatabase () {
 
 	function isManagedSyncWorkerEnabled(sync) {
 		return !!sync && sync === Object(sync) && !Array.isArray(sync) && sync.worker !== false;
-	}
-
-	function appendRoleSuffix(connectionString, suffix) {
-		const value = String(connectionString);
-		if (value.endsWith('.sqlite3'))
-			return value.slice(0, -8) + `.__orange_sync_${suffix}.sqlite3`;
-		if (value.endsWith('.db'))
-			return value.slice(0, -3) + `.__orange_sync_${suffix}.db`;
-		return `${value}.__orange_sync_${suffix}.sqlite3`;
 	}
 
 	function isRole(value) {

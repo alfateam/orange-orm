@@ -525,6 +525,9 @@ describe('sqliteOPFS dual sync integration', () => {
 		const localDb = map({ db: () => dualDb });
 		closeTasks.push(() => localDb.close());
 		const progressEvents = [];
+		const syncEvents = [];
+		const offSync = localDb.syncClient.on('sync', event => syncEvents.push(event));
+		closeTasks.push(() => offSync());
 		const pushedMutationIds = [];
 		const pushedBatchSizes = [];
 		const offProgress = localDb.syncClient.on('sync-progress', event => progressEvents.push(event));
@@ -543,6 +546,7 @@ describe('sqliteOPFS dual sync integration', () => {
 		const beforeSync = await localDb.project.count();
 		const syncResult = await localDb.syncClient.sync();
 		const afterSync = await localDb.project.count();
+		expect(syncEvents.at(-1).changed).toBe(true);
 		const roleA = map({
 			db: con => con.sqlite(connectionString, { size: 1 })
 		});
@@ -613,6 +617,7 @@ describe('sqliteOPFS dual sync integration', () => {
 		await remoteDb.project.update({ title: 'Two updated' }, { where: x => x.id.eq('p2') });
 		await remoteDb.project.insert({ id: 'p3', title: 'Three' });
 		const secondSyncResult = await localDb.syncClient.sync();
+		expect(syncEvents.at(-1).changed).toBe(true);
 
 		expect(secondSyncResult.__orangeDualSync).toMatchObject({
 			activeRole: 'b',
@@ -674,6 +679,7 @@ describe('sqliteOPFS dual sync integration', () => {
 		expect(pushedMutationIds.filter(id => id === mutationCreatedDuringSync)).toHaveLength(1);
 
 		const noOpSyncResult = await localDb.syncClient.sync();
+		expect(syncEvents.at(-1).changed).toBe(false);
 		const roleARows = await roleA.query('SELECT "id", "title" FROM "project" ORDER BY "id"');
 		const roleBRows = await roleB.query('SELECT "id", "title" FROM "project" ORDER BY "id"');
 

@@ -347,10 +347,60 @@ await database.syncClient.start();
 instance must never read credentials from a global mutable "current user".
 Local separation does not replace server-side read and write authorization.
 
+From `5.6.0-beta-6`, a sync key whose row is absent from a successfully completed
+row read removes the previous local copy. This covers deleted rows, rows hidden
+by RLS, and rows outside a `baseFilter` selection. `baseFilter` controls the selected
+data set; enforce authorization separately. Row-response batch metadata identifies
+the processed prefix, so holes within it become incoming deletions without another
+request. Keys beyond a truncated response are fetched later; legacy partial replies
+without batch metadata retain retries. HTTP/network errors and invalid row-response
+envelopes do not imply deletion. Withdrawals use ordinary incoming-delete journal,
+stable-base and outbox handling and do not enqueue a deletion for the server.
+
+The server must announce a change key for each affected row. If visibility depends
+on a parent row, also announce affected children when that parent changes. Changes
+to access rules or selection criteria without row change keys require a separate
+refresh. Each replica remains bound to its authenticated account.
+
+From `5.6.0-beta-7`, two public maintenance functions keep application code
+independent of Orange's storage layout and PostgreSQL trigger names:
+
+```ts
+// PostgreSQL/PGlite: check every table in this connected mapping, without writes.
+await orange.assertSyncReady(serverDb);
+
+// Browser: close every instance using this replica before deleting its files.
+await localDb.close();
+await orange.deleteSqliteOPFS('account.sqlite3', {
+  vfs: 'opfs-sahpool',
+  sync: true
+});
+```
+
+`assertSyncReady()` checks readable log-table columns and enabled INSERT/UPDATE/
+DELETE tracking for every mapped primary-key table, including under a SELECT-only
+runtime role. Pass `{ changeTable, appliedMutationsTable }` if configured during
+setup. It does not install tracking, test authorization policies or perform a
+round trip; install tracking with `orange-orm sync:setup` during deployment.
+
+`deleteSqliteOPFS()` requires the original `vfs`; `sync: true` includes both data
+replicas and the delta store. For custom SAH pools, pass the original `opfsSahPool`
+configuration and use a pool dedicated to that database: its entire directory is
+removed. `opfs-wl` removes database and journal files. Missing files are accepted,
+so interrupted cleanup can be retried after restart without opening the database.
+Storage/locking errors reject; unrelated databases and application media caches
+are retained. This deletes local data including unsent changes, never server rows.
+Close all users of the files first; this API does not close other tabs for you.
+No OPFS access occurs at module import time.
+
 - `await syncClient.stop()` pauses sync, cancels active and queued sync requests,
   and drains storage/rollback work before resolving. Timers and reconnect listeners
   stop. No sync events are delivered while paused. Outbox rows and checkpoints
   remain on disk, and event subscriptions remain registered for a later `start()`.
+- From `5.6.0-beta-8`, successful `sync` events include `changed` when Orange can
+  tell whether the visible local replica changed. `false` means consumers may
+  skip a data reload; an absent value should retain the normal refresh behavior. Manual `sync()`
+  also returns its pull result.
 - After `stop()`, manual `sync()` calls reject with `code: 'ORANGE_SYNC_ABORT'`
   until `start()` resumes the instance. A new instance still supports manual sync
   with `auto: false`. Explicit schema setup/reset and local reads/writes remain

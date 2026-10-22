@@ -167,6 +167,12 @@ describe('sync row reads enforce baseFilter', () => {
 			await local.syncClient.sync();
 			expect((await local.document.getById(1)).title).toBe('Updated');
 			expect(await local.document.getById(3)).toBeUndefined();
+			// The mapped notes relation is outside this replica. Withdrawing a
+			// document must not read or cascade into that nonexistent local table.
+			await db.document.update({ isPublic: false }, { where: x => x.id.eq(2) });
+			await local.syncClient.sync();
+			expect(await local.document.getById(2)).toBeUndefined();
+			expect((await local.document.getMany()).map(row => row.id).sort()).toEqual([1, 4]);
 		}
 		finally {
 			await local.close();

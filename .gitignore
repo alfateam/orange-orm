@@ -14,5 +14,6 @@ coverage
 /tests/.tmp/
 .env
 deno.lock
+*.tgz
 *.db-wal
 *.db-shm

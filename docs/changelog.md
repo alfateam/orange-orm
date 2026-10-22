@@ -1,4 +1,33 @@
 ## Changelog
+__5.6.0-beta-8__
+
+Expose `changed` on successful sync events so clients can skip reads after an
+empty pull. Manual `sync()` now returns its pull result.
+
+__5.6.0-beta-7__
+
+Add public `deleteSqliteOPFS()` for closed single/dual OPFS databases, including
+custom SAH pools, idempotent retry and propagation of storage failures. Database
+creation and deletion share the internal replica-layout helpers.
+
+Add read-only `assertSyncReady()` for PostgreSQL/PGlite mappings. It checks every
+mapped primary-key table using the tracking implementation's own names, works
+under SELECT-only runtime roles and accepts unrelated triggers.
+
+No event contract changes: applications can refresh through the public `sync`
+event without inspecting `__orangeDualSync`. Broader status/retry coordination
+remains separate work.
+
+__5.6.0-beta-6__
+Withdraw stale local rows when a successfully processed sync key has no returned
+row, including rows excluded by PostgreSQL RLS or a server-side `baseFilter`.
+Complete row responses identify the processed prefix: missing rows in that prefix
+become incoming deletions immediately, while keys beyond a truncated response are
+fetched later. Legacy partial responses without batch metadata retain retries.
+Apply withdrawals through the pull journal and stable base without outgoing
+deletions. Sync deletes target only the specified rows, avoiding ORM cascades into
+mapped tables outside the replica. Failed row reads retain cached data for retry.
+
 __5.6.0-beta-5__
 Add `syncClient.recoverLocalSchema()` to drain persisted old-schema mutations before
 reset, with optional per-mutation HTTP 409 discard, durable acknowledgements,

@@ -80,6 +80,34 @@ async function setupChangeTracking(db, tables, options = {}) {
 	return { trackedTables, changeTable, appliedMutationsTable };
 }
 
+// PostgreSQL/PGlite readiness belongs beside the implementation that installs
+// tracking. Application code need not know trigger names, counts or log columns.
+async function assertSyncReady(db, options = {}) {
+	if (!db || typeof db.query !== 'function' || !db.tables)
+		throw new Error('Orange: assertSyncReady requires a connected mapped database.');
+	const changeTable = normalizeChangeTable(options.changeTable);
+	const appliedTable = normalizeAppliedMutationsTable(options.appliedMutationsTable);
+	await db.query(`SELECT id, table_name, op, pk_json, ts FROM ${quoteQualified(changeTable)} LIMIT 0`);
+	await db.query(`SELECT client_id, mutation_id, applied_at, result_json FROM ${quoteQualified(appliedTable)} LIMIT 0`);
+	const visited = new Set();
+	for (const table of Object.values(db.tables)) {
+		const name = table && table._dbName;
+		if (!name || isChangeTable(name, changeTable) || !(table._primaryColumns || []).length || visited.has(name))
+			continue;
+		visited.add(name);
+		// pg_catalog remains visible to SELECT-only runtime roles.
+		const triggers = await db.query({
+			sql: 'SELECT tgname AS name, tgtype AS type, tgenabled AS enabled FROM pg_catalog.pg_trigger WHERE tgrelid = to_regclass($1) AND NOT tgisinternal',
+			parameters: [quoteQualified(name)]
+		});
+		for (const [operation, type] of [['insert', 5], ['update', 17], ['delete', 9]]) {
+			if (!triggers.some(trigger => trigger.name === buildTriggerName(name, operation)
+				&& Number(trigger.type) === type && ['O', 'A'].includes(trigger.enabled)))
+				throw new Error(`Orange sync tracking is missing or disabled for ${name} (${operation}). Run orange-orm sync:setup before starting the server.`);
+		}
+	}
+}
+
 function normalizeChangeTable(changeTable) {
 	return (changeTable && String(changeTable).trim()) || 'orange_changes';
 }
@@ -184,5 +212,6 @@ function sqlStringLiteral(value) {
 
 module.exports = {
 	buildChangeTrackingSql,
-	setupChangeTracking
+	setupChangeTracking,
+	assertSyncReady
 };

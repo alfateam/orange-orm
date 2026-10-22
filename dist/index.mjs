@@ -9338,7 +9338,7 @@ function requireSyncClient () {
 		}
 
 		async function sync(options = {}) {
-			await pull(normalizeSyncOptions(options));
+			return pull(normalizeSyncOptions(options));
 		}
 
 		async function syncAndCapturePullJournal(options = {}) {
@@ -9486,6 +9486,8 @@ function requireSyncClient () {
 				try {
 					const result = await fn(options);
 					const payload = result === undefined ? { method } : { method, result };
+					if (method === 'sync' && typeof result?.applied === 'number')
+						payload.changed = result.applied > 0;
 					emit(method, payload);
 					if (method !== 'sync')
 						emit('sync', payload);
@@ -10365,7 +10367,7 @@ function requireSyncClient () {
 						const deleteItems = batch.filter(x => x.op === 'D');
 						const upsertItems = batch.filter(x => x.op !== 'D' && x.row !== undefined);
 						if (deleteItems.length > 0) {
-							applied += await applyDeleteItemsOnTx(tx, deleteItems, defaultPatchOptions);
+							applied += await applyDeleteItemsOnTx(tx, deleteItems);
 							if (!fileSnapshotRollback)
 								await applyDeleteItemsToStableBase(tx, deleteItems);
 						}
@@ -10816,6 +10818,11 @@ function requireSyncClient () {
 
 				function acceptRowsPayload(batchState, currentItems, payload) {
 					const acceptedCount = getRowsAcceptedCount(payload, currentItems.length);
+					// A complete protocol response identifies the processed prefix. Holes
+					// within it are authoritative; only the truncated suffix needs fetching.
+					const completeResponse = payload.requested === currentItems.length
+						&& Number.isInteger(payload.limit) && payload.limit > 0
+						&& typeof payload.truncated === 'boolean';
 					const acceptedItems = acceptedCount < currentItems.length
 						? currentItems.slice(0, acceptedCount)
 						: currentItems;
@@ -10823,7 +10830,7 @@ function requireSyncClient () {
 					let finalMissingItems = [];
 					if (acceptedCount < currentItems.length) {
 						const deferredItems = currentItems.slice(acceptedCount);
-						const missingChunks = requeueMissingRowChunks(acceptedItems, missingItems);
+						const missingChunks = requeueMissingRowChunks(acceptedItems, missingItems, completeResponse);
 						if (!missingChunks.requeued)
 							finalMissingItems = missingItems;
 						const requeuedChunks = [];
@@ -10834,7 +10841,7 @@ function requireSyncClient () {
 						addRowJobsFront(batchState, requeuedChunks);
 					}
 					else {
-						const missingChunks = requeueMissingRowChunks(currentItems, missingItems);
+						const missingChunks = requeueMissingRowChunks(currentItems, missingItems, completeResponse);
 						if (!missingChunks.requeued)
 							finalMissingItems = missingItems;
 						addRowJobsFront(batchState, missingChunks.chunks);
@@ -10843,9 +10850,10 @@ function requireSyncClient () {
 					markMissingPullJournalRows(batchState.itemState, finalMissingItems);
 				}
 
-				function requeueMissingRowChunks(requestedItems, missingItems) {
+				function requeueMissingRowChunks(requestedItems, missingItems, completeResponse) {
 					const chunks = [];
-					const requeued = enqueueMissingRows(chunks, requestedItems, missingItems);
+					// Retain retries for legacy partial responses without batch metadata.
+					const requeued = !completeResponse && enqueueMissingRows(chunks, requestedItems, missingItems);
 					return { requeued, chunks };
 				}
 
@@ -11289,6 +11297,10 @@ function requireSyncClient () {
 					continue;
 				const state = states.shift();
 				state.ready = true;
+				// Only keys missing from completed row reads reach here (after retry
+				// for legacy responses). Withdraw rows through the normal pull delete
+				// path, including stable-base/journal handling, without an outbox write.
+				state.item = { ...state.item, op: 'D' };
 				state.rowItem = undefined;
 			}
 		}
@@ -12210,6 +12222,35 @@ function requireSyncClient () {
 			return new Map(entries.map(entry => [entry.name, entry]));
 		}
 
+		async function applyDeleteItemsOnTx(tx, items) {
+			const perTable = new Map();
+			for (const item of items) {
+				if (!item || typeof item.table !== 'string' || !Array.isArray(item.pk))
+					continue;
+				if (!perTable.has(item.table))
+					perTable.set(item.table, []);
+				perTable.get(item.table).push(item.pk);
+			}
+			let applied = 0;
+			for (const name of orderTablesByDependencies(client, Array.from(perTable.keys())).reverse()) {
+				const table = client.tables && client.tables[name];
+				const primaryColumns = getPrimaryColumns(table);
+				if (!table || primaryColumns.length === 0)
+					throw new Error(`Table "${name}" does not exist in this client`);
+				const keys = perTable.get(name);
+				// Replication deletes only the specified rows. Patch removal cascades
+				// through mapped relations, including tables outside the local replica.
+				for (let offset = 0; offset < keys.length; offset += maxStableBaseKeysPerStatement) {
+					const batch = keys.slice(offset, offset + maxStableBaseKeysPerStatement);
+					const where = primaryKeyWhereAnySql(primaryColumns, batch);
+					if (where)
+						await tx.query(`DELETE FROM ${quoteIdent(table._dbName || name)} WHERE ${where}`);
+				}
+				applied += keys.length;
+			}
+			return applied;
+		}
+
 		async function applyDeleteItemsToStableBase(db, items, knownBaseByName) {
 			const deletes = Array.isArray(items) ? items : [];
 			if (deletes.length === 0)
@@ -12266,7 +12307,7 @@ function requireSyncClient () {
 			let applied = 0;
 			if (deleteItems.length > 0) {
 				const dataApplyStartedAtMs = Date.now();
-				applied += await applyDeleteItemsOnTx(tx, deleteItems, patchOptions);
+				applied += await applyDeleteItemsOnTx(tx, deleteItems);
 				addPullTiming(timings, 'dataApplyMs', dataApplyStartedAtMs);
 				if (!deferStableBase) {
 					const stableBaseStartedAtMs = Date.now();
@@ -13242,34 +13283,6 @@ function requireSyncClient () {
 				return keyItem;
 			})
 		};
-	}
-
-	async function applyDeleteItemsOnTx(tx, items, patchOptions) {
-		const deletes = Array.isArray(items) ? items : [];
-		const perTable = new Map();
-		for (let i = 0; i < deletes.length; i++) {
-			const item = deletes[i];
-			if (!item || typeof item.table !== 'string' || !Array.isArray(item.pk))
-				continue;
-			if (!perTable.has(item.table))
-				perTable.set(item.table, []);
-			perTable.get(item.table).push({
-				op: 'remove',
-				path: `/${JSON.stringify(item.pk)}`
-			});
-		}
-
-		const tableNames = orderTablesByDependencies(tx, Array.from(perTable.keys())).reverse();
-		let applied = 0;
-		for (let i = 0; i < tableNames.length; i++) {
-			const table = tableNames[i];
-			if (!tx[table] || typeof tx[table].patch !== 'function')
-				throw new Error(`Table "${table}" does not exist in this client`);
-			const patch = perTable.get(table);
-			await tx[table].patch(patch, patchOptions);
-			applied += patch.length;
-		}
-		return applied;
 	}
 
 	async function applyRowsPayloadOnTx(tx, items, patchOptions) {
@@ -27057,6 +27070,373 @@ function requireCreateWorker () {
 	return createWorker;
 }
 
+var storageLayout;
+var hasRequiredStorageLayout;
+
+function requireStorageLayout () {
+	if (hasRequiredStorageLayout) return storageLayout;
+	hasRequiredStorageLayout = 1;
+	function toCachePoolOptions(poolOptions = {}, connectionString) {
+		const options = toSecondaryDataPoolOptions(poolOptions, connectionString);
+		delete options.sync;
+		return options;
+	}
+
+	function toSecondaryDataPoolOptions(poolOptions = {}, connectionString) {
+		let options = { ...poolOptions };
+		const hadProvidedWorker = !!options.worker;
+		delete options.worker;
+		if (hadProvidedWorker)
+			delete options.closeDbOnClose;
+		options = withIsolatedSahPool(options, connectionString);
+		return options;
+	}
+
+	function withIsolatedSahPool(poolOptions, connectionString) {
+		if (!usesSahPool(poolOptions))
+			return poolOptions;
+		const source = poolOptions.opfsSahPool || poolOptions.opfsSAHPool || poolOptions.sahPool || {};
+		const baseName = nonEmptyString(source.name) || 'opfs-sahpool';
+		const baseDirectory = nonEmptyString(source.directory) || `.${baseName}`;
+		const token = stableSahPoolToken(connectionString);
+		return {
+			...poolOptions,
+			opfsSahPool: {
+				...source,
+				name: `${baseName}-orange-${token}`,
+				directory: `${baseDirectory}-orange-${token}`
+			}
+		};
+	}
+
+	function usesSahPool(poolOptions) {
+		return poolOptions.vfs === 'opfs-sahpool';
+	}
+
+	function stableSahPoolToken(value) {
+		const text = String(value || 'default');
+		let hash = 2166136261;
+		for (let i = 0; i < text.length; i++) {
+			hash ^= text.charCodeAt(i);
+			hash = Math.imul(hash, 16777619);
+		}
+		return (hash >>> 0).toString(16).padStart(8, '0');
+	}
+
+	function appendRoleSuffix(connectionString, suffix) {
+		const value = String(connectionString);
+		if (value.endsWith('.sqlite3'))
+			return value.slice(0, -8) + `.__orange_sync_${suffix}.sqlite3`;
+		if (value.endsWith('.db'))
+			return value.slice(0, -3) + `.__orange_sync_${suffix}.db`;
+		return `${value}.__orange_sync_${suffix}.sqlite3`;
+	}
+
+	function nonEmptyString(value) {
+		return typeof value === 'string' && value.length > 0 ? value : undefined;
+	}
+
+	storageLayout = { appendRoleSuffix, toSecondaryDataPoolOptions, toCachePoolOptions };
+	return storageLayout;
+}
+
+var deleteDatabase;
+var hasRequiredDeleteDatabase;
+
+function requireDeleteDatabase () {
+	if (hasRequiredDeleteDatabase) return deleteDatabase;
+	hasRequiredDeleteDatabase = 1;
+	const normalizeSahPool = requireNormalizeOpfsSahPoolOptions();
+	const { appendRoleSuffix, toSecondaryDataPoolOptions, toCachePoolOptions } = requireStorageLayout();
+	const { runWithCrossTabLock, normalizeLockNamePart } = requireCrossTabLock();
+
+	// Call only after all clients using these files have completed db.close().
+	// This also works after a restart, without reopening a deleted account's data.
+	async function deleteSqliteOPFS(connectionString, options = {}) {
+		if (typeof connectionString !== 'string' || !connectionString.trim())
+			throw new Error('deleteSqliteOPFS requires a database name.');
+		if (options.vfs !== 'opfs-sahpool' && options.vfs !== 'opfs-wl')
+			throw new Error('deleteSqliteOPFS requires the original vfs.');
+		const storage = globalThis.navigator && globalThis.navigator.storage;
+		if (!storage || typeof storage.getDirectory !== 'function')
+			throw new Error('OPFS storage is unavailable.');
+		const databases = [{ name: connectionString, options }];
+		if (options.sync) {
+			const secondary = appendRoleSuffix(connectionString, 'b');
+			const delta = appendRoleSuffix(connectionString, 'delta');
+			databases.push({ name: secondary, options: toSecondaryDataPoolOptions(options, secondary) },
+				{ name: delta, options: toCachePoolOptions(options, delta) });
+		}
+		const paths = databases.flatMap(database => {
+			if (options.vfs === 'opfs-sahpool') {
+				const pool = normalizeSahPool(database.options, database.name);
+				return [{ path: pool.directory || '.' + (pool.name || 'opfs-sahpool'), recursive: true }];
+			}
+			return ['', '-journal', '-wal', '-shm'].map(suffix => ({ path: database.name + suffix, recursive: false }));
+		}).map(entry => ({ ...entry, parts: safePath(entry.path) }));
+		const identity = normalizeLockNamePart(connectionString);
+		const lockNames = options.sync
+			? ['dual-sync', 'dual-write', 'dual-read'].map(kind => `orange-orm:sqliteOPFS:${kind}:${identity}`)
+			: [];
+		if (options.vfs === 'opfs-wl')
+			for (const database of databases)
+				lockNames.push(`orange-orm:sqlite-opfs-access:${normalizeLockNamePart(database.name)}:opfs-wl`);
+		async function locked(index) {
+			if (index < lockNames.length)
+				return runWithCrossTabLock(lockNames[index], { enabled: true, timeoutMs: 15000 }, () => locked(index + 1));
+			const root = await storage.getDirectory();
+			for (const entry of paths) {
+				try {
+					let directory = root;
+					for (const part of entry.parts.slice(0, -1))
+						directory = await directory.getDirectoryHandle(part);
+					await directory.removeEntry(entry.parts[entry.parts.length - 1], { recursive: entry.recursive });
+				}
+				catch (error) {
+					if (!error || error.name !== 'NotFoundError') throw error;
+				}
+			}
+		}
+		await locked(0);
+	}
+
+	function safePath(path) {
+		const parts = String(path || '').replace(/^\/+/, '').split('/');
+		if (parts.some(part => !part || part === '.' || part === '..') || String(path).includes('\\'))
+			throw new Error('Refusing to delete an invalid OPFS database path.');
+		return parts;
+	}
+
+	deleteDatabase = deleteSqliteOPFS;
+	return deleteDatabase;
+}
+
+var setupChangeTracking_1;
+var hasRequiredSetupChangeTracking;
+
+function requireSetupChangeTracking () {
+	if (hasRequiredSetupChangeTracking) return setupChangeTracking_1;
+	hasRequiredSetupChangeTracking = 1;
+	function buildChangeTrackingSql(tables, options = {}) {
+		const changeTable = normalizeChangeTable(options.changeTable);
+		const appliedMutationsTable = normalizeAppliedMutationsTable(options.appliedMutationsTable);
+		const statements = [
+			buildCreateChangeTableSql(changeTable),
+			buildCreateAppliedMutationsTableSql(appliedMutationsTable)
+		];
+		let trackedTables = 0;
+		const tableNames = tables ? Object.keys(tables) : [];
+		for (const name of tableNames) {
+			const table = tables[name];
+			const dbName = table && table._dbName;
+			if (typeof dbName !== 'string' || dbName.length === 0)
+				continue;
+			if (isChangeTable(dbName, changeTable))
+				continue;
+
+			const pkColumns = table._primaryColumns || [];
+			if (pkColumns.length === 0) {
+				console.warn(`Orange: skipping ${dbName} (no primary key).`);
+				continue;
+			}
+
+			const qualifiedTable = quoteQualified(dbName);
+			const functionName = buildFunctionName(dbName);
+			const functionRef = qualifyWithSchema(dbName, functionName);
+			const qualifiedChangeTable = quoteQualified(changeTable);
+
+			const triggerInsert = buildTriggerName(dbName, 'insert');
+			const triggerUpdate = buildTriggerName(dbName, 'update');
+			const triggerDelete = buildTriggerName(dbName, 'delete');
+
+			statements.push(`DROP TRIGGER IF EXISTS ${quoteIdent(triggerInsert)} ON ${qualifiedTable};`);
+			statements.push(`DROP TRIGGER IF EXISTS ${quoteIdent(triggerUpdate)} ON ${qualifiedTable};`);
+			statements.push(`DROP TRIGGER IF EXISTS ${quoteIdent(triggerDelete)} ON ${qualifiedTable};`);
+			statements.push(`DROP FUNCTION IF EXISTS ${functionRef}();`);
+
+			const jsonNew = buildPkJson(pkColumns, 'NEW');
+			const jsonOld = buildPkJson(pkColumns, 'OLD');
+			const tableNameLiteral = sqlStringLiteral(dbName);
+
+			statements.push([
+				`CREATE OR REPLACE FUNCTION ${functionRef}() RETURNS trigger AS $$`,
+				'DECLARE',
+				'\tv_pk_json text;',
+				'BEGIN',
+				'\tIF (TG_OP = \'DELETE\') THEN',
+				`\t\tv_pk_json := ${jsonOld};`,
+				'\tELSE',
+				`\t\tv_pk_json := ${jsonNew};`,
+				'\tEND IF;',
+				`\tINSERT INTO ${qualifiedChangeTable}(table_name, op, pk_json, ts)`,
+				`\tVALUES (${tableNameLiteral}, SUBSTRING(TG_OP, 1, 1), v_pk_json, NOW());`,
+				'\tIF (TG_OP = \'DELETE\') THEN',
+				'\t\tRETURN OLD;',
+				'\tEND IF;',
+				'\tRETURN NEW;',
+				'END;',
+				'$$ LANGUAGE plpgsql;'
+			].join('\n'));
+
+			statements.push(`CREATE TRIGGER ${quoteIdent(triggerInsert)} AFTER INSERT ON ${qualifiedTable} FOR EACH ROW EXECUTE FUNCTION ${functionRef}();`);
+			statements.push(`CREATE TRIGGER ${quoteIdent(triggerUpdate)} AFTER UPDATE ON ${qualifiedTable} FOR EACH ROW EXECUTE FUNCTION ${functionRef}();`);
+			statements.push(`CREATE TRIGGER ${quoteIdent(triggerDelete)} AFTER DELETE ON ${qualifiedTable} FOR EACH ROW EXECUTE FUNCTION ${functionRef}();`);
+			trackedTables += 1;
+		}
+
+		return { statements, sql: statements.join('\n\n') + '\n', trackedTables, changeTable, appliedMutationsTable };
+	}
+
+	async function setupChangeTracking(db, tables, options = {}) {
+		if (!db || typeof db.query !== 'function')
+			throw new Error('Orange: setupChangeTracking requires a connected db with a query method.');
+		const { statements, trackedTables, changeTable, appliedMutationsTable } = buildChangeTrackingSql(tables, options);
+		for (const statement of statements) {
+			if (!statement.trim())
+				continue;
+			await db.query(statement);
+		}
+		return { trackedTables, changeTable, appliedMutationsTable };
+	}
+
+	// PostgreSQL/PGlite readiness belongs beside the implementation that installs
+	// tracking. Application code need not know trigger names, counts or log columns.
+	async function assertSyncReady(db, options = {}) {
+		if (!db || typeof db.query !== 'function' || !db.tables)
+			throw new Error('Orange: assertSyncReady requires a connected mapped database.');
+		const changeTable = normalizeChangeTable(options.changeTable);
+		const appliedTable = normalizeAppliedMutationsTable(options.appliedMutationsTable);
+		await db.query(`SELECT id, table_name, op, pk_json, ts FROM ${quoteQualified(changeTable)} LIMIT 0`);
+		await db.query(`SELECT client_id, mutation_id, applied_at, result_json FROM ${quoteQualified(appliedTable)} LIMIT 0`);
+		const visited = new Set();
+		for (const table of Object.values(db.tables)) {
+			const name = table && table._dbName;
+			if (!name || isChangeTable(name, changeTable) || !(table._primaryColumns || []).length || visited.has(name))
+				continue;
+			visited.add(name);
+			// pg_catalog remains visible to SELECT-only runtime roles.
+			const triggers = await db.query({
+				sql: 'SELECT tgname AS name, tgtype AS type, tgenabled AS enabled FROM pg_catalog.pg_trigger WHERE tgrelid = to_regclass($1) AND NOT tgisinternal',
+				parameters: [quoteQualified(name)]
+			});
+			for (const [operation, type] of [['insert', 5], ['update', 17], ['delete', 9]]) {
+				if (!triggers.some(trigger => trigger.name === buildTriggerName(name, operation)
+					&& Number(trigger.type) === type && ['O', 'A'].includes(trigger.enabled)))
+					throw new Error(`Orange sync tracking is missing or disabled for ${name} (${operation}). Run orange-orm sync:setup before starting the server.`);
+			}
+		}
+	}
+
+	function normalizeChangeTable(changeTable) {
+		return (changeTable && String(changeTable).trim()) || 'orange_changes';
+	}
+
+	function normalizeAppliedMutationsTable(appliedMutationsTable) {
+		return (appliedMutationsTable && String(appliedMutationsTable).trim()) || 'orange_sync_applied_mutations';
+	}
+
+	function buildCreateChangeTableSql(changeTable) {
+		const qualifiedChangeTable = quoteQualified(changeTable);
+		return [
+			`CREATE TABLE IF NOT EXISTS ${qualifiedChangeTable} (`,
+			'\tid BIGSERIAL PRIMARY KEY,',
+			'\ttable_name TEXT NOT NULL,',
+			'\top CHAR(1) NOT NULL,',
+			'\tpk_json TEXT NOT NULL,',
+			'\tts TIMESTAMPTZ NOT NULL DEFAULT NOW()',
+			');'
+		].join('\n');
+	}
+
+	function buildCreateAppliedMutationsTableSql(appliedMutationsTable) {
+		const qualifiedAppliedMutationsTable = quoteQualified(appliedMutationsTable);
+		return [
+			`CREATE TABLE IF NOT EXISTS ${qualifiedAppliedMutationsTable} (`,
+			'\tclient_id TEXT NOT NULL,',
+			'\tmutation_id TEXT NOT NULL,',
+			'\tapplied_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),',
+			'\tresult_json JSONB NOT NULL,',
+			'\tPRIMARY KEY (client_id, mutation_id)',
+			');'
+		].join('\n');
+	}
+
+	function isChangeTable(dbName, changeTable) {
+		const dbNormalized = normalizeQualifiedName(dbName);
+		const changeNormalized = normalizeQualifiedName(changeTable);
+		if (dbNormalized === changeNormalized)
+			return true;
+		const dbTail = dbNormalized.split('.').pop();
+		const changeTail = changeNormalized.split('.').pop();
+		return dbTail === changeTail && (dbTail === dbNormalized || changeTail === changeNormalized);
+	}
+
+	function normalizeQualifiedName(name) {
+		return String(name).replace(/"/g, '').trim().toLowerCase();
+	}
+
+	function buildFunctionName(dbName) {
+		const safe = sanitizeIdent(dbName);
+		return `orange_sync__${safe}__log`;
+	}
+
+	function buildTriggerName(dbName, op) {
+		const safe = sanitizeIdent(dbName);
+		return `orange_sync__${safe}__${op}`;
+	}
+
+	function sanitizeIdent(value) {
+		return value
+			.replace(/[^a-zA-Z0-9_]+/g, '_')
+			.replace(/^_+|_+$/g, '')
+			.toLowerCase() || 'table';
+	}
+
+	function buildPkJson(pkColumns, rowAlias) {
+		const args = [];
+		for (const column of pkColumns) {
+			const key = sqlStringLiteral(column.alias);
+			const value = `${rowAlias}.${quoteIdent(column._dbName)}`;
+			args.push(`${key}, ${value}`);
+		}
+		return `json_build_object(${args.join(', ')})::text`;
+	}
+
+	function qualifyWithSchema(dbName, ident) {
+		const schema = splitSchema(dbName);
+		if (!schema)
+			return quoteIdent(ident);
+		return `${quoteIdent(schema)}.${quoteIdent(ident)}`;
+	}
+
+	function splitSchema(dbName) {
+		const parts = dbName.split('.');
+		if (parts.length <= 1)
+			return null;
+		return parts[0];
+	}
+
+	function quoteQualified(dbName) {
+		const parts = dbName.split('.').map(quoteIdent);
+		return parts.join('.');
+	}
+
+	function quoteIdent(name) {
+		return `"${String(name).replace(/"/g, '""')}"`;
+	}
+
+	function sqlStringLiteral(value) {
+		return `'${String(value).replace(/'/g, '\'\'')}'`;
+	}
+
+	setupChangeTracking_1 = {
+		buildChangeTrackingSql,
+		setupChangeTracking,
+		assertSyncReady
+	};
+	return setupChangeTracking_1;
+}
+
 var commitCommand;
 var hasRequiredCommitCommand;
 
@@ -33896,6 +34276,7 @@ var hasRequiredDualSyncDatabase;
 function requireDualSyncDatabase () {
 	if (hasRequiredDualSyncDatabase) return dualSyncDatabase.exports;
 	hasRequiredDualSyncDatabase = 1;
+	const { appendRoleSuffix, toSecondaryDataPoolOptions, toCachePoolOptions } = requireStorageLayout();
 	const { clearSyncOperationMemory } = requireOperationContext();
 	const createSyncLifecycle = requireSyncLifecycle();
 	const hostLocal = requireHostLocal();
@@ -34567,7 +34948,7 @@ function requireDualSyncDatabase () {
 			const emittedDataReadySync = await maybeEmitInitialReady(
 				publishedManifest.activeRole,
 				publishedManifest,
-				{ method: 'sync', result: dataReadyResult }
+				syncEventPayload('sync', dataReadyResult)
 			);
 			if (emittedDataReadySync && result && result === Object(result))
 				dataReadySyncResults.add(result);
@@ -35464,7 +35845,7 @@ function requireDualSyncDatabase () {
 					&& result && result === Object(result)
 					&& dataReadySyncResults.delete(result);
 				if (!dataReadySyncEmitted)
-					emit(method, { method, result });
+					emit(method, syncEventPayload(method, result));
 				if (method !== 'sync')
 					emit('sync', { method, result });
 				return result;
@@ -35476,6 +35857,14 @@ function requireDualSyncDatabase () {
 				emit('error', { method, error });
 				throw error;
 			}
+		}
+
+		function syncEventPayload(method, result) {
+			const payload = { method, result };
+			const swapped = result && result.__orangeDualSync && result.__orangeDualSync.swapped;
+			if (method === 'sync' && typeof swapped === 'boolean')
+				payload.changed = swapped;
+			return payload;
 		}
 
 		function emit(event, payload) {
@@ -36584,53 +36973,6 @@ function requireDualSyncDatabase () {
 		return options;
 	}
 
-	function toCachePoolOptions(poolOptions = {}, connectionString) {
-		const options = toSecondaryDataPoolOptions(poolOptions, connectionString);
-		delete options.sync;
-		return options;
-	}
-
-	function toSecondaryDataPoolOptions(poolOptions = {}, connectionString) {
-		let options = { ...poolOptions };
-		const hadProvidedWorker = !!options.worker;
-		delete options.worker;
-		if (hadProvidedWorker)
-			delete options.closeDbOnClose;
-		options = withIsolatedSahPool(options, connectionString);
-		return options;
-	}
-
-	function withIsolatedSahPool(poolOptions, connectionString) {
-		if (!usesSahPool(poolOptions))
-			return poolOptions;
-		const source = poolOptions.opfsSahPool || poolOptions.opfsSAHPool || poolOptions.sahPool || {};
-		const baseName = nonEmptyString(source.name) || 'opfs-sahpool';
-		const baseDirectory = nonEmptyString(source.directory) || `.${baseName}`;
-		const token = stableSahPoolToken(connectionString);
-		return {
-			...poolOptions,
-			opfsSahPool: {
-				...source,
-				name: `${baseName}-orange-${token}`,
-				directory: `${baseDirectory}-orange-${token}`
-			}
-		};
-	}
-
-	function usesSahPool(poolOptions) {
-		return poolOptions.vfs === 'opfs-sahpool';
-	}
-
-	function stableSahPoolToken(value) {
-		const text = String(value || 'default');
-		let hash = 2166136261;
-		for (let i = 0; i < text.length; i++) {
-			hash ^= text.charCodeAt(i);
-			hash = Math.imul(hash, 16777619);
-		}
-		return (hash >>> 0).toString(16).padStart(8, '0');
-	}
-
 	function nonEmptyString(value) {
 		return typeof value === 'string' && value.length > 0 ? value : undefined;
 	}
@@ -36647,15 +36989,6 @@ function requireDualSyncDatabase () {
 
 	function isManagedSyncWorkerEnabled(sync) {
 		return !!sync && sync === Object(sync) && !Array.isArray(sync) && sync.worker !== false;
-	}
-
-	function appendRoleSuffix(connectionString, suffix) {
-		const value = String(connectionString);
-		if (value.endsWith('.sqlite3'))
-			return value.slice(0, -8) + `.__orange_sync_${suffix}.sqlite3`;
-		if (value.endsWith('.db'))
-			return value.slice(0, -3) + `.__orange_sync_${suffix}.db`;
-		return `${value}.__orange_sync_${suffix}.sqlite3`;
 	}
 
 	function isRole(value) {
@@ -40749,6 +41082,8 @@ function requireSrc () {
 	connectViaPool.createSyncWorkerHandler = requireSyncWorkerHandler();
 	connectViaPool.createSqliteOPFSWorker = requireCreateWorker();
 	connectViaPool.connectSqliteOPFSWorker = requireConnectWorkerPort();
+	connectViaPool.deleteSqliteOPFS = requireDeleteDatabase();
+	connectViaPool.assertSyncReady = requireSetupChangeTracking().assertSyncReady;
 	connectViaPool.table = requireTable();
 	connectViaPool.filter = requireEmptyFilter();
 	connectViaPool.commit = requireCommit();

@@ -24,6 +24,15 @@ declare namespace r {
     function pglite(config?: PGliteOptions | string | undefined, options?: PoolOptions): Pool;
     function sqlite(connectionString: string, options?: PoolOptions): Pool;
     function sqliteOPFS(connectionString: string, options?: SqliteOPFSPoolOptions): Pool;
+    /** Delete closed OPFS storage, including both replicas and delta storage when sync is true. */
+    function deleteSqliteOPFS(connectionString: string, options: {
+        vfs: 'opfs-sahpool' | 'opfs-wl';
+        sync?: boolean;
+        opfsSahPool?: MapSqliteOPFSPoolOptions['opfsSahPool'];
+    }): Promise<void>;
+    /** Read-only verification of PostgreSQL/PGlite tracking for every mapped table. */
+    function assertSyncReady(db: { query(query: string | { sql: string; parameters: any[] }): Promise<unknown[]> },
+        options?: { changeTable?: string; appliedMutationsTable?: string }): Promise<void>;
     function sap(connectionString: string, options?: PoolOptions): Pool;
     function mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions): Pool;
     function mssql(connectionString: string, options?: PoolOptions): Pool;

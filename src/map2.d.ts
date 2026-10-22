@@ -1277,6 +1277,8 @@ export interface SyncErrorEvent {
 export interface SyncEvent {
   method: 'sync';
   result?: any;
+  /** Whether this sync changed the visible local replica. Omitted when unknown. */
+  changed?: boolean;
 }
 
 export interface SyncProgressEvent {
@@ -1379,7 +1381,7 @@ export interface SyncInitialReadyEvent<M extends Record<string, TableDefinition<
 }
 
 export interface SyncClient<M extends Record<string, TableDefinition<M>> = any> {
-  sync(options?: SyncOptions): Promise<void>;
+  sync(options?: SyncOptions): Promise<{ applied?: number; [key: string]: unknown }>;
   ensureLocalSchema(options?: SyncOptions): Promise<SyncLocalSchemaResult<M>>;
   resetLocal(options?: SyncResetLocalOptions<M>): Promise<SyncResetLocalResult<M>>;
   /** Drain the old outbox before resetting the schema. Errors retain unresolved writes.

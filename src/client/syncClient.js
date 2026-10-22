@@ -196,7 +196,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 	}
 
 	async function sync(options = {}) {
-		await pull(normalizeSyncOptions(options));
+		return pull(normalizeSyncOptions(options));
 	}
 
 	async function syncAndCapturePullJournal(options = {}) {
@@ -344,6 +344,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 			try {
 				const result = await fn(options);
 				const payload = result === undefined ? { method } : { method, result };
+				if (method === 'sync' && typeof result?.applied === 'number')
+					payload.changed = result.applied > 0;
 				emit(method, payload);
 				if (method !== 'sync')
 					emit('sync', payload);
@@ -1223,7 +1225,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 					const deleteItems = batch.filter(x => x.op === 'D');
 					const upsertItems = batch.filter(x => x.op !== 'D' && x.row !== undefined);
 					if (deleteItems.length > 0) {
-						applied += await applyDeleteItemsOnTx(tx, deleteItems, defaultPatchOptions);
+						applied += await applyDeleteItemsOnTx(tx, deleteItems);
 						if (!fileSnapshotRollback)
 							await applyDeleteItemsToStableBase(tx, deleteItems);
 					}
@@ -1674,6 +1676,11 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 
 			function acceptRowsPayload(batchState, currentItems, payload) {
 				const acceptedCount = getRowsAcceptedCount(payload, currentItems.length);
+				// A complete protocol response identifies the processed prefix. Holes
+				// within it are authoritative; only the truncated suffix needs fetching.
+				const completeResponse = payload.requested === currentItems.length
+					&& Number.isInteger(payload.limit) && payload.limit > 0
+					&& typeof payload.truncated === 'boolean';
 				const acceptedItems = acceptedCount < currentItems.length
 					? currentItems.slice(0, acceptedCount)
 					: currentItems;
@@ -1681,7 +1688,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 				let finalMissingItems = [];
 				if (acceptedCount < currentItems.length) {
 					const deferredItems = currentItems.slice(acceptedCount);
-					const missingChunks = requeueMissingRowChunks(acceptedItems, missingItems);
+					const missingChunks = requeueMissingRowChunks(acceptedItems, missingItems, completeResponse);
 					if (!missingChunks.requeued)
 						finalMissingItems = missingItems;
 					const requeuedChunks = [];
@@ -1692,7 +1699,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 					addRowJobsFront(batchState, requeuedChunks);
 				}
 				else {
-					const missingChunks = requeueMissingRowChunks(currentItems, missingItems);
+					const missingChunks = requeueMissingRowChunks(currentItems, missingItems, completeResponse);
 					if (!missingChunks.requeued)
 						finalMissingItems = missingItems;
 					addRowJobsFront(batchState, missingChunks.chunks);
@@ -1701,9 +1708,10 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 				markMissingPullJournalRows(batchState.itemState, finalMissingItems);
 			}
 
-			function requeueMissingRowChunks(requestedItems, missingItems) {
+			function requeueMissingRowChunks(requestedItems, missingItems, completeResponse) {
 				const chunks = [];
-				const requeued = enqueueMissingRows(chunks, requestedItems, missingItems);
+				// Retain retries for legacy partial responses without batch metadata.
+				const requeued = !completeResponse && enqueueMissingRows(chunks, requestedItems, missingItems);
 				return { requeued, chunks };
 			}
 
@@ -2147,6 +2155,10 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 				continue;
 			const state = states.shift();
 			state.ready = true;
+			// Only keys missing from completed row reads reach here (after retry
+			// for legacy responses). Withdraw rows through the normal pull delete
+			// path, including stable-base/journal handling, without an outbox write.
+			state.item = { ...state.item, op: 'D' };
 			state.rowItem = undefined;
 		}
 	}
@@ -3068,6 +3080,35 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		return new Map(entries.map(entry => [entry.name, entry]));
 	}
 
+	async function applyDeleteItemsOnTx(tx, items) {
+		const perTable = new Map();
+		for (const item of items) {
+			if (!item || typeof item.table !== 'string' || !Array.isArray(item.pk))
+				continue;
+			if (!perTable.has(item.table))
+				perTable.set(item.table, []);
+			perTable.get(item.table).push(item.pk);
+		}
+		let applied = 0;
+		for (const name of orderTablesByDependencies(client, Array.from(perTable.keys())).reverse()) {
+			const table = client.tables && client.tables[name];
+			const primaryColumns = getPrimaryColumns(table);
+			if (!table || primaryColumns.length === 0)
+				throw new Error(`Table "${name}" does not exist in this client`);
+			const keys = perTable.get(name);
+			// Replication deletes only the specified rows. Patch removal cascades
+			// through mapped relations, including tables outside the local replica.
+			for (let offset = 0; offset < keys.length; offset += maxStableBaseKeysPerStatement) {
+				const batch = keys.slice(offset, offset + maxStableBaseKeysPerStatement);
+				const where = primaryKeyWhereAnySql(primaryColumns, batch);
+				if (where)
+					await tx.query(`DELETE FROM ${quoteIdent(table._dbName || name)} WHERE ${where}`);
+			}
+			applied += keys.length;
+		}
+		return applied;
+	}
+
 	async function applyDeleteItemsToStableBase(db, items, knownBaseByName) {
 		const deletes = Array.isArray(items) ? items : [];
 		if (deletes.length === 0)
@@ -3124,7 +3165,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		let applied = 0;
 		if (deleteItems.length > 0) {
 			const dataApplyStartedAtMs = Date.now();
-			applied += await applyDeleteItemsOnTx(tx, deleteItems, patchOptions);
+			applied += await applyDeleteItemsOnTx(tx, deleteItems);
 			addPullTiming(timings, 'dataApplyMs', dataApplyStartedAtMs);
 			if (!deferStableBase) {
 				const stableBaseStartedAtMs = Date.now();
@@ -4100,34 +4141,6 @@ function stripInlineRowsFromKeysPayload(payload) {
 			return keyItem;
 		})
 	};
-}
-
-async function applyDeleteItemsOnTx(tx, items, patchOptions) {
-	const deletes = Array.isArray(items) ? items : [];
-	const perTable = new Map();
-	for (let i = 0; i < deletes.length; i++) {
-		const item = deletes[i];
-		if (!item || typeof item.table !== 'string' || !Array.isArray(item.pk))
-			continue;
-		if (!perTable.has(item.table))
-			perTable.set(item.table, []);
-		perTable.get(item.table).push({
-			op: 'remove',
-			path: `/${JSON.stringify(item.pk)}`
-		});
-	}
-
-	const tableNames = orderTablesByDependencies(tx, Array.from(perTable.keys())).reverse();
-	let applied = 0;
-	for (let i = 0; i < tableNames.length; i++) {
-		const table = tableNames[i];
-		if (!tx[table] || typeof tx[table].patch !== 'function')
-			throw new Error(`Table "${table}" does not exist in this client`);
-		const patch = perTable.get(table);
-		await tx[table].patch(patch, patchOptions);
-		applied += patch.length;
-	}
-	return applied;
 }
 
 async function applyRowsPayloadOnTx(tx, items, patchOptions) {

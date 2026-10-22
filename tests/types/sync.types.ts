@@ -1,4 +1,5 @@
 import type { DBClient, SyncInitialReadyEvent } from '../../src/map2';
+import orange from '../../src';
 
 type Model = {
 	item: {
@@ -11,9 +12,17 @@ type Model = {
 };
 
 declare const db: DBClient<Model>;
+const deletion: Promise<void> = orange.deleteSqliteOPFS('app.sqlite3', { vfs: 'opfs-sahpool', sync: true });
+const readinessCheck: Promise<void> = orange.assertSyncReady(db);
+void deletion;
+void readinessCheck;
 
 const sqliteOPFS = db.sqliteOPFS('app.sqlite3', { sync: { url: '/rdb' } });
 sqliteOPFS.syncClient.sync();
+sqliteOPFS.syncClient.on('sync', event => {
+	const changed: boolean | undefined = event.changed;
+	void changed;
+});
 const stopped: Promise<void> = sqliteOPFS.syncClient.stop();
 const closed: Promise<void> = sqliteOPFS.syncClient.close();
 void stopped;

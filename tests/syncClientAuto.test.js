@@ -263,12 +263,12 @@ describe('sync client auto start', () => {
 				});
 			}
 		});
-		client.on('sync', (payload) => events.push(['sync', payload.method]));
+		client.on('sync', (payload) => events.push(['sync', payload.method, payload.changed]));
 
 		await client.sync();
 
 		expect(events).toEqual([
-			['sync', 'sync']
+			['sync', 'sync', false]
 		]);
 	});
 
@@ -1106,7 +1106,7 @@ describe('sync client auto start', () => {
 		]]);
 	});
 
-	test('does not count missing staged rows as applied', async () => {
+	test.each([false, true])('turns missing staged rows into incoming deletions (complete metadata=%s)', async complete => {
 		const patches = [];
 		const rowRequests = [];
 		const db = newJournalDb({
@@ -1153,6 +1153,7 @@ describe('sync client auto start', () => {
 					return {
 						data: {
 							phase: 'rows',
+							...(complete ? { requested: request.data.items.length, limit: 2, truncated: false } : {}),
 							items: request.data.items
 								.filter((item) => item.pk[0] === 1)
 								.map((item) => ({
@@ -1170,7 +1171,8 @@ describe('sync client auto start', () => {
 
 		await client.sync();
 
-		expect(rowRequests).toEqual([[1, 2], [2]]);
+		expect(rowRequests).toEqual(complete ? [[1, 2]] : [[1, 2], [2]]);
+		expect(db.queryLog).toContain('DELETE FROM "customer" WHERE "id" = 2');
 		expect(patches).toEqual([
 			[{ op: 'add', path: '/[1]', value: { id: 1 } }]
 		]);
