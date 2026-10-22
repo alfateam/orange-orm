@@ -46,3 +46,14 @@ void readiness;
 const sqlite = db.sqlite('app.sqlite3');
 // @ts-expect-error Sync is currently public only through sqliteOPFS.
 sqlite.syncClient.sync();
+
+const rowSync = sqliteOPFS.item.syncById(1, { id: false });
+void rowSync;
+// @ts-expect-error Only configured sync clients expose syncById.
+db.item.syncById(1);
+// @ts-expect-error Only configured sync clients expose syncById.
+sqlite.item.syncById(1);
+// @ts-expect-error A partial collection cannot be synchronized.
+sqliteOPFS.item.syncById(1, { limit: 1 });
+// @ts-expect-error The primary key must have its mapped type.
+sqliteOPFS.item.syncById('1');

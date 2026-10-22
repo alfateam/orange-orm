@@ -1,4 +1,5 @@
 const { appendRoleSuffix, toSecondaryDataPoolOptions, toCachePoolOptions } = require('./storageLayout');
+const rowGraph = require('../sync/rowGraph');
 const { clearSyncOperationMemory } = require('../sync/operationContext');
 const createSyncLifecycle = require('../client/syncLifecycle');
 const hostLocal = require('../hostLocal');
@@ -255,6 +256,12 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		);
 		const syncClient = {
 			sync: syncObserved,
+			syncRow: options => lifecycle.run(bound => {
+				const plan = rowGraph.planGraph(rootClient.tables, bound.table, bound.strategy);
+				rowGraph.validateKey(plan, bound.pk);
+				return queueSync({ _syncRow: { table: plan.name, pk: bound.pk, strategy: plan.strategy },
+					[syncAbortSignalSymbol]: bound[syncAbortSignalSymbol] });
+			}, options),
 			ensureLocalSchema: options => lifecycle.run(ensureLocalSchema, options, true),
 			resetLocal: options => lifecycle.run(resetLocal, options, true),
 			recoverLocalSchema: options => lifecycle.run(recoverLocalSchema, options, true),
@@ -420,6 +427,17 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		let manifest = await getManifest(true);
 		throwIfSyncAborted(signal);
 		const recovery = await readRecoveryState();
+		if (recovery && recovery.mode === 'row' && !isPublishedRecovery(manifest, recovery)) {
+			// A targeted pull never rebuilds the replica from a full snapshot:
+			// restore the last published file, preserving earlier on-demand data.
+			await awaitSyncWork(runSyncSwap(router, async () => {
+				assertExpectedRecoveryManifest(await getManifest(true), recovery);
+				await cloneRoleDatabase(manifest.activeRole, manifest.stagingRole);
+				await clearAllDeltas();
+				await clearRecoveryState();
+			}), signal);
+			return sync(options);
+		}
 		if (recovery) {
 			if (recovery.mode === dataFirstRecoveryMode) {
 				if (manifest.replicaState === replicaReadyState && isPublishedRecovery(manifest, recovery)) {
@@ -427,6 +445,12 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 					manifest = await getManifest(true);
 				}
 				else {
+					if (options._syncRow) {
+						const recoveryOptions = { ...options };
+						delete recoveryOptions._syncRow;
+						await resumeDataFirstBootstrap(recoveryOptions, manifest, recovery);
+						return sync(options);
+					}
 					return resumeDataFirstBootstrap(options, manifest, recovery);
 				}
 			}
@@ -436,6 +460,12 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			}
 			else {
 				assertExpectedRecoveryManifest(manifest, recovery);
+				if (options._syncRow) {
+					const recoveryOptions = { ...options };
+					delete recoveryOptions._syncRow;
+					await recoverInterruptedSync(recoveryOptions, manifest, recovery);
+					return sync(options);
+				}
 				return recoverInterruptedSync(options, manifest, recovery);
 			}
 		}
@@ -443,13 +473,17 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		const stagingRole = manifest.stagingRole;
 		const activeSync = getRoleSyncClient(activeRole);
 		const stagingSync = getRoleSyncClient(stagingRole);
+		const schemaOptions = { ...options };
+		delete schemaOptions._syncRow;
 		await Promise.all([
-			activeSync.ensureLocalSchema(options),
-			stagingSync.ensureLocalSchema(options)
+			activeSync.ensureLocalSchema(schemaOptions),
+			stagingSync.ensureLocalSchema(schemaOptions)
 		]);
 		throwIfSyncAborted(signal);
 		await ensureSharedClientId(manifest);
 		if (!await roleHasInitialState(activeRole)) {
+			if (options._syncRow)
+				throw Object.assign(new Error('syncById requires a completed initial sync.'), { code: 'ORANGE_SYNC_NOT_READY' });
 			return runDataFirstBootstrap(options, manifest);
 		}
 
@@ -490,7 +524,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		await mirrorFailedOutboxMetadata(activeSync, stagingSync);
 		throwIfSyncAborted(signal);
 
-		await writeRecoveryState(manifest);
+		await writeRecoveryState(manifest, options._syncRow ? 'row' : undefined);
 		const pullResult = await pullIntoStaging({
 			activeRole,
 			activeSync,
@@ -561,7 +595,8 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			await clearRecoveryState();
 		}), signal);
 
-		publishedManifest = await markSuccessfulSync();
+		if (!options._syncRow)
+			publishedManifest = await markSuccessfulSync();
 		const newActiveRole = publishedManifest.activeRole;
 		await maybeEmitInitialReady(newActiveRole, publishedManifest);
 		emitSyncProgress('complete', {
@@ -571,6 +606,10 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			cloneMs,
 			deferred
 		});
+		if (options._syncRow && deferred) {
+			result.applied = 0;
+			result.deferred = deferred;
+		}
 		const dualResult = withDualSyncResult(result, {
 			...publishedManifest,
 			deltaId,

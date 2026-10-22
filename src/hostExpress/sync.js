@@ -1,6 +1,7 @@
 const stringify = require('../client/stringify');
 const getExposedTables = require('./getExposedTables');
 const createQueue = require('./createQueue');
+const rowGraph = require('../sync/rowGraph');
 
 function newSyncHandler(client, options = {}, tables = getExposedTables(client.tables, options)) {
 	const syncOptions = normalizeSyncOptions(options.sync);
@@ -45,13 +46,45 @@ function newSyncHandler(client, options = {}, tables = getExposedTables(client.t
 			return pullKeys(body, request, response);
 		if (phase === 'rows')
 			return pullRows(body, request, response);
-		const error = new Error('Invalid sync phase. Use { phase: "keys" }, { phase: "rows" }, or { phase: "push" }.');
+		if (phase === 'row')
+			return pullRowGraph(body, request, response);
+		const error = new Error('Invalid sync phase. Use { phase: "keys" }, { phase: "rows" }, { phase: "push" }, or { phase: "row" }.');
 		error.status = 400;
 		throw error;
 	}
 
-	async function runHookedTransaction(fn, transactionOptions, request, response) {
-		if (!hasTransactionHooks)
+	async function pullRowGraph(body, request, response) {
+		const plan = rowGraph.planGraph(tables, body.table, body.strategy);
+		rowGraph.validateKey(plan, body.pk);
+		const allowed = new Set(rowGraph.graphTables(plan));
+		if (!Array.isArray(body.known))
+			throw rowGraph.invalid('known keys must be an array.');
+		for (const item of body.known) {
+			if (!item || !allowed.has(item.table))
+				throw rowGraph.invalid('known key is outside the selected graph.');
+			rowGraph.validateKey(rowGraph.planGraph(tables, item.table), item.pk);
+		}
+		return runHookedTransaction(async tx => {
+			const filter = (db, name) => resolveBaseFilter(db, tableMeta.byName.get(name), request, response);
+			const graph = await rowGraph.readGraph(tx, plan, [body.pk], filter);
+			const incoming = rowGraph.flatten(plan, graph);
+			const retained = [], removed = [];
+			for (const name of allowed) {
+				const missing = body.known.filter(item => item.table === name && !incoming.has(stringify([name, item.pk])));
+				const flatPlan = rowGraph.planGraph(tables, name);
+				const found = rowGraph.flatten(flatPlan, await rowGraph.readGraph(tx, flatPlan, missing.map(item => item.pk), filter));
+				retained.push(...found.values());
+				for (const item of missing) {
+					if (!found.has(stringify([name, item.pk])))
+						removed.push({ table: name, pk: item.pk, op: 'D' });
+				}
+			}
+			return { phase: 'row', complete: true, table: body.table, pk: body.pk, graph, retained, removed };
+		}, undefined, request, response, true);
+	}
+
+	async function runHookedTransaction(fn, transactionOptions, request, response, consistent = false) {
+		if (!hasTransactionHooks && !consistent)
 			return client.transaction(fn, transactionOptions);
 
 		let hookDb;
@@ -59,6 +92,8 @@ function newSyncHandler(client, options = {}, tables = getExposedTables(client.t
 		try {
 			result = await client.transaction(async (tx) => {
 				hookDb = tx;
+				if (consistent)
+					await tx.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
 				if (transactionHookFns.beforeBegin)
 					await transactionHookFns.beforeBegin(hookDb, request, response);
 				if (transactionHookFns.afterBegin)

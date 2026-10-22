@@ -34,6 +34,7 @@ function createSyncWorkerClient(worker, options = {}) {
 
 	const client = {
 		sync: request.bind(null, 'sync'),
+		syncRow: request.bind(null, 'syncRow'),
 		ensureLocalSchema: request.bind(null, 'ensureLocalSchema'),
 		resetLocal: request.bind(null, 'resetLocal'),
 		recoverLocalSchema: request.bind(null, 'recoverLocalSchema'),

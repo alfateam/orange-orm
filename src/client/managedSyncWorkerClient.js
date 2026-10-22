@@ -31,6 +31,19 @@ function buildManagedSyncSchema(client, syncConfig) {
 	const schema = buildSyncSchema(client && client.tables, tables);
 	if (!schema.tables.length)
 		throw new Error('Managed sync worker requires mapped sync tables.');
+	// Preserve public relation names/directions for targeted graph reads. SQL
+	// foreign keys alone cannot reconstruct hasMany/hasOne strategy properties.
+	schema.relations = {};
+	for (const table of schema.tables) {
+		const mapped = client.tables[table.name];
+		schema.relations[table.name] = Object.entries(mapped._relations || {}).flatMap(([name, relation]) => {
+			const target = schema.tables.find(candidate => client.tables[candidate.name] === relation.childTable);
+			if (!target) return [];
+			const join = relation.joinRelation || relation;
+			return [{ name, target: target.name, kind: relation.isMany ? 'hasMany' : relation.isOne ? 'hasOne' : 'references',
+				columns: join.columns.map(column => column.alias) }];
+		});
+	}
 	return schema;
 }
 

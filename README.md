@@ -362,6 +362,35 @@ on a parent row, also announce affected children when that parent changes. Chang
 to access rules or selection criteria without row change keys require a separate
 refresh. Each replica remains bound to its authenticated account.
 
+After the initial sync, synchronize one row and its complete selected relations:
+
+```ts
+await database.problem.syncById(problemId, { comments: true });
+// Composite keys use the same argument order as getById:
+await database.entry.syncById(accountId, entryId, { children: true });
+```
+
+`syncById` is available on tables of a database configured with sync. It accepts
+mapped relations recursively and always fetches every mapped scalar column;
+column selections and `orderBy` are ignored. `where`, `limit`, and `offset` are
+rejected at every level. Selected tables must belong to the configured sync set
+and be exposed by the server. This operation does not advance the ordinary sync
+checkpoint or change which tables participate in initial sync.
+
+The server reads the entire selected graph in one consistent transaction, applying
+RLS and each table's `baseFilter`. Missing cached keys are checked again by primary
+key: a row moved to another parent is updated, while a deleted or no-longer-visible
+row is removed locally. Shared references are also checked before removal. A failed
+or incomplete response never authorizes cleanup. Local application is atomic;
+missing foreign-key dependencies reject the operation rather than applying a
+partial graph. Include required references in the strategy when they are not
+already cached.
+
+Pending writes are pushed first. If new local writes arrive during the request,
+the result reports `deferred: 'pending-writes'`; retry to complete the refresh.
+Otherwise the result contains `applied` and `tables`. Normal sync events, worker
+transport, and replica swapping also apply to these requests.
+
 From `5.6.0-beta-7`, two public maintenance functions keep application code
 independent of Orange's storage layout and PostgreSQL trigger names:
 

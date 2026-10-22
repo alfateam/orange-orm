@@ -891,6 +891,28 @@ type AggregateCustomSelectorProperties<M extends Record<string, TableDefinition<
         : never;
 };
 
+/** Complete row synchronization: column selections and ordering are ignored. */
+export type SyncStrategy<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
+  ColumnSelection<M, K> & {
+    orderBy?: OrderBy<M, K>;
+    where?: never;
+    limit?: never;
+    offset?: never;
+  } & (M[K] extends { relations: infer R } ? {
+    [Name in keyof R]?: R[Name] extends { target: infer Target extends keyof M }
+      ? boolean | SyncStrategy<M, Target> : never;
+  } : {});
+
+export interface SyncRowResult {
+  applied: number;
+  tables: string[];
+  deferred?: 'pending-writes';
+}
+
+export type SyncTableClient<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
+  syncById(...args: [...PrimaryKeyArgs<M, K>, strategy?: SyncStrategy<M, K>]): Promise<SyncRowResult>;
+};
+
 export type TableClient<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
   // Array methods - return arrays with array-level active record methods, but individual items are plain
   getMany<const strategy extends FetchStrategy<M, K>>(
@@ -1448,7 +1470,8 @@ export type DBClient<
   Commands extends AnyCommandMap = {},
   Sync extends boolean = false
 > = {
-  [TableName in keyof M]: RootTableRefs<M, TableName> & TableClient<M, TableName>;
+  [TableName in keyof M]: RootTableRefs<M, TableName> & TableClient<M, TableName>
+    & (Sync extends true ? SyncTableClient<M, TableName> : {});
 } & CommandApi<Commands> & {
   close(): Promise<void>;
   filter: Filter;

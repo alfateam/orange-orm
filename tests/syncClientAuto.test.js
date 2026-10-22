@@ -295,7 +295,11 @@ describe('sync client auto start', () => {
 		});
 		client.on('sync', payload => events.push(payload.method));
 
-		await expect(client.sync()).resolves.toBeUndefined();
+		await expect(client.sync()).resolves.toMatchObject({
+			applied: 0,
+			tables: [],
+			since: 'cursor-1'
+		});
 
 		expect(events).toEqual(['sync']);
 	});

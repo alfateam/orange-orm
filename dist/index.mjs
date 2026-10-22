@@ -930,6 +930,132 @@ function requireCreateQueue () {
 	return createQueue_1;
 }
 
+var rowGraph;
+var hasRequiredRowGraph;
+
+function requireRowGraph () {
+	if (hasRequiredRowGraph) return rowGraph;
+	hasRequiredRowGraph = 1;
+	const stringify = requireStringify();
+
+	function invalid(message) {
+		return Object.assign(new Error(`syncById: ${message}`), { status: 400 });
+	}
+
+	// Resolve the graph from trusted mapping metadata on both sides of the wire.
+	function planGraph(tables, name, strategy = {}, depth = 0) {
+		const table = tables && tables[name];
+		if (!table || !table._primaryColumns?.length)
+			throw invalid(`table "${name}" is not mapped or exposed.`);
+		if (depth > 16)
+			throw invalid('relation strategy is too deep.');
+		if (!strategy || typeof strategy !== 'object' || Array.isArray(strategy))
+			throw invalid('strategy must be an object.');
+		const columns = table._columns.map(column => column.alias);
+		const plan = { name, columns, keys: table._primaryColumns.map(column => column.alias), relations: [], strategy: {} };
+		for (const key of Object.keys(strategy)) {
+			const value = strategy[key];
+			if (key === 'where' || key === 'limit' || key === 'offset')
+				throw invalid(`"${key}" cannot restrict a complete relation.`);
+			if (columns.includes(key) || key === 'orderBy')
+				continue;
+			const relation = Object.hasOwn(table._relations, key) && table._relations[key];
+			if (!relation)
+				throw invalid(`unsupported strategy property "${name}.${key}".`);
+			if (value === false || value === undefined)
+				continue;
+			const target = relation.childTable;
+			const targetName = Object.keys(tables).find(candidate => tables[candidate] === target);
+			if (!targetName)
+				throw invalid(`relation "${name}.${key}" is not exposed.`);
+			const child = planGraph(tables, targetName, value === true ? {} : value, depth + 1);
+			const join = relation.joinRelation || relation;
+			const owned = !!relation.joinRelation;
+			const sourceColumns = (owned ? table._primaryColumns : join.columns).map(column => column.alias);
+			const targetColumns = (owned ? join.columns : target._primaryColumns).map(column => column.alias);
+			if (!sourceColumns.length || sourceColumns.length !== targetColumns.length)
+				throw invalid(`unsupported relation "${name}.${key}".`);
+			plan.relations.push({ key, owned, sourceColumns, targetColumns, plan: child });
+			plan.strategy[key] = child.strategy;
+		}
+		return plan;
+	}
+
+	function validateKey(plan, pk) {
+		if (!Array.isArray(pk) || pk.length !== plan.keys.length || pk.some(value => value == null
+			|| !['string', 'number', 'boolean'].includes(typeof value) || typeof value === 'number' && !Number.isFinite(value)))
+			throw invalid('supply every primary-key component.');
+	}
+
+	function keyOf(plan, row) {
+		return plan.keys.map(key => row[key]);
+	}
+
+	function keyFilter(db, name, columns, keys) {
+		return db.or(...keys.map(values => db.and(...columns.map((column, index) => db[name][column].eq(values[index])))));
+	}
+
+	// One batched query per selected relation path. Server filters are evaluated
+	// on the same transaction/identity as the root, including nested relations.
+	async function readGraph(db, plan, keys, resolveFilter, columns = plan.keys) {
+		const unique = [...new Map(keys.filter(key => key.every(value => value != null))
+			.map(key => [stringify(key), key])).values()];
+		const rows = [];
+		for (let offset = 0; offset < unique.length; offset += 200) {
+			const filter = keyFilter(db, plan.name, columns, unique.slice(offset, offset + 200));
+			const base = resolveFilter && await resolveFilter(db, plan.name);
+			const table = resolveFilter ? db({ [plan.name]: { baseFilter: undefined } })[plan.name] : db[plan.name];
+			const fetched = await table.getMany(base ? db.and(base, filter) : filter);
+			rows.push(...fetched.map(row => Object.fromEntries(plan.columns.map(key => [key, row[key]]))));
+		}
+		const children = {};
+		for (const relation of plan.relations) {
+			children[relation.key] = await readGraph(db, relation.plan,
+				rows.map(row => relation.sourceColumns.map(key => row[key])), resolveFilter, relation.targetColumns);
+		}
+		return { rows, children };
+	}
+
+	// Validate the full envelope before any local writes or removal decisions.
+	function validateGraph(plan, graph, keys, columns = plan.keys) {
+		if (!graph || !Array.isArray(graph.rows) || !graph.children || typeof graph.children !== 'object')
+			throw invalid('incomplete row graph response.');
+		for (const row of graph.rows) {
+			if (!row || typeof row !== 'object' || plan.columns.some(key => !Object.hasOwn(row, key)))
+				throw invalid('row graph response is missing mapped columns.');
+			validateKey(plan, keyOf(plan, row));
+			if (keys && !keys.some(values => values.every((value, index) => stringify(value) === stringify(row[columns[index]]))))
+				throw invalid('row graph response contains an unrelated row.');
+		}
+		for (const relation of plan.relations)
+			validateGraph(relation.plan, graph.children[relation.key],
+				graph.rows.map(row => relation.sourceColumns.map(key => row[key])), relation.targetColumns);
+	}
+
+	function flatten(plan, graph, result = new Map()) {
+		for (const row of graph.rows) {
+			const pk = keyOf(plan, row);
+			result.set(stringify([plan.name, pk]), { table: plan.name, pk, op: 'U', row });
+		}
+		for (const relation of plan.relations)
+			flatten(relation.plan, graph.children[relation.key], result);
+		return result;
+	}
+
+	// Missing keys are rechecked under server visibility, including shared references.
+	// A changed relationship alone never authorizes deleting its previous target.
+	function knownKeys(plan, graph) {
+		return [...flatten(plan, graph).values()].map(({ table, pk }) => ({ table, pk }));
+	}
+
+	function graphTables(plan) {
+		return [...new Set([plan.name, ...plan.relations.flatMap(relation => graphTables(relation.plan))])];
+	}
+
+	rowGraph = { planGraph, validateKey, readGraph, validateGraph, flatten, knownKeys, graphTables, keyOf, invalid };
+	return rowGraph;
+}
+
 var sync;
 var hasRequiredSync;
 
@@ -939,6 +1065,7 @@ function requireSync () {
 	const stringify = requireStringify();
 	const getExposedTables = requireGetExposedTables();
 	const createQueue = requireCreateQueue();
+	const rowGraph = requireRowGraph();
 
 	function newSyncHandler(client, options = {}, tables = getExposedTables(client.tables, options)) {
 		const syncOptions = normalizeSyncOptions(options.sync);
@@ -983,13 +1110,45 @@ function requireSync () {
 				return pullKeys(body, request, response);
 			if (phase === 'rows')
 				return pullRows(body, request, response);
-			const error = new Error('Invalid sync phase. Use { phase: "keys" }, { phase: "rows" }, or { phase: "push" }.');
+			if (phase === 'row')
+				return pullRowGraph(body, request, response);
+			const error = new Error('Invalid sync phase. Use { phase: "keys" }, { phase: "rows" }, { phase: "push" }, or { phase: "row" }.');
 			error.status = 400;
 			throw error;
 		}
 
-		async function runHookedTransaction(fn, transactionOptions, request, response) {
-			if (!hasTransactionHooks)
+		async function pullRowGraph(body, request, response) {
+			const plan = rowGraph.planGraph(tables, body.table, body.strategy);
+			rowGraph.validateKey(plan, body.pk);
+			const allowed = new Set(rowGraph.graphTables(plan));
+			if (!Array.isArray(body.known))
+				throw rowGraph.invalid('known keys must be an array.');
+			for (const item of body.known) {
+				if (!item || !allowed.has(item.table))
+					throw rowGraph.invalid('known key is outside the selected graph.');
+				rowGraph.validateKey(rowGraph.planGraph(tables, item.table), item.pk);
+			}
+			return runHookedTransaction(async tx => {
+				const filter = (db, name) => resolveBaseFilter(db, tableMeta.byName.get(name), request, response);
+				const graph = await rowGraph.readGraph(tx, plan, [body.pk], filter);
+				const incoming = rowGraph.flatten(plan, graph);
+				const retained = [], removed = [];
+				for (const name of allowed) {
+					const missing = body.known.filter(item => item.table === name && !incoming.has(stringify([name, item.pk])));
+					const flatPlan = rowGraph.planGraph(tables, name);
+					const found = rowGraph.flatten(flatPlan, await rowGraph.readGraph(tx, flatPlan, missing.map(item => item.pk), filter));
+					retained.push(...found.values());
+					for (const item of missing) {
+						if (!found.has(stringify([name, item.pk])))
+							removed.push({ table: name, pk: item.pk, op: 'D' });
+					}
+				}
+				return { phase: 'row', complete: true, table: body.table, pk: body.pk, graph, retained, removed };
+			}, undefined, request, response, true);
+		}
+
+		async function runHookedTransaction(fn, transactionOptions, request, response, consistent = false) {
+			if (!hasTransactionHooks && !consistent)
 				return client.transaction(fn, transactionOptions);
 
 			let hookDb;
@@ -997,6 +1156,8 @@ function requireSync () {
 			try {
 				result = await client.transaction(async (tx) => {
 					hookDb = tx;
+					if (consistent)
+						await tx.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
 					if (transactionHookFns.beforeBegin)
 						await transactionHookFns.beforeBegin(hookDb, request, response);
 					if (transactionHookFns.afterBegin)
@@ -9141,6 +9302,7 @@ function requireSyncClient () {
 	if (hasRequiredSyncClient) return syncClient.exports;
 	hasRequiredSyncClient = 1;
 	const createSyncLifecycle = requireSyncLifecycle();
+	const rowGraph = requireRowGraph();
 	const randomUuid = requireRandomUuid();
 	const stringify = requireStringify();
 	const { createSyncAuto, syncAutoStartSymbol } = requireSyncAuto();
@@ -9239,12 +9401,16 @@ function requireSyncClient () {
 		const queuedEnsureLocalSchema = serializeSyncWork(lockedEnsureLocalSchema);
 		const queuedRecoverLocalSchema = serializeSyncWork(withCrossTabSyncLock(recoverLocalSchema));
 		const observedSync = observeSyncMethod('sync', queuedSync);
+		const observedRowSync = observeSyncMethod('sync', serializeSyncWork(withCrossTabSyncLock(options => pull({
+			...options, _syncRow: options
+		}))));
 		const auto = createSyncAuto({
 			sync: options => lifecycle.run(observedSync, options)
 		}, getConfig);
 
 		const syncClientApi = {
 			sync: options => lifecycle.run(observedSync, options),
+			syncRow: options => lifecycle.run(observedRowSync, options),
 			ensureLocalSchema: options => lifecycle.run(queuedEnsureLocalSchema, options, true),
 			resetLocal: options => lifecycle.run(lockedResetLocal, options, true),
 			recoverLocalSchema: options => lifecycle.run(queuedRecoverLocalSchema, options, true),
@@ -9344,6 +9510,7 @@ function requireSyncClient () {
 		async function syncAndCapturePullJournal(options = {}) {
 			const pullOptions = {
 				...normalizePullOptions(options),
+				_syncRow: options._syncRow,
 				_capturePullJournal: true
 			};
 			if (typeof options._capturePullJournalChunk === 'function')
@@ -9522,6 +9689,8 @@ function requireSyncClient () {
 
 		async function pull(options = {}) {
 			const normalizedOptions = normalizePullOptions(options);
+			if (options._syncRow)
+				normalizedOptions._syncRow = options._syncRow;
 			throwIfSyncAborted(normalizedOptions[syncAbortSignalSymbol]);
 			if (options && options._capturePullJournal)
 				normalizedOptions._capturePullJournal = true;
@@ -9642,6 +9811,18 @@ function requireSyncClient () {
 		async function pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, options = {}) {
 			const signal = options[syncAbortSignalSymbol];
 			throwIfSyncAborted(signal);
+			if (options._syncRow) {
+				if (await getScopeSince(configuredTables, db) === undefined)
+					throw Object.assign(new Error('syncById requires a completed initial sync.'), { code: 'ORANGE_SYNC_NOT_READY' });
+				const request = options._syncRow;
+				const plan = rowGraph.planGraph(client.tables, request.table, request.strategy);
+				rowGraph.validateKey(plan, request.pk);
+				if (rowGraph.graphTables(plan).some(name => !configuredTables.includes(name)))
+					throw rowGraph.invalid('selected relations must belong to the configured sync tables.');
+				if (options._skipPushBeforePull !== true)
+					await pushBeforePull(db, syncConfig, hadStableBase, undefined, options);
+				return pullRowGraph(db, pullConfig, plan, request.pk, options);
+			}
 			if (options._skipPushBeforePull !== true)
 				await pushBeforePull(db, syncConfig, hadStableBase, undefined, options);
 			throwIfSyncAborted(signal);
@@ -9684,6 +9865,71 @@ function requireSyncClient () {
 				await replayLocalOutbox(db);
 			throwIfSyncAborted(signal);
 			await maybeEmitInitialReady(syncConfig, configuredTables, db, 'sync');
+			return result;
+		}
+
+		async function pullRowGraph(db, pullConfig, plan, pk, options) {
+			const signal = options[syncAbortSignalSymbol];
+			const before = await client.transaction(tx => rowGraph.readGraph(tx, plan, [pk]), { readonly: true });
+			const known = rowGraph.knownKeys(plan, before);
+			const payload = await requestPayload({ ...pullConfig, body: {
+				phase: 'row', table: plan.name, pk, strategy: plan.strategy, known
+			} }, { ...options, _syncInterceptors: interceptors, _syncAxiosInterceptor: axiosInterceptor });
+			throwIfSyncAborted(signal);
+			if (!payload || payload.phase !== 'row' || payload.complete !== true || payload.table !== plan.name
+				|| stringify(payload.pk) !== stringify(pk) || !Array.isArray(payload.retained) || !Array.isArray(payload.removed))
+				throw rowGraph.invalid('incomplete row graph response.');
+			rowGraph.validateGraph(plan, payload.graph, [pk]);
+			if (payload.graph.rows.length > 1)
+				throw rowGraph.invalid('row response contains more than one root.');
+			const incoming = rowGraph.flatten(plan, payload.graph);
+			const missing = new Map(known.filter(item => !incoming.has(stringify([item.table, item.pk])))
+				.map(item => [stringify([item.table, item.pk]), item]));
+			const removals = [];
+			for (const [items, removed] of [[payload.retained, false], [payload.removed, true]]) {
+				for (const item of items) {
+					const key = stringify([item && item.table, item && item.pk]);
+					if (!missing.delete(key))
+						throw rowGraph.invalid('invalid withdrawal confirmation.');
+					if (removed)
+						removals.push({ table: item.table, pk: item.pk, op: 'D' });
+					else {
+						const flatPlan = rowGraph.planGraph(client.tables, item.table);
+						rowGraph.validateGraph(flatPlan, { rows: [item.row], children: {} }, [item.pk]);
+						incoming.set(key, { table: item.table, pk: item.pk, op: 'U', row: item.row });
+					}
+				}
+			}
+			if (missing.size)
+				throw rowGraph.invalid('row response did not resolve every missing local key.');
+			const items = removals.concat([...incoming.values()]);
+			const tables = rowGraph.graphTables(plan);
+			let deferred;
+			const applied = await runSyncMaintenance(db, () => client.transaction(async tx => {
+				throwIfSyncAborted(signal);
+				if ((await readPendingMutationRows(tx, 1)).length) {
+					deferred = 'pending-writes';
+					return 0;
+				}
+				await tryDeferForeignKeys(tx);
+				const fileSnapshot = usesFileSnapshotRollback(options);
+				if (!fileSnapshot)
+					await ensureStableBaseTables(tx, tables);
+				const count = await applyPullJournalBatchOnTx(tx, items,
+					{ concurrency: 'overwrite', skipSelectAfterInsert: true }, undefined, { deferStableBase: fileSnapshot });
+				await validateForeignKeys(tx);
+				throwIfSyncAborted(signal);
+				return count;
+			}, { suppressSyncOutbox: true }));
+			const journalItems = deferred ? [] : items;
+			if (options._capturePullJournalChunk)
+				await options._capturePullJournalChunk(journalItems);
+			const result = { applied, tables, ...(deferred ? { deferred } : {}) };
+			if (options._capturePullJournal)
+				Object.defineProperty(result, '__orangePullJournal', { value: {
+					scopeKey: `row:${plan.name}:${stringify(pk)}`, tables, itemCount: journalItems.length,
+					items: options._capturePullJournalChunk ? [] : journalItems
+				} });
 			return result;
 		}
 
@@ -13727,6 +13973,7 @@ function requireClient () {
 	const createHttpInterceptor = requireHttpInterceptor();
 	const flags = requireFlags();
 	const newSyncClient = requireSyncClient();
+	const rowGraph = requireRowGraph();
 	const { ensureLocalSchemaReadySymbol } = newSyncClient;
 	const { runSyncWrite } = requireWriteGate();
 	const {
@@ -14129,6 +14376,8 @@ function requireClient () {
 
 			let handler = {
 				get(_target, property,) {
+					if (property === 'syncById')
+						return syncOwner && syncOwner.__sqliteSync ? syncById : undefined;
 					if (property in c)
 						return Reflect.get(...arguments);
 					else
@@ -14321,6 +14570,19 @@ function requireClient () {
 				}
 				let args = [keyFilter].concat(Array.prototype.slice.call(arguments).slice(meta.keys.length));
 				return getOne.apply(null, args);
+			}
+
+			async function syncById(...args) {
+				const db = await getDb();
+				if (!db || !db.__sqliteSync)
+					throw new Error('syncById requires a database configured with sync.');
+				const keyCount = options.tables[tableName]._primaryColumns.length;
+				if (args.length < keyCount || args.length > keyCount + 1)
+					throw rowGraph.invalid('supply the primary key followed by an optional strategy.');
+				const plan = rowGraph.planGraph(options.tables, tableName, args[keyCount]);
+				const pk = args.slice(0, keyCount);
+				rowGraph.validateKey(plan, pk);
+				return client.syncClient.syncRow({ table: tableName, pk, strategy: plan.strategy });
 			}
 
 			async function getManyCore() {
@@ -25016,6 +25278,7 @@ function requireSyncWorkerClient () {
 
 		const client = {
 			sync: request.bind(null, 'sync'),
+			syncRow: request.bind(null, 'syncRow'),
 			ensureLocalSchema: request.bind(null, 'ensureLocalSchema'),
 			resetLocal: request.bind(null, 'resetLocal'),
 			recoverLocalSchema: request.bind(null, 'recoverLocalSchema'),
@@ -25412,7 +25675,7 @@ function requireSyncWorkerHandler () {
 				postResponse(message.id, undefined, new Error('Sync worker handler closed.'));
 				return;
 			}
-			if (message.method === 'sync')
+			if (message.method === 'sync' || message.method === 'syncRow')
 				restartPendingRequestInterceptors();
 			const controller = createSyncAbortController();
 			requestControllers.set(message.id, controller);
@@ -25654,6 +25917,7 @@ function requireSyncWorkerHandler () {
 
 	function methodAcceptsOptions(method) {
 		return method === 'sync'
+			|| method === 'syncRow'
 			|| method === 'ensureLocalSchema'
 			|| method === 'resetLocal'
 			|| method === 'recoverLocalSchema'
@@ -34192,6 +34456,19 @@ function requireManagedSyncWorkerClient () {
 		const schema = buildSyncSchema(client && client.tables, tables);
 		if (!schema.tables.length)
 			throw new Error('Managed sync worker requires mapped sync tables.');
+		// Preserve public relation names/directions for targeted graph reads. SQL
+		// foreign keys alone cannot reconstruct hasMany/hasOne strategy properties.
+		schema.relations = {};
+		for (const table of schema.tables) {
+			const mapped = client.tables[table.name];
+			schema.relations[table.name] = Object.entries(mapped._relations || {}).flatMap(([name, relation]) => {
+				const target = schema.tables.find(candidate => client.tables[candidate.name] === relation.childTable);
+				if (!target) return [];
+				const join = relation.joinRelation || relation;
+				return [{ name, target: target.name, kind: relation.isMany ? 'hasMany' : relation.isOne ? 'hasOne' : 'references',
+					columns: join.columns.map(column => column.alias) }];
+			});
+		}
 		return schema;
 	}
 
@@ -34277,6 +34554,7 @@ function requireDualSyncDatabase () {
 	if (hasRequiredDualSyncDatabase) return dualSyncDatabase.exports;
 	hasRequiredDualSyncDatabase = 1;
 	const { appendRoleSuffix, toSecondaryDataPoolOptions, toCachePoolOptions } = requireStorageLayout();
+	const rowGraph = requireRowGraph();
 	const { clearSyncOperationMemory } = requireOperationContext();
 	const createSyncLifecycle = requireSyncLifecycle();
 	const hostLocal = requireHostLocal();
@@ -34533,6 +34811,12 @@ function requireDualSyncDatabase () {
 			);
 			const syncClient = {
 				sync: syncObserved,
+				syncRow: options => lifecycle.run(bound => {
+					const plan = rowGraph.planGraph(rootClient.tables, bound.table, bound.strategy);
+					rowGraph.validateKey(plan, bound.pk);
+					return queueSync({ _syncRow: { table: plan.name, pk: bound.pk, strategy: plan.strategy },
+						[syncAbortSignalSymbol]: bound[syncAbortSignalSymbol] });
+				}, options),
 				ensureLocalSchema: options => lifecycle.run(ensureLocalSchema, options, true),
 				resetLocal: options => lifecycle.run(resetLocal, options, true),
 				recoverLocalSchema: options => lifecycle.run(recoverLocalSchema, options, true),
@@ -34698,6 +34982,17 @@ function requireDualSyncDatabase () {
 			let manifest = await getManifest(true);
 			throwIfSyncAborted(signal);
 			const recovery = await readRecoveryState();
+			if (recovery && recovery.mode === 'row' && !isPublishedRecovery(manifest, recovery)) {
+				// A targeted pull never rebuilds the replica from a full snapshot:
+				// restore the last published file, preserving earlier on-demand data.
+				await awaitSyncWork(runSyncSwap(router, async () => {
+					assertExpectedRecoveryManifest(await getManifest(true), recovery);
+					await cloneRoleDatabase(manifest.activeRole, manifest.stagingRole);
+					await clearAllDeltas();
+					await clearRecoveryState();
+				}), signal);
+				return sync(options);
+			}
 			if (recovery) {
 				if (recovery.mode === dataFirstRecoveryMode) {
 					if (manifest.replicaState === replicaReadyState && isPublishedRecovery(manifest, recovery)) {
@@ -34705,6 +35000,12 @@ function requireDualSyncDatabase () {
 						manifest = await getManifest(true);
 					}
 					else {
+						if (options._syncRow) {
+							const recoveryOptions = { ...options };
+							delete recoveryOptions._syncRow;
+							await resumeDataFirstBootstrap(recoveryOptions, manifest, recovery);
+							return sync(options);
+						}
 						return resumeDataFirstBootstrap(options, manifest, recovery);
 					}
 				}
@@ -34714,6 +35015,12 @@ function requireDualSyncDatabase () {
 				}
 				else {
 					assertExpectedRecoveryManifest(manifest, recovery);
+					if (options._syncRow) {
+						const recoveryOptions = { ...options };
+						delete recoveryOptions._syncRow;
+						await recoverInterruptedSync(recoveryOptions, manifest, recovery);
+						return sync(options);
+					}
 					return recoverInterruptedSync(options, manifest, recovery);
 				}
 			}
@@ -34721,13 +35028,17 @@ function requireDualSyncDatabase () {
 			const stagingRole = manifest.stagingRole;
 			const activeSync = getRoleSyncClient(activeRole);
 			const stagingSync = getRoleSyncClient(stagingRole);
+			const schemaOptions = { ...options };
+			delete schemaOptions._syncRow;
 			await Promise.all([
-				activeSync.ensureLocalSchema(options),
-				stagingSync.ensureLocalSchema(options)
+				activeSync.ensureLocalSchema(schemaOptions),
+				stagingSync.ensureLocalSchema(schemaOptions)
 			]);
 			throwIfSyncAborted(signal);
 			await ensureSharedClientId(manifest);
 			if (!await roleHasInitialState(activeRole)) {
+				if (options._syncRow)
+					throw Object.assign(new Error('syncById requires a completed initial sync.'), { code: 'ORANGE_SYNC_NOT_READY' });
 				return runDataFirstBootstrap(options, manifest);
 			}
 
@@ -34768,7 +35079,7 @@ function requireDualSyncDatabase () {
 			await mirrorFailedOutboxMetadata(activeSync, stagingSync);
 			throwIfSyncAborted(signal);
 
-			await writeRecoveryState(manifest);
+			await writeRecoveryState(manifest, options._syncRow ? 'row' : undefined);
 			const pullResult = await pullIntoStaging({
 				activeRole,
 				activeSync,
@@ -34839,7 +35150,8 @@ function requireDualSyncDatabase () {
 				await clearRecoveryState();
 			}), signal);
 
-			publishedManifest = await markSuccessfulSync();
+			if (!options._syncRow)
+				publishedManifest = await markSuccessfulSync();
 			const newActiveRole = publishedManifest.activeRole;
 			await maybeEmitInitialReady(newActiveRole, publishedManifest);
 			emitSyncProgress('complete', {
@@ -34849,6 +35161,10 @@ function requireDualSyncDatabase () {
 				cloneMs,
 				deferred
 			});
+			if (options._syncRow && deferred) {
+				result.applied = 0;
+				result.deferred = deferred;
+			}
 			const dualResult = withDualSyncResult(result, {
 				...publishedManifest,
 				deltaId,

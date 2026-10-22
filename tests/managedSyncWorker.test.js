@@ -80,6 +80,16 @@ describe('managed sync worker', () => {
 		expect(buildSyncSchema(rebuilt, ['parent', 'child'])).toEqual(schema);
 	});
 
+	test('preserves eager relation strategies across the managed worker boundary', () => {
+		const source = createMappedTables();
+		const schema = createManagedSyncWorkerClient.buildManagedSyncSchema({ tables: { parent: source.parent, child: source.child } }, {});
+		const rebuilt = mapFromSyncSchema(rdb, JSON.parse(JSON.stringify(schema)));
+		const { planGraph } = require('../src/sync/rowGraph');
+		const strategy = { children: { parent: true } };
+		expect(planGraph(rebuilt, 'parent', strategy)).toEqual(planGraph(source, 'parent', strategy));
+		expect(buildSyncSchema(rebuilt, ['parent', 'child'])).toEqual(buildSyncSchema(source, ['parent', 'child']));
+	});
+
 	test('creates a sync worker client with internal SQLite ports', async () => {
 		const messages = [];
 		let terminated = false;
@@ -158,6 +168,7 @@ function createMappedTables() {
 			at: column('at').dateWithTimeZone()
 		}))
 	})).map(tables => ({
+		parent: tables.parent.map(({ hasMany }) => ({ children: hasMany(tables.child).by('parentId') })),
 		child: tables.child.map(({ references }) => ({
 			parent: references(tables.parent).by('parentId').notNull()
 		}))

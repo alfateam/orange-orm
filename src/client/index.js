@@ -11,6 +11,7 @@ const clone = require('rfdc/default');
 const createHttpInterceptor = require('./httpInterceptor');
 const flags = require('../flags');
 const newSyncClient = require('./syncClient');
+const rowGraph = require('../sync/rowGraph');
 const { ensureLocalSchemaReadySymbol } = newSyncClient;
 const { runSyncWrite } = require('../sync/writeGate');
 const {
@@ -413,6 +414,8 @@ function rdbClient(options = {}) {
 
 		let handler = {
 			get(_target, property,) {
+				if (property === 'syncById')
+					return syncOwner && syncOwner.__sqliteSync ? syncById : undefined;
 				if (property in c)
 					return Reflect.get(...arguments);
 				else
@@ -605,6 +608,19 @@ function rdbClient(options = {}) {
 			}
 			let args = [keyFilter].concat(Array.prototype.slice.call(arguments).slice(meta.keys.length));
 			return getOne.apply(null, args);
+		}
+
+		async function syncById(...args) {
+			const db = await getDb();
+			if (!db || !db.__sqliteSync)
+				throw new Error('syncById requires a database configured with sync.');
+			const keyCount = options.tables[tableName]._primaryColumns.length;
+			if (args.length < keyCount || args.length > keyCount + 1)
+				throw rowGraph.invalid('supply the primary key followed by an optional strategy.');
+			const plan = rowGraph.planGraph(options.tables, tableName, args[keyCount]);
+			const pk = args.slice(0, keyCount);
+			rowGraph.validateKey(plan, pk);
+			return client.syncClient.syncRow({ table: tableName, pk, strategy: plan.strategy });
 		}
 
 		async function getManyCore() {

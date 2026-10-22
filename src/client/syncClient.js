@@ -1,4 +1,5 @@
 const createSyncLifecycle = require('./syncLifecycle');
+const rowGraph = require('../sync/rowGraph');
 const randomUuid = require('../randomUuid');
 const stringify = require('./stringify');
 const { createSyncAuto, syncAutoStartSymbol } = require('./syncAuto');
@@ -97,12 +98,16 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 	const queuedEnsureLocalSchema = serializeSyncWork(lockedEnsureLocalSchema);
 	const queuedRecoverLocalSchema = serializeSyncWork(withCrossTabSyncLock(recoverLocalSchema));
 	const observedSync = observeSyncMethod('sync', queuedSync);
+	const observedRowSync = observeSyncMethod('sync', serializeSyncWork(withCrossTabSyncLock(options => pull({
+		...options, _syncRow: options
+	}))));
 	const auto = createSyncAuto({
 		sync: options => lifecycle.run(observedSync, options)
 	}, getConfig);
 
 	const syncClientApi = {
 		sync: options => lifecycle.run(observedSync, options),
+		syncRow: options => lifecycle.run(observedRowSync, options),
 		ensureLocalSchema: options => lifecycle.run(queuedEnsureLocalSchema, options, true),
 		resetLocal: options => lifecycle.run(lockedResetLocal, options, true),
 		recoverLocalSchema: options => lifecycle.run(queuedRecoverLocalSchema, options, true),
@@ -202,6 +207,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 	async function syncAndCapturePullJournal(options = {}) {
 		const pullOptions = {
 			...normalizePullOptions(options),
+			_syncRow: options._syncRow,
 			_capturePullJournal: true
 		};
 		if (typeof options._capturePullJournalChunk === 'function')
@@ -380,6 +386,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 
 	async function pull(options = {}) {
 		const normalizedOptions = normalizePullOptions(options);
+		if (options._syncRow)
+			normalizedOptions._syncRow = options._syncRow;
 		throwIfSyncAborted(normalizedOptions[syncAbortSignalSymbol]);
 		if (options && options._capturePullJournal)
 			normalizedOptions._capturePullJournal = true;
@@ -500,6 +508,18 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 	async function pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, options = {}) {
 		const signal = options[syncAbortSignalSymbol];
 		throwIfSyncAborted(signal);
+		if (options._syncRow) {
+			if (await getScopeSince(configuredTables, db) === undefined)
+				throw Object.assign(new Error('syncById requires a completed initial sync.'), { code: 'ORANGE_SYNC_NOT_READY' });
+			const request = options._syncRow;
+			const plan = rowGraph.planGraph(client.tables, request.table, request.strategy);
+			rowGraph.validateKey(plan, request.pk);
+			if (rowGraph.graphTables(plan).some(name => !configuredTables.includes(name)))
+				throw rowGraph.invalid('selected relations must belong to the configured sync tables.');
+			if (options._skipPushBeforePull !== true)
+				await pushBeforePull(db, syncConfig, hadStableBase, undefined, options);
+			return pullRowGraph(db, pullConfig, plan, request.pk, options);
+		}
 		if (options._skipPushBeforePull !== true)
 			await pushBeforePull(db, syncConfig, hadStableBase, undefined, options);
 		throwIfSyncAborted(signal);
@@ -542,6 +562,71 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 			await replayLocalOutbox(db);
 		throwIfSyncAborted(signal);
 		await maybeEmitInitialReady(syncConfig, configuredTables, db, 'sync');
+		return result;
+	}
+
+	async function pullRowGraph(db, pullConfig, plan, pk, options) {
+		const signal = options[syncAbortSignalSymbol];
+		const before = await client.transaction(tx => rowGraph.readGraph(tx, plan, [pk]), { readonly: true });
+		const known = rowGraph.knownKeys(plan, before);
+		const payload = await requestPayload({ ...pullConfig, body: {
+			phase: 'row', table: plan.name, pk, strategy: plan.strategy, known
+		} }, { ...options, _syncInterceptors: interceptors, _syncAxiosInterceptor: axiosInterceptor });
+		throwIfSyncAborted(signal);
+		if (!payload || payload.phase !== 'row' || payload.complete !== true || payload.table !== plan.name
+			|| stringify(payload.pk) !== stringify(pk) || !Array.isArray(payload.retained) || !Array.isArray(payload.removed))
+			throw rowGraph.invalid('incomplete row graph response.');
+		rowGraph.validateGraph(plan, payload.graph, [pk]);
+		if (payload.graph.rows.length > 1)
+			throw rowGraph.invalid('row response contains more than one root.');
+		const incoming = rowGraph.flatten(plan, payload.graph);
+		const missing = new Map(known.filter(item => !incoming.has(stringify([item.table, item.pk])))
+			.map(item => [stringify([item.table, item.pk]), item]));
+		const removals = [];
+		for (const [items, removed] of [[payload.retained, false], [payload.removed, true]]) {
+			for (const item of items) {
+				const key = stringify([item && item.table, item && item.pk]);
+				if (!missing.delete(key))
+					throw rowGraph.invalid('invalid withdrawal confirmation.');
+				if (removed)
+					removals.push({ table: item.table, pk: item.pk, op: 'D' });
+				else {
+					const flatPlan = rowGraph.planGraph(client.tables, item.table);
+					rowGraph.validateGraph(flatPlan, { rows: [item.row], children: {} }, [item.pk]);
+					incoming.set(key, { table: item.table, pk: item.pk, op: 'U', row: item.row });
+				}
+			}
+		}
+		if (missing.size)
+			throw rowGraph.invalid('row response did not resolve every missing local key.');
+		const items = removals.concat([...incoming.values()]);
+		const tables = rowGraph.graphTables(plan);
+		let deferred;
+		const applied = await runSyncMaintenance(db, () => client.transaction(async tx => {
+			throwIfSyncAborted(signal);
+			if ((await readPendingMutationRows(tx, 1)).length) {
+				deferred = 'pending-writes';
+				return 0;
+			}
+			await tryDeferForeignKeys(tx);
+			const fileSnapshot = usesFileSnapshotRollback(options);
+			if (!fileSnapshot)
+				await ensureStableBaseTables(tx, tables);
+			const count = await applyPullJournalBatchOnTx(tx, items,
+				{ concurrency: 'overwrite', skipSelectAfterInsert: true }, undefined, { deferStableBase: fileSnapshot });
+			await validateForeignKeys(tx);
+			throwIfSyncAborted(signal);
+			return count;
+		}, { suppressSyncOutbox: true }));
+		const journalItems = deferred ? [] : items;
+		if (options._capturePullJournalChunk)
+			await options._capturePullJournalChunk(journalItems);
+		const result = { applied, tables, ...(deferred ? { deferred } : {}) };
+		if (options._capturePullJournal)
+			Object.defineProperty(result, '__orangePullJournal', { value: {
+				scopeKey: `row:${plan.name}:${stringify(pk)}`, tables, itemCount: journalItems.length,
+				items: options._capturePullJournalChunk ? [] : journalItems
+			} });
 		return result;
 	}
 

@@ -13,14 +13,21 @@ function mapFromSyncSchema(rdb, schema) {
 
 	mapped = mapped.map(tables => Object.fromEntries(schemaTables.map(tableSchema => [
 		tableSchema.name,
-		tables[tableSchema.name].map(({ references }) => {
+		tables[tableSchema.name].map(({ references, hasMany, hasOne }) => {
 			const relations = {};
+			for (const relation of schema.relations?.[tableSchema.name] || []) {
+				const factory = { references, hasMany, hasOne }[relation.kind];
+				if (factory && tables[relation.target])
+					relations[relation.name] = factory(tables[relation.target]).by(...relation.columns);
+			}
 			for (let i = 0; i < (tableSchema.foreignKeys || []).length; i++) {
 				const foreignKey = tableSchema.foreignKeys[i];
 				const referencedName = tableNameByDbName.get(foreignKey.referencesTable);
 				if (!referencedName || !tables[referencedName])
 					continue;
 				const relationName = relationNameForForeignKey(tableSchema, foreignKey, i);
+				if (relations[relationName])
+					continue;
 				let relation = references(tables[referencedName]).by(...foreignKey.columns);
 				if (foreignKeyIsNotNull(tableSchema, foreignKey))
 					relation = relation.notNull();

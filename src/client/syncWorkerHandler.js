@@ -72,7 +72,7 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 			postResponse(message.id, undefined, new Error('Sync worker handler closed.'));
 			return;
 		}
-		if (message.method === 'sync')
+		if (message.method === 'sync' || message.method === 'syncRow')
 			restartPendingRequestInterceptors();
 		const controller = createSyncAbortController();
 		requestControllers.set(message.id, controller);
@@ -314,6 +314,7 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 
 function methodAcceptsOptions(method) {
 	return method === 'sync'
+		|| method === 'syncRow'
 		|| method === 'ensureLocalSchema'
 		|| method === 'resetLocal'
 		|| method === 'recoverLocalSchema'

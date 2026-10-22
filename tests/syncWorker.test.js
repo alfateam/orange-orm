@@ -7,6 +7,20 @@ const { syncAbortSignalSymbol, syncAutoStartSymbol } = require('../src/client/sy
 const { registerSyncOperationMemory } = require('../src/sync/operationContext');
 
 describe('sync worker rpc', () => {
+	test('forwards targeted row keys and nested strategies', async () => {
+		const request = { table: 'parent', pk: ['uuid', 2], strategy: { children: { parent: {} } } };
+		const bridge = createBridge({
+			syncRow: async options => {
+				expect(options).toMatchObject(request);
+				expect(options[syncAbortSignalSymbol]).toBeDefined();
+				return { applied: 3, tables: ['parent', 'child'] };
+			}, stop: async () => {}
+		}, { autoStart: false });
+		const client = rdb.createSyncWorkerClient(bridge.worker);
+		expect(await client.syncRow(request)).toEqual({ applied: 3, tables: ['parent', 'child'] });
+		await client.close();
+	});
+
 	test('schema recovery forwards the conflict policy and preserves blocked HTTP status across RPC', async () => {
 		let call = 0;
 		const bridge = createBridge({

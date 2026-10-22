@@ -538,9 +538,11 @@ function newFakeDb(connectionString, options, fixture) {
 				return queryCache(sql, fixture);
 			if (/^SELECT "checksum", "schema_json" FROM "orange_schema_state"/u.test(sqlText))
 				return [];
+			if (/^SELECT "schema_json" FROM "orange_schema_state"/u.test(sqlText))
+				return [];
 			if (/^CREATE TABLE IF NOT EXISTS "project"/u.test(sqlText))
 				fixture.schemaReadyByConnection.set(connectionString, true);
-			if (/^SELECT/u.test(sqlText) && fixture.schemaReadyByConnection.get(connectionString) === false)
+			if (/^SELECT\b.*\bFROM "project"/iu.test(sqlText) && fixture.schemaReadyByConnection.get(connectionString) === false)
 				throw new Error('SQLITE_ERROR: sqlite3 result code 1: no such table: project');
 			if (/^select count\(\*\) "_count" from "project"/iu.test(sqlText))
 				return [{ _count: '0' }];
