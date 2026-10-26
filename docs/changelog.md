@@ -1,4 +1,6 @@
 ## Changelog
+__5.5.1__  
+Add support for Tedious 20 (requires Node.js 22 or newer), while retaining support for earlier Tedious versions.  
 __5.5.0__  
 Add read-only ad-hoc `many()` and `one()` relations, allowing custom queries across relationships directly from fetch strategies. [#205](https://github.com/alfateam/orange-orm/issues/205)  
 Fix mapped `hasMany` fetch strategies so nested `limit` and `offset` work independently for each parent.  [#206](https://github.com/alfateam/orange-orm/issues/206)  

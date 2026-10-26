@@ -1,6 +1,6 @@
 {
     "name": "orange-orm",
-    "version": "5.5.0",
+    "version": "5.5.1",
     "publishConfig": {
         "access": "public"
     },
@@ -99,7 +99,7 @@
         "oracledb": "^6.3.0",
         "pg": "^8.5.1",
         "pg-query-stream": "^3.3.2",
-        "tedious": "^15.1.2 || ^16.0.0 || ^18.1.0 || ^19.0.0"
+        "tedious": "^15.1.2 || ^16.0.0 || ^18.1.0 || ^19.0.0 || ^20.0.0"
     },
     "peerDependenciesMeta": {
         "pg": {
