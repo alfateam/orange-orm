@@ -907,6 +907,9 @@ export interface SyncRowResult {
   applied: number;
   tables: string[];
   deferred?: 'pending-writes';
+  scope?: SyncRowScope;
+  /** A preceding push may have reconciled rows outside the selected graph. */
+  changed?: boolean;
 }
 
 export type SyncTableClient<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
@@ -1296,11 +1299,22 @@ export interface SyncErrorEvent {
   error: Error;
 }
 
+export interface SyncRowScope {
+  kind: 'row';
+  table: string;
+  pk: Array<string | number | boolean>;
+  tables: string[];
+}
+
 export interface SyncEvent {
   method: 'sync';
   result?: any;
   /** Whether this sync changed the visible local replica. Omitted when unknown. */
   changed?: boolean;
+  /** Present only when local changes are confined to a root and its owned graph.
+   * Absent for general sync, shared references, reparenting, or preceding pushes.
+   * Applications must still account for their own reverse/shared dependencies. */
+  scope?: SyncRowScope;
 }
 
 export interface SyncProgressEvent {

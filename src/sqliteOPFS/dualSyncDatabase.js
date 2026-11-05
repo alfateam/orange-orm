@@ -610,6 +610,8 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			result.applied = 0;
 			result.deferred = deferred;
 		}
+		if (acceptedMutationCount || pushConflictError || deferred)
+			delete result.scope;
 		const dualResult = withDualSyncResult(result, {
 			...publishedManifest,
 			deltaId,
@@ -1625,6 +1627,8 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		const swapped = result && result.__orangeDualSync && result.__orangeDualSync.swapped;
 		if (method === 'sync' && typeof swapped === 'boolean')
 			payload.changed = swapped;
+		if (method === 'sync' && result?.scope)
+			payload.scope = result.scope;
 		return payload;
 	}
 
@@ -2579,7 +2583,10 @@ function canResumePullAfterError(error) {
 	if (/Abort|Timeout/u.test(name))
 		return true;
 	const message = String(error && error.message || error || '');
-	return /network|fetch|timed? ?out|ECONN|socket|aborted/u.test(message);
+	// Safari rejects failed fetches with TypeError('Load failed'). Keep the
+	// incremental checkpoint just as for other browsers' network failures.
+	return (name === 'TypeError' && /^Load failed\.?$/iu.test(message))
+		|| /network|fetch|timed? ?out|ECONN|socket|aborted/iu.test(message);
 }
 
 function isPublishedRecovery(manifest, recovery) {

@@ -12,6 +12,7 @@ let outboxTableSql = require('./sync/outboxTableSql');
 let { runSyncWrite } = require('./sync/writeGate');
 let ensureOutboxOperationColumns = require('./sync/ensureOutboxOperationColumns');
 let { updateOutboxOperationFromContext } = require('./sync/operationContext');
+const filterPushPatch = require('./sync/filterPushPatch');
 const readonlyOps = ['getManyDto', 'getMany', 'aggregate', 'distinct', 'count'];
 const syncOutboxEnsuredKey = typeof Symbol === 'function'
 	? Symbol.for('orange-orm.syncOutboxEnsured')
@@ -225,6 +226,9 @@ function hostLocal() {
 	async function captureSyncOutboxPatch(context, patch, options) {
 		if (!Array.isArray(patch) || patch.length === 0)
 			return;
+		const replayPatch = filterPushPatch(table, patch, true);
+		patch = filterPushPatch(table, patch);
+		if (!patch.length) return;
 		const tableName = _options.syncTableName;
 		if (!tableName)
 			return;
@@ -234,6 +238,7 @@ function hostLocal() {
 		state.patches.push({
 			table: tableName,
 			patch,
+			...(replayPatch !== patch && stringify(replayPatch) !== stringify(patch) ? { replayPatch } : {}),
 			options: sanitizeSyncPatchOptions(options)
 		});
 		await updateSyncOutboxCaptureState(context, state);
@@ -242,7 +247,8 @@ function hostLocal() {
 	async function prepareSyncOutboxPatchCapture(context, patch) {
 		if (!Array.isArray(patch) || patch.length === 0 || !_options.syncTableName)
 			return;
-		await getSyncOutboxCaptureState(context);
+		if (filterPushPatch(table, patch).length)
+			await getSyncOutboxCaptureState(context);
 	}
 
 	async function captureSyncOutboxCommand(context, name, args) {

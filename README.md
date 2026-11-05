@@ -1,3 +1,14 @@
+<!-- Bleau recovery release note: 2026-10-24 -->
+
+The isolated `5.6.0-beta-12` release is based on the published beta-11 package
+plus two fixes: lazy database providers use the resolved local owner for schema
+readiness, and Safari `TypeError: Load failed` retains incremental-sync recovery.
+Schema validation, cross-context locks and pending writes remain enforced. This
+release does not add worker restart-on-resume behavior or establish the cause of
+an observed iOS worker stall. Other pending working-tree changes are not part of
+this isolated release. Source regression tests cover local readiness without the
+external worker and network recovery preserving offline writes.
+
 codex resume 019f4c45-7ef1-7160-9040-394522ae7c07
 
 <div align="center">
@@ -316,6 +327,34 @@ await pool.close();         // closes all pooled connections
 __Why close ?__
 In serverless environments (e.g. AWS Lambda, Vercel, Cloudflare Workers) execution contexts are frequently frozen and resumed. Explicitly closing the client or pool ensures that file handles are released promptly and prevents “database locked” errors between invocations.
 
+__Columns excluded from sync uploads__
+
+Use `.sync({ push: false })` on a mapped column to keep it locally writable
+while excluding it from sync uploads:
+
+```ts
+commentCount: column('comment_count').numeric().sync({ push: false })
+```
+
+`push` defaults to `true`. Pull always includes the column: a received server
+value overwrites the local value, including while other changes to the row are
+pending. Ordinary database writes are unaffected. This option does not compute
+values or install aggregate triggers; maintain values in application code or
+in database triggers separately.
+
+Changes only to excluded columns do not enqueue an upload. Mixed updates and
+nested inserts omit these columns from the outgoing patch, including old values.
+Local replay retains excluded values for pending inserts, so required local
+columns survive replica rebuilds; this replay data is never uploaded. Server
+sync handlers also omit excluded columns from incoming patches. Configure the
+same policy on client and server. This is a sync policy, not access control for
+ordinary HTTP/database operations or custom sync commands.
+
+The server must supply an omitted insert value (for example through a database
+default or trigger). Use `.notNullExceptInsert()` where the ORM should allow
+omitting a required server-generated value. Primary keys cannot disable push.
+Changing this policy does not require resetting the local SQLite schema.
+
 __SQLite sync lifecycle and account switching__
 
 Each local replica belongs to one backend and one authenticated identity. Give
@@ -390,6 +429,18 @@ Pending writes are pushed first. If new local writes arrive during the request,
 the result reports `deferred: 'pending-writes'`; retry to complete the refresh.
 Otherwise the result contains `applied` and `tables`. Normal sync events, worker
 transport, and replica swapping also apply to these requests.
+
+The result and `sync` event may include `scope: { kind: 'row', table, pk, tables }`.
+This identifies local changes confined to the requested root and its owned
+relations, allowing applications to re-query that root using their current
+filters instead of invalidating a whole catalogue. `pk` is an array, including
+for single-column keys. Missing scope means unknown/broad changes: retain your
+full-refresh fallback. Scope is omitted for shared-reference strategies, rows
+moving between roots, preceding accepted pushes, and deferred application.
+Applications must account for reverse/shared dependencies in their own model.
+Scope does not mean the root still exists or still matches an application filter;
+an empty re-query must remove its old presentation entry. `changed: false` still
+means no refresh is needed. Worker events preserve the same scope.
 
 From `5.6.0-beta-7`, two public maintenance functions keep application code
 independent of Orange's storage layout and PostgreSQL trigger names:

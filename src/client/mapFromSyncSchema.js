@@ -66,6 +66,8 @@ function mapColumn(column, schema) {
 		column = column.notNull();
 	else if (schema && schema.notNullExceptInsert)
 		column = column.notNullExceptInsert();
+	if (schema && schema.sync)
+		column = column.sync(schema.sync);
 	return column;
 }
 

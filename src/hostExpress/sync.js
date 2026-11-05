@@ -1,4 +1,6 @@
+const filterPushPatch = require('../sync/filterPushPatch');
 const stringify = require('../client/stringify');
+const syncSnapshotRead = require('../client/syncSnapshotRead');
 const getExposedTables = require('./getExposedTables');
 const createQueue = require('./createQueue');
 const rowGraph = require('../sync/rowGraph');
@@ -209,7 +211,9 @@ function newSyncHandler(client, options = {}, tables = getExposedTables(client.t
 				error.status = 400;
 				throw error;
 			}
-			const result = await table.patch(entry.patch, entry.options || mutation.options || {});
+			const patch = filterPushPatch(tables[entry.table], entry.patch);
+			if (!patch.length) continue;
+			const result = await table.patch(patch, entry.options || mutation.options || {});
 			changed += Array.isArray(result && result.changed) ? result.changed.length : 0;
 			results.push({ table: entry.table, result });
 		}
@@ -493,7 +497,7 @@ function newSyncHandler(client, options = {}, tables = getExposedTables(client.t
 		const filter = buildSnapshotKeysetFilter(meta, lastPk, upperPk);
 		const rows = await runHookedTransaction(async (tx) => {
 			const base = inlineRows ? await resolveBaseFilter(tx, meta, request, response) : undefined;
-			return readTable(tx, meta).getMany(base ? tx.and(base, filter) : filter, strategy);
+			return readTable(tx, meta)[syncSnapshotRead](base ? tx.and(base, filter) : filter, strategy);
 		}, { readonly: true }, request, response);
 		return rows;
 	}
@@ -538,10 +542,8 @@ function newSyncHandler(client, options = {}, tables = getExposedTables(client.t
 		return runHookedTransaction(async (tx) => {
 			const base = await resolveBaseFilter(tx, meta, request, response);
 			if (base)
-				return readTable(tx, meta).getMany(tx.and(base, primaryKeyFilter(tx, meta, keyObjects.map(key => toPkArray(meta, key)))));
-			return readTable(tx, meta).getMany({
-				where: () => keyObjects
-			});
+				return readTable(tx, meta)[syncSnapshotRead](tx.and(base, primaryKeyFilter(tx, meta, keyObjects.map(key => toPkArray(meta, key)))));
+			return readTable(tx, meta)[syncSnapshotRead](keyObjects);
 		}, { readonly: true }, request, response);
 	}
 

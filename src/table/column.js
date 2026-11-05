@@ -89,7 +89,20 @@ function defineColumn(column, table) {
 		return c;
 	};
 
+	c.sync = function(options) {
+		if (!options || typeof options !== 'object' || Array.isArray(options)
+			|| Object.keys(options).some(key => key !== 'push')
+			|| (options.push !== undefined && typeof options.push !== 'boolean'))
+			throw new Error('Column sync expects { push?: boolean }.');
+		if (column.isPrimary && options.push === false)
+			throw new Error('Primary key columns cannot disable sync push.');
+		column._sync = { push: options.push !== false };
+		return c;
+	};
+
 	c.primary = function() {
+		if (column._sync && column._sync.push === false)
+			throw new Error('Primary key columns cannot disable sync push.');
 		column.isPrimary = true;
 		table._primaryColumns.push(column);
 		return c;

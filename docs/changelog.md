@@ -1,4 +1,11 @@
 ## Changelog
+__Unreleased — sync serialization (2026-11-05)__
+
+Initial snapshots and incremental row batches use the existing DTO path without
+wrapping rows in editable proxies. Filters, transaction hooks, paging and wire
+data are unchanged; ordinary ORM reads retain change tracking. This is a
+source-only local change, not yet bundled or published.
+
 __5.6.0-beta-8__
 
 Expose `changed` on successful sync events so clients can skip reads after an

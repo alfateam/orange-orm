@@ -4,6 +4,7 @@ const randomUuid = require('../randomUuid');
 const stringify = require('./stringify');
 const { createSyncAuto, syncAutoStartSymbol } = require('./syncAuto');
 const createHttpInterceptor = require('./httpInterceptor');
+const filterPushPatch = require('../sync/filterPushPatch');
 const outboxTableSql = require('../sync/outboxTableSql');
 const { ensureSyncSchema, clearEnsuredSyncSchema } = require('./syncSchema');
 const { runSyncMaintenance } = require('../sync/writeGate');
@@ -351,7 +352,9 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 				const result = await fn(options);
 				const payload = result === undefined ? { method } : { method, result };
 				if (method === 'sync' && typeof result?.applied === 'number')
-					payload.changed = result.applied > 0;
+					payload.changed = result.changed === true || result.applied > 0;
+				if (method === 'sync' && result?.scope)
+					payload.scope = result.scope;
 				emit(method, payload);
 				if (method !== 'sync')
 					emit('sync', payload);
@@ -516,9 +519,17 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 			rowGraph.validateKey(plan, request.pk);
 			if (rowGraph.graphTables(plan).some(name => !configuredTables.includes(name)))
 				throw rowGraph.invalid('selected relations must belong to the configured sync tables.');
-			if (options._skipPushBeforePull !== true)
-				await pushBeforePull(db, syncConfig, hadStableBase, undefined, options);
-			return pullRowGraph(db, pullConfig, plan, request.pk, options);
+			const pushed = options._skipPushBeforePull !== true
+				? await pushBeforePull(db, syncConfig, hadStableBase, undefined, options) : undefined;
+			const result = await pullRowGraph(db, pullConfig, plan, request.pk, options);
+			// A preceding push can reconcile rows outside the requested graph.
+			if (pushed) {
+				delete result.scope;
+				// Push reconciliation can change other local rows even when the
+				// selected graph itself is unchanged. Require the broad refresh.
+				result.changed = true;
+			}
+			return result;
 		}
 		if (options._skipPushBeforePull !== true)
 			await pushBeforePull(db, syncConfig, hadStableBase, undefined, options);
@@ -601,12 +612,26 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 			throw rowGraph.invalid('row response did not resolve every missing local key.');
 		const items = removals.concat([...incoming.values()]);
 		const tables = rowGraph.graphTables(plan);
+		let scoped = payload.retained.length === 0 && rowGraph.isOwnedGraph(plan);
 		let deferred;
 		const applied = await runSyncMaintenance(db, () => client.transaction(async tx => {
 			throwIfSyncAborted(signal);
 			if ((await readPendingMutationRows(tx, 1)).length) {
 				deferred = 'pending-writes';
 				return 0;
+			}
+			// A row newly entering this graph may have moved from another root.
+			// Only advertise a root scope when those keys are genuinely new locally.
+			if (scoped) {
+				const previous = new Set(known.map(item => stringify([item.table, item.pk])));
+				for (const table of tables) {
+					const keys = items.filter(item => item.table === table && item.op === 'U'
+						&& !previous.has(stringify([item.table, item.pk]))).map(item => item.pk);
+					if (keys.length && (await rowGraph.readGraph(tx, rowGraph.planGraph(client.tables, table), keys)).rows.length) {
+						scoped = false;
+						break;
+					}
+				}
 			}
 			await tryDeferForeignKeys(tx);
 			const fileSnapshot = usesFileSnapshotRollback(options);
@@ -622,6 +647,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		if (options._capturePullJournalChunk)
 			await options._capturePullJournalChunk(journalItems);
 		const result = { applied, tables, ...(deferred ? { deferred } : {}) };
+		if (scoped && !deferred)
+			result.scope = { kind: 'row', table: plan.name, pk: [...pk], tables };
 		if (options._capturePullJournal)
 			Object.defineProperty(result, '__orangePullJournal', { value: {
 				scopeKey: `row:${plan.name}:${stringify(pk)}`, tables, itemCount: journalItems.length,
@@ -1149,7 +1176,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 				const entry = patches[i];
 				if (!tx[entry.table] || typeof tx[entry.table].patch !== 'function')
 					throw new Error(`Table "${entry.table}" does not exist in this client`);
-				await tx[entry.table].patch(entry.patch, {
+				await tx[entry.table].patch(filterPushPatch(client.tables[entry.table], entry.replayPatch || entry.patch, true), {
 					...(entry.options || {}),
 					concurrency: 'overwrite',
 					skipSelectAfterInsert: true
@@ -1910,6 +1937,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		return {
 			table: input.table,
 			patch: input.patch,
+			replayPatch: input.replayPatch,
 			options: input.options
 		};
 	}
@@ -2613,6 +2641,13 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		const keys = Object.keys(mutation);
 		for (let i = 0; i < keys.length; i++)
 			result[keys[i]] = mutation[keys[i]];
+		if (Array.isArray(result.patches))
+			result.patches = result.patches.map(entry => ({ table: entry.table,
+				patch: filterPushPatch(client.tables[entry.table], entry.patch), options: entry.options }));
+		else if (Array.isArray(result.patch)) {
+			result.patch = filterPushPatch(client.tables[result.table], result.patch);
+			delete result.replayPatch;
+		}
 		return result;
 	}
 

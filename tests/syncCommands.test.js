@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 const newSyncHandler = require('../src/hostExpress/sync');
 const hostExpress = require('../src/hostExpress');
+const syncSnapshotRead = require('../src/client/syncSnapshotRead');
 
 describe('sync commands', () => {
 	test('merges Express command handlers by name with the last registration winning', async () => {
@@ -312,8 +313,9 @@ describe('sync commands', () => {
 		const transactionOptions = [];
 		const tx = {
 			project: {
+				[syncSnapshotRead](...args) { return this.getMany(...args); },
 				getMany: async (filter) => {
-					calls.push(['getMany', filter.where()]);
+					calls.push(['getMany', filter]);
 					return [{ id: 1, name: 'Project 1' }];
 				}
 			}
@@ -361,6 +363,7 @@ describe('sync commands', () => {
 		const transactionOptions = [];
 		const tx = {
 			project: {
+				[syncSnapshotRead](...args) { return this.getMany(...args); },
 				getMany: async (_filter, strategy) => {
 					calls.push(['getMany', strategy.orderBy[0]]);
 					return [{ id: 1 }];
@@ -411,6 +414,7 @@ describe('sync commands', () => {
 		const seen = [];
 		const tx = {
 			project: {
+				[syncSnapshotRead](...args) { return this.getMany(...args); },
 				getMany: async (filter, strategy) => {
 					seen.push({ filter, strategy });
 					if (strategy.orderBy[0] === 'id desc')
@@ -469,6 +473,7 @@ describe('sync commands', () => {
 		const strategies = [];
 		const tx = {
 			project: {
+				[syncSnapshotRead](...args) { return this.getMany(...args); },
 				getMany: async (_filter, strategy) => {
 					strategies.push(strategy);
 					if (strategy.orderBy[0] === 'id desc')
@@ -507,6 +512,7 @@ describe('sync commands', () => {
 		const sourceIds = [1, 2, 3];
 		const tx = {
 			project: {
+				[syncSnapshotRead](...args) { return this.getMany(...args); },
 				getMany: async (filter, strategy) => {
 					seen.push({ filter, strategy });
 					if (strategy.orderBy[0] === 'id desc')
@@ -560,6 +566,7 @@ describe('sync commands', () => {
 		const seenStrategies = [];
 		const tx = {
 			project: {
+				[syncSnapshotRead](...args) { return this.getMany(...args); },
 				getMany: async (_filter, strategy) => {
 					seenStrategies.push(strategy);
 					if (strategy.orderBy[0] === 'id desc')
@@ -601,6 +608,7 @@ describe('sync commands', () => {
 		const seenStrategies = [];
 		const tx = {
 			project: {
+				[syncSnapshotRead](...args) { return this.getMany(...args); },
 				getMany: async (_filter, strategy) => {
 					seenStrategies.push(strategy);
 					if (strategy.orderBy[0] === 'id desc')
@@ -635,6 +643,7 @@ describe('sync commands', () => {
 		const itemCount = 1200;
 		const tx = {
 			project: {
+				[syncSnapshotRead](...args) { return this.getMany(...args); },
 				getMany: async () => Array.from({ length: itemCount }, (_x, index) => ({ id: index + 1 }))
 			}
 		};

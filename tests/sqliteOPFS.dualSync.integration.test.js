@@ -46,6 +46,27 @@ afterEach(async () => {
 });
 
 describe('sqliteOPFS dual sync integration', () => {
+	test('resumes incremental sync after Safari Load failed without rebuilding staging or losing local writes', async () => {
+		const fixture = await createDualIntegrationFixture('safari-network-failure', [{ id: 'original', title: 'Original' }]);
+		const { localDb } = fixture.openLocal();
+		await localDb.syncClient.sync();
+		let failPull = true;
+		localDb.syncClient.interceptors.request.use(config => {
+			if (failPull && config?.data?.phase === 'keys') throw new TypeError('Load failed');
+			return config;
+		});
+		await expect(localDb.syncClient.sync()).rejects.toThrow('Load failed');
+		await localDb.project.insert({ id: 'local-draft', title: 'Keep my draft' });
+		expect((await localDb.project.getById('original')).title).toBe('Original');
+		const phases = [];
+		localDb.syncClient.on('sync-progress', event => phases.push(event.phase));
+		failPull = false;
+		await localDb.syncClient.sync();
+		expect(phases).not.toContain('recovering-staging');
+		expect((await localDb.project.getById('local-draft')).title).toBe('Keep my draft');
+		expect((await fixture.remoteDb.project.getById('local-draft')).title).toBe('Keep my draft');
+	}, 30000);
+
 	test('switches accounts with isolated snapshots, checkpoints and a preserved offline outbox', async () => {
 		const fixture = await createDualIntegrationFixture('accounts', [
 			{ id: 'a-old', title: 'A private' }, { id: 'b-old', title: 'B private' }

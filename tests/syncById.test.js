@@ -115,6 +115,36 @@ async function fixture(dual, rls = true) {
 
 
 for (const dual of [false, true]) describe(dual ? 'dual replica syncById' : 'single replica syncById', () => {
+	test('scopes owned row refreshes and deletions, but not general sync or moved-in children', async () => {
+		const f = await fixture(dual), { db } = f.open();
+		const events = [];
+		db.syncClient.on('sync', event => events.push(event));
+		await db.syncClient.sync();
+		expect(events.at(-1).scope).toBeUndefined();
+		await f.asAdmin(remote => remote.note.insert({ id: 12, documentId: 1, body: 'New activity' }));
+		const result = await db.document.syncById(1, { notes: true });
+		const scope = { kind: 'row', table: 'document', pk: [1], tables: ['document', 'note'] };
+		expect(result.scope).toEqual(scope);
+		expect(events.at(-1)).toMatchObject({ changed: true, scope });
+		expect(await db.note.getById(12)).toMatchObject({ body: 'New activity' });
+		await f.asAdmin(remote => remote.note.update({ documentId: 2 }, { where: x => x.id.eq(12) }));
+		await db.document.syncById(2, { notes: true });
+		expect(events.at(-1).scope).toBeUndefined();
+		await f.asAdmin(async remote => {
+			await remote.note.delete(remote.note.documentId.eq(1));
+			await remote.document.delete(remote.document.id.eq(1));
+		});
+		await db.document.syncById(1, { notes: true });
+		expect(events.at(-1)).toMatchObject({ changed: true, scope });
+		expect(await db.document.getById(1)).toBeUndefined();
+		const draft = await db.document.getById(4);
+		draft.title = 'Pending unrelated write';
+		await draft.saveChanges();
+		await db.document.syncById(2, { notes: true });
+		expect(events.at(-1).scope).toBeUndefined();
+		expect(events.at(-1).changed).toBe(true);
+	}, 30000);
+
 	test.each([true, false])('reconciles full collections, including moved rows (RLS=%s)', async rls => {
 		const f = await fixture(dual, rls), { db } = f.open();
 		await db.syncClient.sync();
@@ -126,7 +156,8 @@ for (const dual of [false, true]) describe(dual ? 'dual replica syncById' : 'sin
 			await remote.document.update({ title: 'Unselected' }, { where: x => x.id.eq(2) });
 		});
 		f.requests.length = 0;
-		await db.document.syncById(1, { title: false, notes: { body: true, orderBy: 'id' } });
+		const moved = await db.document.syncById(1, { title: false, notes: { body: true, orderBy: 'id' } });
+		expect(moved.scope).toBeUndefined();
 		expect(await db.document.getById(1)).toMatchObject({ title: 'Updated' });
 		expect(await db.document.getById(2)).toMatchObject({ title: 'Still public' });
 		expect(await db.note.getById(10)).toMatchObject({ documentId: 2, body: 'Moved' });
@@ -201,7 +232,7 @@ for (const dual of [false, true]) describe(dual ? 'dual replica syncById' : 'sin
 			await remote.note.insert({ id: 50, documentId: 5, body: 'New child' });
 		});
 		// The graph starts at the child, but its new parent must be inserted first.
-		await db.note.syncById(50, { document: true });
+		expect((await db.note.syncById(50, { document: true })).scope).toBeUndefined();
 		expect(await db.note.getById(50)).toMatchObject({ documentId: 5 });
 		await f.asAdmin(async remote => {
 			await remote.note.update({ documentId: 2 }, { where: x => x.id.eq(10) });

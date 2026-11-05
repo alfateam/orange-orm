@@ -6,6 +6,7 @@ const toKeyPositionMap = require('./toKeyPositionMap');
 const rootMap = new WeakMap();
 const fetchingStrategyMap = new WeakMap();
 const targetKey = Symbol();
+const syncSnapshotRead = require('./syncSnapshotRead');
 const map = require('./clientMap');
 const clone = require('rfdc/default');
 const createHttpInterceptor = require('./httpInterceptor');
@@ -314,8 +315,10 @@ function rdbClient(options = {}) {
 			return;
 		if (localSchemaReadySkipped)
 			return;
-		const ensureReadyOwner = baseUrl && typeof baseUrl[ensureLocalSchemaReadySymbol] === 'function'
-			? baseUrl
+		// Use the same resolved owner as sync initialization. A lazy provider
+		// must not make local reads depend on the network sync worker.
+		const ensureReadyOwner = syncOwner && typeof syncOwner[ensureLocalSchemaReadySymbol] === 'function'
+			? syncOwner
 			: client.syncClient;
 		const ensureReady = ensureReadyOwner && ensureReadyOwner[ensureLocalSchemaReadySymbol];
 		if (typeof ensureReady !== 'function') {
@@ -414,6 +417,8 @@ function rdbClient(options = {}) {
 
 		let handler = {
 			get(_target, property,) {
+				if (property === syncSnapshotRead)
+					return getManyCore;
 				if (property === 'syncById')
 					return syncOwner && syncOwner.__sqliteSync ? syncById : undefined;
 				if (property in c)

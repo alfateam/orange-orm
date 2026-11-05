@@ -177,6 +177,7 @@ declare namespace r {
     }
 
     export interface ColumnDef {
+        sync(options: { push?: boolean }): ColumnDef;
         serializable(value: boolean): ColumnDef;
         string(): ColumnOf<string>;
         numeric(): ColumnOf<number>;
@@ -190,6 +191,7 @@ declare namespace r {
         validate(validator: (value?: Date | string, meta?: ValidationMeta) => void): DateColumnDef;
         notNull(): DateColumnNotNullDef;
         JSONSchema(schema: object, options?: Options): DateColumnDef;
+        sync(options: { push?: boolean }): DateColumnDef;
         serializable(value: boolean): DateColumnDef;
         as(dbName: string): DateColumnDef;
         default(value: Date | string | null | undefined | (() => Date | string | null | undefined)): DateColumnDef
@@ -199,6 +201,7 @@ declare namespace r {
     export interface DateColumnNotNullDef {
         validate(validator: (value: Date | string, meta?: ValidationMeta) => void): DateColumnNotNullDef;
         JSONSchema(schema: object, options?: Options): DateColumnNotNullDef;
+        sync(options: { push?: boolean }): DateColumnNotNullDef;
         serializable(value: boolean): DateColumnNotNullDef;
         as(dbName: string): DateColumnNotNullDef;
         default(value: Date | string | null | undefined | (() => Date | string | null | undefined)): DateColumnNotNullDef
@@ -209,6 +212,7 @@ declare namespace r {
         validate(validator: (value?: Buffer | string, meta?: ValidationMeta) => void): BinaryColumnDef;
         notNull(): BinaryColumnNotNullDef;
         JSONSchema(schema: object, options?: Options): BinaryColumnDef;
+        sync(options: { push?: boolean }): BinaryColumnDef;
         serializable(value: boolean): BinaryColumnDef;
         as(dbName: string): BinaryColumnDef;
         default(value: Buffer | string | null | undefined | (() => Buffer | string | null | undefined)): BinaryColumnDef
@@ -218,6 +222,7 @@ declare namespace r {
     export interface BinaryColumnNotNullDef {
         validate(validator: (value: Buffer | string, meta?: ValidationMeta) => void): BinaryColumnNotNullDef;
         JSONSchema(schema: object, options?: Options): BinaryColumnNotNullDef;
+        sync(options: { push?: boolean }): BinaryColumnNotNullDef;
         serializable(value: boolean): BinaryColumnNotNullDef;
         as(dbName: string): BinaryColumnNotNullDef;
         default(value: Buffer | string | null | undefined | (() => Buffer | string | null | undefined)): BinaryColumnNotNullDef
@@ -228,6 +233,7 @@ declare namespace r {
         validate(validator: (value?: T, meta?: ValidationMeta) => void): ColumnOf<T>;
         notNull(): ColumnNotNullOf<T>;
         JSONSchema(schema: object, options?: Options): ColumnOf<T>;
+        sync(options: { push?: boolean }): ColumnOf<T>;
         serializable(value: boolean): ColumnOf<T>;
         default(value: T | null | undefined | (() => T | null | undefined)): ColumnOf<T>;
         dbNull(value: T | null): ColumnOf<T>;
@@ -238,6 +244,7 @@ declare namespace r {
         validate(validator: (value: T, meta?: ValidationMeta) => void): ColumnNotNullOf<T>;
         notNull(): ColumnNotNullOf<T>;
         JSONSchema(schema: object, options?: Options): ColumnNotNullOf<T>;
+        sync(options: { push?: boolean }): ColumnNotNullOf<T>;
         serializable(value: boolean): ColumnNotNullOf<T>;
         default(value: T | null | undefined | (() => T | null | undefined)): ColumnNotNullOf<T>;
         dbNull(value: T | null): ColumnNotNullOf<T>;

@@ -801,6 +801,7 @@ type StringColumnTypeDef<M> = StringValidator<M> & {
 	primary(): StringColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): StringColumnTypeDef<M & NotNull> & NotNull;
 	notNullExceptInsert(): StringColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
+	sync(options: { push?: boolean }): StringColumnTypeDef<M>;
 	serializable(value: boolean): StringColumnTypeDef<M>;
 	JSONSchema(schema: object, options?: Options): StringColumnTypeDef<M>;
 	default(value: string | null | undefined | (() => string | null | undefined)): StringColumnTypeDef<M>;
@@ -816,6 +817,7 @@ type NumericColumnTypeDef<M> = NumericValidator<M> & {
 	primary(): NumericColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): NumericColumnTypeDef<M & NotNull> & NotNull;
 	notNullExceptInsert(): NumericColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
+	sync(options: { push?: boolean }): NumericColumnTypeDef<M>;
 	serializable(value: boolean): NumericColumnTypeDef<M>;
 	JSONSchema(schema: object, options?: Options): NumericColumnTypeDef<M>;
 	default(value: number | null | undefined | (() => string | null | undefined)): NumericColumnTypeDef<M>;
@@ -831,6 +833,7 @@ type BigIntColumnTypeDef<M> = BigIntValidator<M> & {
 	primary(): BigIntColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): BigIntColumnTypeDef<M & NotNull> & NotNull;
 	notNullExceptInsert(): BigIntColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
+	sync(options: { push?: boolean }): BigIntColumnTypeDef<M>;
 	serializable(value: boolean): BigIntColumnTypeDef<M>;
 	JSONSchema(schema: object, options?: Options): BigIntColumnTypeDef<M>;
 	default(value: bigint | null | undefined | (() => bigint | null | undefined)): BigIntColumnTypeDef<M>;
@@ -846,6 +849,7 @@ type UuidColumnTypeDef<M> = UuidValidator<M> & {
 	primary(): UuidColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): UuidColumnTypeDef<M & NotNull> & NotNull;
 	notNullExceptInsert(): UuidColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
+	sync(options: { push?: boolean }): UuidColumnTypeDef<M>;
 	serializable(value: boolean): UuidColumnTypeDef<M>;
 	JSONSchema(schema: object, options?: Options): UuidColumnTypeDef<M>;
 	default(value: string | null | undefined | (() => string | null | undefined)): UuidColumnTypeDef<M>;
@@ -857,6 +861,7 @@ type JSONColumnTypeDef<M> = JSONValidator<M> & {
 	primary(): JSONColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): JSONColumnTypeDef<M & NotNull> & NotNull;
 	notNullExceptInsert(): JSONColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
+	sync(options: { push?: boolean }): JSONColumnTypeDef<M>;
 	serializable(value: boolean): JSONColumnTypeDef<M>;
 	JSONSchema(schema: object, options?: Options): JSONColumnTypeDef<M>;
 	default(value: ToJsonType<M> | null | undefined | (() => string | null | undefined)): JSONColumnTypeDef<M>;
@@ -872,6 +877,7 @@ type BinaryColumnTypeDef<M> = BinaryValidator<M> & {
 	primary(): BinaryColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): BinaryColumnTypeDef<M & NotNull> & NotNull;
 	notNullExceptInsert(): BinaryColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
+	sync(options: { push?: boolean }): BinaryColumnTypeDef<M>;
 	serializable(value: boolean): BinaryColumnTypeDef<M>;
 	JSONSchema(schema: object, options?: Options): BinaryColumnTypeDef<M>;
 	default(value: string | null | undefined | (() => string | null | undefined)): BinaryColumnTypeDef<M>;
@@ -887,6 +893,7 @@ type BooleanColumnTypeDef<M> = BooleanValidator<M> & {
 	primary(): BooleanColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): BooleanColumnTypeDef<M & NotNull> & NotNull;
 	notNullExceptInsert(): BooleanColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
+	sync(options: { push?: boolean }): BooleanColumnTypeDef<M>;
 	serializable(value: boolean): BooleanColumnTypeDef<M>;
 	JSONSchema(schema: object, options?: Options): BooleanColumnTypeDef<M>;
 	default(value: boolean | null | undefined | (() => string | null | undefined)): BooleanColumnTypeDef<M>;
@@ -902,6 +909,7 @@ type DateColumnTypeDef<M> = DateValidator<M> & {
 	primary(): DateColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): DateColumnTypeDef<M & NotNull> & NotNull;
 	notNullExceptInsert(): DateColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
+	sync(options: { push?: boolean }): DateColumnTypeDef<M>;
 	serializable(value: boolean): DateColumnTypeDef<M>;
 	JSONSchema(schema: object, options?: Options): DateColumnTypeDef<M>;
 	default(value: string | Date | null | undefined | (() => string | Date | null | undefined)): DateColumnTypeDef<M>;
@@ -917,6 +925,7 @@ type DateWithTimeZoneColumnTypeDef<M> = DateValidator<M> & {
 	primary(): DateWithTimeZoneColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): DateWithTimeZoneColumnTypeDef<M & NotNull> & NotNull;
 	notNullExceptInsert(): DateWithTimeZoneColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
+	sync(options: { push?: boolean }): DateWithTimeZoneColumnTypeDef<M>;
 	serializable(value: boolean): DateWithTimeZoneColumnTypeDef<M>;
 	JSONSchema(schema: object, options?: Options): DateWithTimeZoneColumnTypeDef<M>;
 	default(value: string | Date | null | undefined | (() => string | Date | null | undefined)): DateWithTimeZoneColumnTypeDef<M>;

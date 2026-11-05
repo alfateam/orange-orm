@@ -73,7 +73,7 @@ async function checkPreviousTableSchemas(db, schema) {
 			// Relations can gain foreign keys when their target table joins the
 			// scope. Compare the table's own columns and key, not scope metadata.
 			for (const key of ['columns', 'primaryKey']) {
-				if (stableStringify(table[key]) !== stableStringify(next[key]))
+				if (stableStringify(stripIndexes(table[key])) !== stableStringify(stripIndexes(next[key])))
 					throw schemaMismatch();
 			}
 			unchecked.delete(table.dbName);
@@ -127,6 +127,7 @@ function tableToSchema(name, table) {
 
 function columnToSchema(column) {
 	return {
+		...(column._sync?.push === false ? { sync: { push: false } } : {}),
 		name: column.alias,
 		dbName: column._dbName,
 		type: columnType(column),
@@ -375,7 +376,7 @@ function stripIndexes(value) {
 		return value;
 	const result = {};
 	for (let key in value) {
-		if (key !== 'indexes')
+		if (key !== 'indexes' && key !== 'sync')
 			result[key] = stripIndexes(value[key]);
 	}
 	return result;

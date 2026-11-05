@@ -22,6 +22,13 @@ sqliteOPFS.syncClient.sync();
 sqliteOPFS.syncClient.on('sync', event => {
 	const changed: boolean | undefined = event.changed;
 	void changed;
+	if (event.scope) {
+		const kind: 'row' = event.scope.kind;
+		const table: string = event.scope.table;
+		const pk: Array<string | number | boolean> = event.scope.pk;
+		const tables: string[] = event.scope.tables;
+		void [kind, table, pk, tables];
+	}
 });
 const stopped: Promise<void> = sqliteOPFS.syncClient.stop();
 const closed: Promise<void> = sqliteOPFS.syncClient.close();

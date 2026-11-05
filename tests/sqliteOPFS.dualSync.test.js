@@ -307,7 +307,7 @@ describe('sqliteOPFS dual sync database', () => {
 		expect(fixture.externalEnsureCalls).toEqual([]);
 	});
 
-	test('client table reads prefer local dual schema readiness over external sync worker readiness', async () => {
+	test.each(['direct', 'lazy'])('client table reads prefer local dual schema readiness over external sync worker readiness (%s)', async provider => {
 		const fixture = newFixture();
 		fixture.schemaReadyByConnection.set('app.sqlite3', false);
 		const db = newDualSyncDatabase('app.sqlite3', {
@@ -318,7 +318,7 @@ describe('sqliteOPFS dual sync database', () => {
 			throw new Error('external sync worker readiness should not be used for UI reads');
 		};
 		const client = rdb({
-			db,
+			db: provider === 'direct' ? db : () => db,
 			syncClient,
 			tables: newFakeTables()
 		});

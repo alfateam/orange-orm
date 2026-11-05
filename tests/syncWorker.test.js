@@ -444,13 +444,14 @@ describe('sync worker rpc', () => {
 
 		const unsubscribe = client.on('sync', (payload) => events.push(payload));
 		await wait(10);
-		listener({ method: 'sync' });
+		const scope = { kind: 'row', table: 'parent', pk: ['uuid', 2], tables: ['parent', 'child'] };
+		listener({ method: 'sync', changed: true, scope });
 		await wait(10);
 		unsubscribe();
 		client.close();
 		bridge.handler.stop();
 
-		expect(events).toEqual([{ method: 'sync' }]);
+		expect(events).toEqual([{ method: 'sync', changed: true, scope }]);
 	});
 
 	test('times out a sync worker request which never responds', async () => {

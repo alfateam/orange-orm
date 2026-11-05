@@ -798,6 +798,72 @@ function requireGetMeta () {
 	return getMeta_1;
 }
 
+var filterPushPatch_1;
+var hasRequiredFilterPushPatch;
+
+function requireFilterPushPatch () {
+	if (hasRequiredFilterPushPatch) return filterPushPatch_1;
+	hasRequiredFilterPushPatch = 1;
+	// Filter transport patches, never the patch used for the original local write.
+	// Local replay retains values on new rows (including NOT NULL columns), but
+	// excludes updates so a pulled server value wins over pending local edits.
+	function filterPushPatch(table, patches, replay = false) {
+		if (!table || !Array.isArray(patches) || !hasExcludedColumns(table)) return patches;
+		return patches.flatMap(patch => {
+			if (!patch || typeof patch.path !== 'string') return [patch];
+			const path = patch.path.split('/').slice(2).map(unescapePointer);
+			let target = table, collection = false;
+			for (let i = 0; i < path.length; i++) {
+				const column = (target._columns || []).find(column => column.alias === path[i]);
+				if (column) return column._sync?.push === false ? [] : [patch];
+				const relation = target._relations?.[path[i]];
+				if (!relation) return [patch];
+				target = relation.childTable;
+				collection = relation.isMany && i === path.length - 1;
+				if (relation.isMany && !collection) i++;
+			}
+			const result = { ...patch };
+			for (const key of ['value', 'oldValue']) {
+				if (Object.hasOwn(patch, key))
+					result[key] = stripValue(target, patch[key], collection,
+						replay && patch.op === 'add' && key === 'value');
+			}
+			return [result];
+		});
+	}
+
+	function stripValue(table, value, collection, preserve) {
+		if (!value || typeof value !== 'object' || preserve) return value;
+		if (Array.isArray(value)) return value.map(row => stripValue(table, row, false, false));
+		const result = {};
+		for (const key of Object.keys(value)) {
+			if (collection) {
+				result[key] = key === '__patchType' ? value[key] : stripValue(table, value[key], false, false);
+				continue;
+			}
+			const column = (table._columns || []).find(column => column.alias === key);
+			if (column?._sync?.push === false) continue;
+			const relation = table._relations?.[key];
+			result[key] = relation ? stripValue(relation.childTable, value[key], relation.isMany, false) : value[key];
+		}
+		return result;
+	}
+
+	function hasExcludedColumns(table, visited = new Set()) {
+		if (visited.has(table)) return false;
+		visited.add(table);
+		return (table._columns || []).some(column => column._sync?.push === false)
+			|| Object.values(table._relations || {}).some(relation => hasExcludedColumns(relation.childTable, visited));
+	}
+
+	function unescapePointer(value) {
+		return value.replace(/~1/g, '/').replace(/~0/g, '~');
+	}
+
+	filterPushPatch_1 = filterPushPatch;
+	return filterPushPatch_1;
+}
+
 var dateToISOString_1;
 var hasRequiredDateToISOString;
 
@@ -856,6 +922,17 @@ function requireStringify () {
 
 	stringify_1 = stringify;
 	return stringify_1;
+}
+
+var syncSnapshotRead;
+var hasRequiredSyncSnapshotRead;
+
+function requireSyncSnapshotRead () {
+	if (hasRequiredSyncSnapshotRead) return syncSnapshotRead;
+	hasRequiredSyncSnapshotRead = 1;
+	// Internal read path: sync snapshots and row batches need DTOs, not editable proxies.
+	syncSnapshotRead = Symbol('syncSnapshotRead');
+	return syncSnapshotRead;
 }
 
 var getExposedTables_1;
@@ -1051,7 +1128,11 @@ function requireRowGraph () {
 		return [...new Set([plan.name, ...plan.relations.flatMap(relation => graphTables(relation.plan))])];
 	}
 
-	rowGraph = { planGraph, validateKey, readGraph, validateGraph, flatten, knownKeys, graphTables, keyOf, invalid };
+	function isOwnedGraph(plan) {
+		return plan.relations.every(relation => relation.owned && isOwnedGraph(relation.plan));
+	}
+
+	rowGraph = { planGraph, validateKey, readGraph, validateGraph, flatten, knownKeys, graphTables, keyOf, invalid, isOwnedGraph };
 	return rowGraph;
 }
 
@@ -1061,7 +1142,9 @@ var hasRequiredSync;
 function requireSync () {
 	if (hasRequiredSync) return sync;
 	hasRequiredSync = 1;
+	const filterPushPatch = requireFilterPushPatch();
 	const stringify = requireStringify();
+	const syncSnapshotRead = requireSyncSnapshotRead();
 	const getExposedTables = requireGetExposedTables();
 	const createQueue = requireCreateQueue();
 	const rowGraph = requireRowGraph();
@@ -1272,7 +1355,9 @@ function requireSync () {
 					error.status = 400;
 					throw error;
 				}
-				const result = await table.patch(entry.patch, entry.options || mutation.options || {});
+				const patch = filterPushPatch(tables[entry.table], entry.patch);
+				if (!patch.length) continue;
+				const result = await table.patch(patch, entry.options || mutation.options || {});
 				changed += Array.isArray(result && result.changed) ? result.changed.length : 0;
 				results.push({ table: entry.table, result });
 			}
@@ -1556,7 +1641,7 @@ function requireSync () {
 			const filter = buildSnapshotKeysetFilter(meta, lastPk, upperPk);
 			const rows = await runHookedTransaction(async (tx) => {
 				const base = inlineRows ? await resolveBaseFilter(tx, meta, request, response) : undefined;
-				return readTable(tx, meta).getMany(base ? tx.and(base, filter) : filter, strategy);
+				return readTable(tx, meta)[syncSnapshotRead](base ? tx.and(base, filter) : filter, strategy);
 			}, { readonly: true }, request, response);
 			return rows;
 		}
@@ -1601,10 +1686,8 @@ function requireSync () {
 			return runHookedTransaction(async (tx) => {
 				const base = await resolveBaseFilter(tx, meta, request, response);
 				if (base)
-					return readTable(tx, meta).getMany(tx.and(base, primaryKeyFilter(tx, meta, keyObjects.map(key => toPkArray(meta, key)))));
-				return readTable(tx, meta).getMany({
-					where: () => keyObjects
-				});
+					return readTable(tx, meta)[syncSnapshotRead](tx.and(base, primaryKeyFilter(tx, meta, keyObjects.map(key => toPkArray(meta, key)))));
+				return readTable(tx, meta)[syncSnapshotRead](keyObjects);
 			}, { readonly: true }, request, response);
 		}
 
@@ -7650,6 +7733,7 @@ function requireHostLocal () {
 	let { runSyncWrite } = requireWriteGate();
 	let ensureOutboxOperationColumns = requireEnsureOutboxOperationColumns();
 	let { updateOutboxOperationFromContext } = requireOperationContext();
+	const filterPushPatch = requireFilterPushPatch();
 	const readonlyOps = ['getManyDto', 'getMany', 'aggregate', 'distinct', 'count'];
 	const syncOutboxEnsuredKey = typeof Symbol === 'function'
 		? Symbol.for('orange-orm.syncOutboxEnsured')
@@ -7863,6 +7947,9 @@ function requireHostLocal () {
 		async function captureSyncOutboxPatch(context, patch, options) {
 			if (!Array.isArray(patch) || patch.length === 0)
 				return;
+			const replayPatch = filterPushPatch(table, patch, true);
+			patch = filterPushPatch(table, patch);
+			if (!patch.length) return;
 			const tableName = _options.syncTableName;
 			if (!tableName)
 				return;
@@ -7872,6 +7959,7 @@ function requireHostLocal () {
 			state.patches.push({
 				table: tableName,
 				patch,
+				...(replayPatch !== patch && stringify(replayPatch) !== stringify(patch) ? { replayPatch } : {}),
 				options: sanitizeSyncPatchOptions(options)
 			});
 			await updateSyncOutboxCaptureState(context, state);
@@ -7880,7 +7968,8 @@ function requireHostLocal () {
 		async function prepareSyncOutboxPatchCapture(context, patch) {
 			if (!Array.isArray(patch) || patch.length === 0 || !_options.syncTableName)
 				return;
-			await getSyncOutboxCaptureState(context);
+			if (filterPushPatch(table, patch).length)
+				await getSyncOutboxCaptureState(context);
 		}
 
 		async function captureSyncOutboxCommand(context, name, args) {
@@ -8948,7 +9037,7 @@ function requireSyncSchema () {
 				// Relations can gain foreign keys when their target table joins the
 				// scope. Compare the table's own columns and key, not scope metadata.
 				for (const key of ['columns', 'primaryKey']) {
-					if (stableStringify(table[key]) !== stableStringify(next[key]))
+					if (stableStringify(stripIndexes(table[key])) !== stableStringify(stripIndexes(next[key])))
 						throw schemaMismatch();
 				}
 				unchecked.delete(table.dbName);
@@ -9002,6 +9091,7 @@ function requireSyncSchema () {
 
 	function columnToSchema(column) {
 		return {
+			...(column._sync?.push === false ? { sync: { push: false } } : {}),
 			name: column.alias,
 			dbName: column._dbName,
 			type: columnType(column),
@@ -9250,7 +9340,7 @@ function requireSyncSchema () {
 			return value;
 		const result = {};
 		for (let key in value) {
-			if (key !== 'indexes')
+			if (key !== 'indexes' && key !== 'sync')
 				result[key] = stripIndexes(value[key]);
 		}
 		return result;
@@ -9306,6 +9396,7 @@ function requireSyncClient () {
 	const stringify = requireStringify();
 	const { createSyncAuto, syncAutoStartSymbol } = requireSyncAuto();
 	const createHttpInterceptor = requireHttpInterceptor();
+	const filterPushPatch = requireFilterPushPatch();
 	const outboxTableSql = requireOutboxTableSql();
 	const { ensureSyncSchema, clearEnsuredSyncSchema } = requireSyncSchema();
 	const { runSyncMaintenance } = requireWriteGate();
@@ -9653,7 +9744,9 @@ function requireSyncClient () {
 					const result = await fn(options);
 					const payload = result === undefined ? { method } : { method, result };
 					if (method === 'sync' && typeof result?.applied === 'number')
-						payload.changed = result.applied > 0;
+						payload.changed = result.changed === true || result.applied > 0;
+					if (method === 'sync' && result?.scope)
+						payload.scope = result.scope;
 					emit(method, payload);
 					if (method !== 'sync')
 						emit('sync', payload);
@@ -9818,9 +9911,17 @@ function requireSyncClient () {
 				rowGraph.validateKey(plan, request.pk);
 				if (rowGraph.graphTables(plan).some(name => !configuredTables.includes(name)))
 					throw rowGraph.invalid('selected relations must belong to the configured sync tables.');
-				if (options._skipPushBeforePull !== true)
-					await pushBeforePull(db, syncConfig, hadStableBase, undefined, options);
-				return pullRowGraph(db, pullConfig, plan, request.pk, options);
+				const pushed = options._skipPushBeforePull !== true
+					? await pushBeforePull(db, syncConfig, hadStableBase, undefined, options) : undefined;
+				const result = await pullRowGraph(db, pullConfig, plan, request.pk, options);
+				// A preceding push can reconcile rows outside the requested graph.
+				if (pushed) {
+					delete result.scope;
+					// Push reconciliation can change other local rows even when the
+					// selected graph itself is unchanged. Require the broad refresh.
+					result.changed = true;
+				}
+				return result;
 			}
 			if (options._skipPushBeforePull !== true)
 				await pushBeforePull(db, syncConfig, hadStableBase, undefined, options);
@@ -9903,12 +10004,26 @@ function requireSyncClient () {
 				throw rowGraph.invalid('row response did not resolve every missing local key.');
 			const items = removals.concat([...incoming.values()]);
 			const tables = rowGraph.graphTables(plan);
+			let scoped = payload.retained.length === 0 && rowGraph.isOwnedGraph(plan);
 			let deferred;
 			const applied = await runSyncMaintenance(db, () => client.transaction(async tx => {
 				throwIfSyncAborted(signal);
 				if ((await readPendingMutationRows(tx, 1)).length) {
 					deferred = 'pending-writes';
 					return 0;
+				}
+				// A row newly entering this graph may have moved from another root.
+				// Only advertise a root scope when those keys are genuinely new locally.
+				if (scoped) {
+					const previous = new Set(known.map(item => stringify([item.table, item.pk])));
+					for (const table of tables) {
+						const keys = items.filter(item => item.table === table && item.op === 'U'
+							&& !previous.has(stringify([item.table, item.pk]))).map(item => item.pk);
+						if (keys.length && (await rowGraph.readGraph(tx, rowGraph.planGraph(client.tables, table), keys)).rows.length) {
+							scoped = false;
+							break;
+						}
+					}
 				}
 				await tryDeferForeignKeys(tx);
 				const fileSnapshot = usesFileSnapshotRollback(options);
@@ -9924,6 +10039,8 @@ function requireSyncClient () {
 			if (options._capturePullJournalChunk)
 				await options._capturePullJournalChunk(journalItems);
 			const result = { applied, tables, ...(deferred ? { deferred } : {}) };
+			if (scoped && !deferred)
+				result.scope = { kind: 'row', table: plan.name, pk: [...pk], tables };
 			if (options._capturePullJournal)
 				Object.defineProperty(result, '__orangePullJournal', { value: {
 					scopeKey: `row:${plan.name}:${stringify(pk)}`, tables, itemCount: journalItems.length,
@@ -10451,7 +10568,7 @@ function requireSyncClient () {
 					const entry = patches[i];
 					if (!tx[entry.table] || typeof tx[entry.table].patch !== 'function')
 						throw new Error(`Table "${entry.table}" does not exist in this client`);
-					await tx[entry.table].patch(entry.patch, {
+					await tx[entry.table].patch(filterPushPatch(client.tables[entry.table], entry.replayPatch || entry.patch, true), {
 						...(entry.options || {}),
 						concurrency: 'overwrite',
 						skipSelectAfterInsert: true
@@ -11212,6 +11329,7 @@ function requireSyncClient () {
 			return {
 				table: input.table,
 				patch: input.patch,
+				replayPatch: input.replayPatch,
 				options: input.options
 			};
 		}
@@ -11915,6 +12033,13 @@ function requireSyncClient () {
 			const keys = Object.keys(mutation);
 			for (let i = 0; i < keys.length; i++)
 				result[keys[i]] = mutation[keys[i]];
+			if (Array.isArray(result.patches))
+				result.patches = result.patches.map(entry => ({ table: entry.table,
+					patch: filterPushPatch(client.tables[entry.table], entry.patch), options: entry.options }));
+			else if (Array.isArray(result.patch)) {
+				result.patch = filterPushPatch(client.tables[result.table], result.patch);
+				delete result.replayPatch;
+			}
 			return result;
 		}
 
@@ -13967,6 +14092,7 @@ function requireClient () {
 	const rootMap = new WeakMap();
 	const fetchingStrategyMap = new WeakMap();
 	const targetKey = Symbol();
+	const syncSnapshotRead = requireSyncSnapshotRead();
 	const map = requireClientMap();
 	const clone = require$$5;
 	const createHttpInterceptor = requireHttpInterceptor();
@@ -14275,8 +14401,10 @@ function requireClient () {
 				return;
 			if (localSchemaReadySkipped)
 				return;
-			const ensureReadyOwner = baseUrl && typeof baseUrl[ensureLocalSchemaReadySymbol] === 'function'
-				? baseUrl
+			// Use the same resolved owner as sync initialization. A lazy provider
+			// must not make local reads depend on the network sync worker.
+			const ensureReadyOwner = syncOwner && typeof syncOwner[ensureLocalSchemaReadySymbol] === 'function'
+				? syncOwner
 				: client.syncClient;
 			const ensureReady = ensureReadyOwner && ensureReadyOwner[ensureLocalSchemaReadySymbol];
 			if (typeof ensureReady !== 'function') {
@@ -14375,6 +14503,8 @@ function requireClient () {
 
 			let handler = {
 				get(_target, property,) {
+					if (property === syncSnapshotRead)
+						return getManyCore;
 					if (property === 'syncById')
 						return syncOwner && syncOwner.__sqliteSync ? syncById : undefined;
 					if (property in c)
@@ -17479,7 +17609,20 @@ function requireColumn () {
 			return c;
 		};
 
+		c.sync = function(options) {
+			if (!options || typeof options !== 'object' || Array.isArray(options)
+				|| Object.keys(options).some(key => key !== 'push')
+				|| (options.push !== undefined && typeof options.push !== 'boolean'))
+				throw new Error('Column sync expects { push?: boolean }.');
+			if (column.isPrimary && options.push === false)
+				throw new Error('Primary key columns cannot disable sync push.');
+			column._sync = { push: options.push !== false };
+			return c;
+		};
+
 		c.primary = function() {
+			if (column._sync && column._sync.push === false)
+				throw new Error('Primary key columns cannot disable sync push.');
 			column.isPrimary = true;
 			table._primaryColumns.push(column);
 			return c;
@@ -31935,6 +32078,8 @@ function requireDualSyncDatabase () {
 				result.applied = 0;
 				result.deferred = deferred;
 			}
+			if (acceptedMutationCount || pushConflictError || deferred)
+				delete result.scope;
 			const dualResult = withDualSyncResult(result, {
 				...publishedManifest,
 				deltaId,
@@ -32950,6 +33095,8 @@ function requireDualSyncDatabase () {
 			const swapped = result && result.__orangeDualSync && result.__orangeDualSync.swapped;
 			if (method === 'sync' && typeof swapped === 'boolean')
 				payload.changed = swapped;
+			if (method === 'sync' && result?.scope)
+				payload.scope = result.scope;
 			return payload;
 		}
 
@@ -33904,7 +34051,10 @@ function requireDualSyncDatabase () {
 		if (/Abort|Timeout/u.test(name))
 			return true;
 		const message = String(error && error.message || error || '');
-		return /network|fetch|timed? ?out|ECONN|socket|aborted/u.test(message);
+		// Safari rejects failed fetches with TypeError('Load failed'). Keep the
+		// incremental checkpoint just as for other browsers' network failures.
+		return (name === 'TypeError' && /^Load failed\.?$/iu.test(message))
+			|| /network|fetch|timed? ?out|ECONN|socket|aborted/iu.test(message);
 	}
 
 	function isPublishedRecovery(manifest, recovery) {

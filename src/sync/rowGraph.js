@@ -114,4 +114,8 @@ function graphTables(plan) {
 	return [...new Set([plan.name, ...plan.relations.flatMap(relation => graphTables(relation.plan))])];
 }
 
-module.exports = { planGraph, validateKey, readGraph, validateGraph, flatten, knownKeys, graphTables, keyOf, invalid };
+function isOwnedGraph(plan) {
+	return plan.relations.every(relation => relation.owned && isOwnedGraph(relation.plan));
+}
+
+module.exports = { planGraph, validateKey, readGraph, validateGraph, flatten, knownKeys, graphTables, keyOf, invalid, isOwnedGraph };
