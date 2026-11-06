@@ -61,6 +61,12 @@ Orange ORM is available as an MCP resource on Context7. Use it with AI-powered t
 npm install orange-orm
 ```
 
+For browser SQLite with `sqliteOPFS`, also install its optional peer dependency:
+
+```bash
+npm install @sqlite.org/sqlite-wasm
+```
+
 ## Example
 Watch the [tutorial video on YouTube](https://youtu.be/1IwwjPr2lMs)
 
