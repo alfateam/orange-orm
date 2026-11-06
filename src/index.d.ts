@@ -5,7 +5,7 @@ import type { D1Database } from '@cloudflare/workers-types';
 import type { ConnectionConfiguration } from 'tedious';
 import type { PoolAttributes } from 'oracledb';
 import type { AllowedDbMap, DBClientFromMap as MapDBClientFromMap, DbMapper, MappedDbDef, MergeProperties } from './map';
-import type { DBClient as MapDBClient, Filter as MapFilter, Pool as MapPool, PoolOptions as MapPoolOptions, RawFilter as MapRawFilter, SqliteOPFSPoolOptions as MapSqliteOPFSPoolOptions, SyncClient as MapSyncClient, SyncConfig as MapSyncConfig, SyncInitialReadyEvent as MapSyncInitialReadyEvent, TableDefinition as MapTableDefinition } from './map2';
+import type { DBClient as MapDBClient, Filter as MapFilter, Pool as MapPool, PoolOptions as MapPoolOptions, RawFilter as MapRawFilter, SqliteOPFSPoolOptions as MapSqliteOPFSPoolOptions, SyncClient as MapSyncClient, SyncSchemaRecoveryState as MapSyncSchemaRecoveryState, SyncConfig as MapSyncConfig, SyncInitialReadyEvent as MapSyncInitialReadyEvent, TableDefinition as MapTableDefinition } from './map2';
 
 declare function r(config: r.Config): unknown;
 
@@ -133,6 +133,7 @@ declare namespace r {
     export type  PoolOptions = MapPoolOptions;
     export type  SqliteOPFSPoolOptions = MapSqliteOPFSPoolOptions;
     export type  SyncConfig<M extends Record<string, MapTableDefinition<M>> = any> = MapSyncConfig<M>;
+    export type SyncSchemaRecoveryState = MapSyncSchemaRecoveryState;
     export type  SyncClient<M extends Record<string, MapTableDefinition<M>> = any> = MapSyncClient<M>;
     export type  SyncInitialReadyEvent<M extends Record<string, MapTableDefinition<M>> = any> = MapSyncInitialReadyEvent<M>;
     export type DBClient<

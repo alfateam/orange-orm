@@ -8631,6 +8631,108 @@ function requireFlags () {
 
 var syncClient = {exports: {}};
 
+var syncRecovery;
+var hasRequiredSyncRecovery;
+
+function requireSyncRecovery () {
+	if (hasRequiredSyncRecovery) return syncRecovery;
+	hasRequiredSyncRecovery = 1;
+	const { syncAbortError, syncAbortSignalSymbol } = requireSyncAbort();
+
+	// One recovery fence per open sync client. Account policy and consent stay in apps.
+	function createSyncRecovery(lifecycle, stopScheduler, reset, recover, synchronize) {
+		let state = { revision: 0, recovering: false, blocked: false, resetCount: 0, discarded: 0 };
+		let pending;
+		let lastReset;
+		let schemaResetCompleted = false;
+		let resumeAfterRecovery = false;
+		let recoveryStopVersion;
+		const listeners = new Set();
+		const snapshot = () => ({ ...state });
+		function publish(update) {
+			state = { ...state, ...update, revision: state.revision + 1 };
+			if (!lifecycle.closed) for (const listener of [...listeners]) call(listener);
+		}
+		function call(listener) { try { listener(snapshot()); } catch { /* Isolate observers. */ } }
+		function assertReady() {
+			if (state.recovering || state.blocked) {
+				const error = new Error('Schema recovery requires an explicit recoverLocalSchema() or resetLocal() call.');
+				error.code = 'ORANGE_SYNC_SCHEMA_RECOVERY_BLOCKED';
+				error.cause = state.error;
+				throw error;
+			}
+		}
+		function execute(options = {}, discard = false) {
+			try { lifecycle.assertOpen(); } catch (error) { return Promise.reject(error); }
+			if (pending) {
+				// Never turn a concurrent destructive reset into a non-destructive retry (or vice versa).
+				return Promise.reject(Object.assign(new Error('Schema recovery is already running.'), { code: 'ORANGE_SYNC_RECOVERY_BUSY' }));
+			}
+			// Install the fence before stopping/aborting existing work. Reserve pending
+			// before notifying observers, which may reenter recovery.
+			pending = Promise.resolve().then(async () => {
+				await stopped;
+				lifecycle.assertOpen();
+				if (version !== lifecycle.stopVersion) throw syncAbortError(undefined, 'Schema recovery stopped.');
+				return lifecycle.run(async bound => {
+					if (discard || !schemaResetCompleted) {
+						lastReset = await (discard ? reset : recover)(bound);
+						schemaResetCompleted = !discard || !options.tables;
+						publish({ resetCount: state.resetCount + 1, discarded: state.discarded + (lastReset.discarded || 0) });
+					}
+					let downloaded;
+					if (!discard && options.synchronize) downloaded = await synchronize({
+						timeoutMs: bound.timeoutMs, [syncAbortSignalSymbol]: bound[syncAbortSignalSymbol]
+					});
+					return { ...lastReset, ...downloaded, sent: lastReset.sent || 0, discarded: lastReset.discarded || 0 };
+				}, options, true, true);
+			}).then(result => {
+				if (resumeAfterRecovery && version === lifecycle.stopVersion) lifecycle.resume();
+				publish({ recovering: false, blocked: false, error: undefined });
+				return result;
+			}, error => {
+				if (schemaResetCompleted && error && error.code === 'ORANGE_SYNC_SCHEMA_MISMATCH')
+					error = Object.assign(new Error('Schema still mismatches after recovery. A new application version may be required.'), {
+						code: 'ORANGE_SYNC_SCHEMA_RECOVERY_FAILED', cause: error
+					});
+				publish({ recovering: false, blocked: true, error });
+				throw error;
+			}).finally(() => { pending = undefined; });
+			resumeAfterRecovery = lifecycle.active || (state.blocked && recoveryStopVersion === lifecycle.stopVersion && resumeAfterRecovery);
+			const stopped = lifecycle.stop(stopScheduler);
+			const version = recoveryStopVersion = lifecycle.stopVersion;
+			publish({ recovering: true, blocked: true, error: undefined });
+			return pending;
+		}
+		return {
+			assertReady,
+			observeError(error) {
+				if (lifecycle.closed || state.blocked || state.recovering || !error || error.code !== 'ORANGE_SYNC_SCHEMA_MISMATCH') return;
+				// Detection itself fences callers, even when the application cannot
+				// authorize a recovery attempt yet (for example, expired credentials).
+				resumeAfterRecovery = lifecycle.active;
+				void lifecycle.stop(stopScheduler).catch(() => {});
+				recoveryStopVersion = lifecycle.stopVersion;
+				publish({ blocked: true, error });
+			},
+			getState: async () => { lifecycle.assertOpen(); return snapshot(); },
+			recover: options => execute(options),
+			reset: options => execute(options, true),
+			on(listener) {
+				lifecycle.assertOpen();
+				if (typeof listener !== 'function') return () => {};
+				listeners.add(listener);
+				Promise.resolve().then(() => { if (!lifecycle.closed && listeners.has(listener)) call(listener); });
+				return () => listeners.delete(listener);
+			},
+			off: listener => listeners.delete(listener),
+			close: () => listeners.clear()
+		};
+	}
+	syncRecovery = createSyncRecovery;
+	return syncRecovery;
+}
+
 var syncLifecycle;
 var hasRequiredSyncLifecycle;
 
@@ -8648,16 +8750,19 @@ function requireSyncLifecycle () {
 
 	// Own every operation, including work still unwinding after an abortable await.
 	// No account/auth state belongs here: each database has its own lifecycle.
-	function createSyncLifecycle() {
+	function createSyncLifecycle(assertReady = () => {}, reportError = () => {}) {
 		const controllers = new Set();
 		const pending = new Set();
 		let paused = false;
 		let closed = false;
 		let stopping;
+		let stopVersion = 0;
 
 		return { run, track, start, stop, close, assertOpen,
+			resume() { assertOpen(); paused = false; },
 			get active() { return !paused && !closed; },
-			get closed() { return closed; }
+			get closed() { return closed; },
+			get stopVersion() { return stopVersion; }
 		};
 
 		function assertOpen() {
@@ -8672,9 +8777,10 @@ function requireSyncLifecycle () {
 			return promise;
 		}
 
-		function run(fn, options = {}, allowPaused = false) {
+		function run(fn, options = {}, allowPaused = false, maintenance = false) {
 			try {
 				assertOpen();
+				if (!maintenance) assertReady();
 				if (stopping || (paused && !allowPaused))
 					throw syncAbortError(undefined, 'Sync client stopped. Call start() to resume.');
 			}
@@ -8694,7 +8800,11 @@ function requireSyncLifecycle () {
 			controllers.add(controller);
 			return track(Promise.resolve().then(() => {
 				throwIfSyncAborted(controller.signal);
+				if (!maintenance) assertReady();
 				return fn({ ...options, [syncAbortSignalSymbol]: controller.signal });
+			}).catch(error => {
+				if (!maintenance) reportError(error);
+				throw error;
 			}).finally(() => {
 				controllers.delete(controller);
 				if (external) external.removeEventListener('abort', abort);
@@ -8704,6 +8814,7 @@ function requireSyncLifecycle () {
 		function start(fn, options) {
 			try {
 				assertOpen();
+				assertReady();
 				if (stopping)
 					throw syncAbortError(undefined, 'Sync client is stopping. Await stop() before start().');
 				paused = false;
@@ -8715,6 +8826,7 @@ function requireSyncLifecycle () {
 		}
 
 		function stop(stopScheduler = () => {}) {
+			stopVersion++;
 			if (stopping) return stopping;
 			paused = true;
 			// Install the fence before abort listeners can synchronously call start().
@@ -9390,6 +9502,7 @@ var hasRequiredSyncClient;
 function requireSyncClient () {
 	if (hasRequiredSyncClient) return syncClient.exports;
 	hasRequiredSyncClient = 1;
+	const createSyncRecovery = requireSyncRecovery();
 	const createSyncLifecycle = requireSyncLifecycle();
 	const rowGraph = requireRowGraph();
 	const randomUuid = requireRandomUuid();
@@ -9463,7 +9576,12 @@ function requireSyncClient () {
 		: '__orangeOrmSyncClientDrainOutboxBeforeReset';
 
 	function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, internalOptions = {}) {
-		const lifecycle = createSyncLifecycle();
+		let recovery;
+		// Dual replicas share their router's recovery fence, including local resets.
+		const lifecycle = createSyncLifecycle(
+			() => !internalOptions.recoveryManaged && recovery && recovery.assertReady(),
+			error => !internalOptions.recoveryManaged && recovery && recovery.observeError(error)
+		);
 		const sinceByScope = new Map();
 		const ensuredInternalTables = new WeakMap();
 		const syncStateTable = 'orange_sync_state';
@@ -9498,12 +9616,14 @@ function requireSyncClient () {
 			sync: options => lifecycle.run(observedSync, options)
 		}, getConfig);
 
+		recovery = createSyncRecovery(lifecycle, auto.stop, lockedResetLocal, queuedRecoverLocalSchema, observedSync);
 		const syncClientApi = {
 			sync: options => lifecycle.run(observedSync, options),
 			syncRow: options => lifecycle.run(observedRowSync, options),
 			ensureLocalSchema: options => lifecycle.run(queuedEnsureLocalSchema, options, true),
-			resetLocal: options => lifecycle.run(lockedResetLocal, options, true),
-			recoverLocalSchema: options => lifecycle.run(queuedRecoverLocalSchema, options, true),
+			resetLocal: internalOptions.recoveryManaged ? options => lifecycle.run(lockedResetLocal, options, true) : recovery.reset,
+			recoverLocalSchema: recovery.recover,
+			getSchemaRecoveryState: recovery.getState,
 			start: options => lifecycle.start(auto.start, options),
 			stop: () => lifecycle.stop(auto.stop),
 			close,
@@ -9518,7 +9638,7 @@ function requireSyncClient () {
 			value: options => lifecycle.run(auto.startFromConfig, options)
 		});
 		Object.defineProperty(syncClientApi, ensureLocalSchemaReadySymbol, {
-			value: options => lifecycle.run(ensureLocalSchemaReady, options, true)
+			value: options => lifecycle.run(ensureLocalSchemaReady, options, true, true)
 		});
 		Object.defineProperty(syncClientApi, syncAndCapturePullJournalSymbol, {
 			value: syncAndCapturePullJournal
@@ -9551,6 +9671,7 @@ function requireSyncClient () {
 
 		function close() {
 			const closing = lifecycle.close(auto.stop);
+			recovery.close();
 			eventListeners.clear();
 			initialReadyListeners.clear();
 			clearSyncOperationMemory(syncClientApi);
@@ -12911,6 +13032,7 @@ function requireSyncClient () {
 
 		function on(event, listener) {
 			lifecycle.assertOpen();
+			if (event === 'schema-recovery') return recovery.on(listener);
 			if (typeof event !== 'string' || typeof listener !== 'function')
 				return () => {};
 			if (event === 'initial-ready') {
@@ -12928,6 +13050,7 @@ function requireSyncClient () {
 		}
 
 		function off(event, listener) {
+			if (event === 'schema-recovery') return recovery.off(listener);
 			if (event === 'initial-ready') {
 				initialReadyListeners.delete(listener);
 				return;
@@ -13011,7 +13134,7 @@ function requireSyncClient () {
 				updatedAtMs: state.updatedAtMs,
 				source
 			};
-			if (!initialReadyEmitted) {
+			if (!initialReadyEmitted && lifecycle.active) {
 				initialReadyEmitted = true;
 				emitInitialReady(payload);
 			}
@@ -24393,6 +24516,7 @@ function requireSyncWorkerProtocol () {
 		'error',
 		'initial-ready',
 		'sync-progress',
+		'schema-recovery',
 		'operation'
 	]);
 
@@ -24518,6 +24642,7 @@ function requireDbWorkerClient () {
 		const interceptors = createHttpInterceptor();
 		let hasInitialReady = false;
 		let lastInitialReady;
+		let lastRecovery;
 		let closed = false;
 		let closing;
 		let terminalError;
@@ -24542,6 +24667,7 @@ function requireDbWorkerClient () {
 				ensureLocalSchema: syncRequest.bind(null, 'ensureLocalSchema'),
 				resetLocal: syncRequest.bind(null, 'resetLocal'),
 				recoverLocalSchema: syncRequest.bind(null, 'recoverLocalSchema'),
+				getSchemaRecoveryState: () => syncRequest('getSchemaRecoveryState').then(deserializeEventPayload),
 				start: syncRequest.bind(null, 'start'),
 				stop: syncRequest.bind(null, 'stop'),
 				isRunning: syncRequest.bind(null, 'isRunning'),
@@ -24643,6 +24769,13 @@ function requireDbWorkerClient () {
 			eventListeners.add(listener);
 			if (!isAlwaysForwardedEvent(event))
 				request('sync.on', {}, event).catch(() => {});
+			if (event === 'schema-recovery') {
+				const previous = lastRecovery;
+				syncRequest('getSchemaRecoveryState').then(deserializeEventPayload).then(state => {
+					if (!closed && eventListeners.has(listener) && (!lastRecovery || lastRecovery === previous))
+						callListener(listener, state);
+				}).catch(() => {});
+			}
 			if (event === 'initial-ready' && hasInitialReady) {
 				const readyPayload = lastInitialReady;
 				Promise.resolve().then(() => {
@@ -24684,6 +24817,7 @@ function requireDbWorkerClient () {
 			listeners.clear();
 			hasInitialReady = false;
 			lastInitialReady = undefined;
+			lastRecovery = undefined;
 			closing = request('close', {}).finally(() => {
 				worker.removeEventListener('message', onMessage);
 				worker.removeEventListener('error', onWorkerError);
@@ -24711,6 +24845,7 @@ function requireDbWorkerClient () {
 					hasInitialReady = true;
 					lastInitialReady = payload;
 				}
+				if (message.event === 'schema-recovery') lastRecovery = payload;
 				emit(message.event, payload);
 				return;
 			}
@@ -25040,6 +25175,8 @@ function requireDbWorkerHandler () {
 					return { skipped: true };
 				return ensureReady.apply(syncClient, args);
 			}
+			if (method === 'getSchemaRecoveryState')
+				return Promise.resolve(syncClient.getSchemaRecoveryState()).then(serializeEventPayload);
 			const fn = syncClient[method];
 			if (typeof fn !== 'function')
 				throw new Error(`Sync method "${method}" is not implemented.`);
@@ -25375,6 +25512,7 @@ function requireSyncWorkerClient () {
 		const interceptors = createHttpInterceptor();
 		let hasInitialReady = false;
 		let lastInitialReady;
+		let lastRecovery;
 		let closed = false;
 		let closing;
 		let terminalError;
@@ -25391,6 +25529,7 @@ function requireSyncWorkerClient () {
 			ensureLocalSchema: request.bind(null, 'ensureLocalSchema'),
 			resetLocal: request.bind(null, 'resetLocal'),
 			recoverLocalSchema: request.bind(null, 'recoverLocalSchema'),
+			getSchemaRecoveryState: () => request('getSchemaRecoveryState').then(deserializeEventPayload),
 			start: request.bind(null, 'start'),
 			stop: request.bind(null, 'stop'),
 			isRunning: request.bind(null, 'isRunning'),
@@ -25454,6 +25593,13 @@ function requireSyncWorkerClient () {
 			eventListeners.add(listener);
 			if (!isAlwaysForwardedEvent(event))
 				request('on', event).catch(() => {});
+			if (event === 'schema-recovery') {
+				const previous = lastRecovery;
+				request('getSchemaRecoveryState').then(deserializeEventPayload).then(state => {
+					if (!closed && eventListeners.has(listener) && (!lastRecovery || lastRecovery === previous))
+						callListener(listener, state);
+				}).catch(() => {});
+			}
 			if (event === 'initial-ready' && hasInitialReady) {
 				const readyPayload = lastInitialReady;
 				Promise.resolve().then(() => {
@@ -25500,6 +25646,7 @@ function requireSyncWorkerClient () {
 			listeners.clear();
 			hasInitialReady = false;
 			lastInitialReady = undefined;
+			lastRecovery = undefined;
 			// Wait for rollback/storage work in the worker before terminating it.
 			closing = request('close').finally(() => {
 				worker.removeEventListener('message', onMessage);
@@ -25529,6 +25676,7 @@ function requireSyncWorkerClient () {
 					hasInitialReady = true;
 					lastInitialReady = payload;
 				}
+				if (message.event === 'schema-recovery') lastRecovery = payload;
 				emit(message.event, payload);
 				return;
 			}
@@ -25811,6 +25959,8 @@ function requireSyncWorkerHandler () {
 					return { skipped: true };
 				return ensureReady.apply(syncClient, withAbortOptions(args, signal));
 			}
+			if (method === 'getSchemaRecoveryState')
+				return Promise.resolve(syncClient.getSchemaRecoveryState()).then(serializeEventPayload);
 			const fn = syncClient[method];
 			if (typeof fn !== 'function')
 				throw new Error(`Sync worker method "${method}" is not implemented.`);
@@ -31469,6 +31619,7 @@ function requireDualSyncDatabase () {
 	const { appendRoleSuffix, toSecondaryDataPoolOptions, toCachePoolOptions } = requireStorageLayout();
 	const rowGraph = requireRowGraph();
 	const { clearSyncOperationMemory } = requireOperationContext();
+	const createSyncRecovery = requireSyncRecovery();
 	const createSyncLifecycle = requireSyncLifecycle();
 	const hostLocal = requireHostLocal();
 	const express = requireHostExpress();
@@ -31534,7 +31685,8 @@ function requireDualSyncDatabase () {
 		: '__orangeOrmDualSyncFaultInjector';
 
 	function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase) {
-		const lifecycle = createSyncLifecycle();
+		let recovery;
+		const lifecycle = createSyncLifecycle(() => recovery && recovery.assertReady(), error => recovery && recovery.observeError(error));
 		let syncAuto;
 		let closing;
 		const roleUnsubscribers = new Set();
@@ -31678,6 +31830,7 @@ function requireDualSyncDatabase () {
 		function end() {
 			if (closing) return closing;
 			const stopped = lifecycle.close(() => syncAuto && syncAuto.stop());
+			if (recovery) recovery.close();
 			eventListeners.clear();
 			if (externalSyncClient) clearSyncOperationMemory(externalSyncClient);
 			closing = (async () => {
@@ -31722,6 +31875,10 @@ function requireDualSyncDatabase () {
 				async () => router.__sqliteSync,
 				{ runSync: syncAutomatic }
 			);
+			recovery = createSyncRecovery(lifecycle, auto.stop, resetLocal, recoverLocalSchema, async options => {
+				await coalesceSync(normalizeSyncOptions(options));
+				return getManifest(true);
+			});
 			const syncClient = {
 				sync: syncObserved,
 				syncRow: options => lifecycle.run(bound => {
@@ -31731,8 +31888,9 @@ function requireDualSyncDatabase () {
 						[syncAbortSignalSymbol]: bound[syncAbortSignalSymbol] });
 				}, options),
 				ensureLocalSchema: options => lifecycle.run(ensureLocalSchema, options, true),
-				resetLocal: options => lifecycle.run(resetLocal, options, true),
-				recoverLocalSchema: options => lifecycle.run(recoverLocalSchema, options, true),
+				resetLocal: recovery.reset,
+				recoverLocalSchema: recovery.recover,
+				getSchemaRecoveryState: recovery.getState,
 				start: options => lifecycle.start(auto.start, options),
 				stop: () => lifecycle.stop(auto.stop),
 				close: end,
@@ -33036,6 +33194,7 @@ function requireDualSyncDatabase () {
 
 		function on(event, listener) {
 			lifecycle.assertOpen();
+			if (event === 'schema-recovery') return recovery.on(listener);
 			if (typeof event !== 'string' || typeof listener !== 'function')
 				return () => {};
 			let listeners = eventListeners.get(event);
@@ -33051,6 +33210,7 @@ function requireDualSyncDatabase () {
 		}
 
 		function off(event, listener) {
+			if (event === 'schema-recovery') return recovery.off(listener);
 			const listeners = eventListeners.get(event);
 			if (!listeners)
 				return;
@@ -33155,7 +33315,7 @@ function requireDualSyncDatabase () {
 			catch (_e) {
 				return false;
 			}
-			if (initialReadyEmitted)
+			if (initialReadyEmitted || !lifecycle.active)
 				return false;
 			initialReadyEmitted = true;
 			const manifest = normalizeManifestInfo(manifestInfo) || await getManifest(true);
@@ -33375,7 +33535,7 @@ function requireDualSyncDatabase () {
 					getDb,
 					roleHttpInterceptor,
 					syncInterceptors,
-					{ fileSnapshotRollback: true, operationMemoryScope: externalSyncClient }
+					{ fileSnapshotRollback: true, recoveryManaged: true, operationMemoryScope: externalSyncClient }
 				);
 				clientByRole.set(role, roleClient);
 				for (const event of eventListeners.keys())

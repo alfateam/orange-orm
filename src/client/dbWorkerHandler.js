@@ -188,6 +188,8 @@ function createDbWorkerHandler(client, options = {}) {
 				return { skipped: true };
 			return ensureReady.apply(syncClient, args);
 		}
+		if (method === 'getSchemaRecoveryState')
+			return Promise.resolve(syncClient.getSchemaRecoveryState()).then(serializeEventPayload);
 		const fn = syncClient[method];
 		if (typeof fn !== 'function')
 			throw new Error(`Sync method "${method}" is not implemented.`);

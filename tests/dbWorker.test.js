@@ -39,6 +39,28 @@ afterAll(async () => {
 });
 
 describe('db worker rpc', () => {
+	test('replays recovery status with errors and forwards reset events', async () => {
+		const listeners = new Map();
+		let state = { revision: 1, blocked: true, recovering: false, resetCount: 0, discarded: 0,
+			error: Object.assign(new Error('Unavailable'), { response: { status: 503 }, code: 'REMOTE' }) };
+		const bridge = createBridge({ syncClient: {
+			getSchemaRecoveryState: async () => state,
+			on(event, listener) { listeners.set(event, listener); return () => listeners.delete(event); },
+			stop: async () => {}
+		} }, { autoStart: false });
+		const workerClient = rdb.createDbWorkerClient(bridge.worker);
+		const events = [];
+		workerClient.syncClient.on('schema-recovery', value => events.push(value));
+		await new Promise(resolve => setTimeout(resolve, 0));
+		expect(events.at(-1)).toMatchObject({ error: { code: 'REMOTE', response: { status: 503 } } });
+		expect((await workerClient.syncClient.getSchemaRecoveryState()).error).toBeInstanceOf(Error);
+		state = { ...state, revision: 2, blocked: false, resetCount: 1, error: undefined };
+		listeners.get('schema-recovery')(state);
+		await new Promise(resolve => setTimeout(resolve, 0));
+		expect(events.at(-1)).toMatchObject({ resetCount: 1, blocked: false });
+		await workerClient.close();
+	});
+
 	test('auto-starts worker sync client after the main-thread client is ready', async () => {
 		let starts = 0;
 		let autoStarts = 0;

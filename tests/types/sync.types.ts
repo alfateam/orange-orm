@@ -64,3 +64,12 @@ sqlite.item.syncById(1);
 sqliteOPFS.item.syncById(1, { limit: 1 });
 // @ts-expect-error The primary key must have its mapped type.
 sqliteOPFS.item.syncById('1');
+
+const recoveryState: Promise<orange.SyncSchemaRecoveryState> = sqliteOPFS.syncClient.getSchemaRecoveryState();
+void recoveryState;
+sqliteOPFS.syncClient.recoverLocalSchema({ synchronize: true, discardConflicts: true, timeoutMs: 15000 });
+sqliteOPFS.syncClient.on('schema-recovery', state => {
+  const count: number = state.resetCount;
+  const blocked: boolean = state.blocked;
+  void count; void blocked;
+});

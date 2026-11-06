@@ -1,6 +1,7 @@
 const { appendRoleSuffix, toSecondaryDataPoolOptions, toCachePoolOptions } = require('./storageLayout');
 const rowGraph = require('../sync/rowGraph');
 const { clearSyncOperationMemory } = require('../sync/operationContext');
+const createSyncRecovery = require('../client/syncRecovery');
 const createSyncLifecycle = require('../client/syncLifecycle');
 const hostLocal = require('../hostLocal');
 const express = require('../hostExpress');
@@ -66,7 +67,8 @@ const dualSyncFaultInjectorSymbol = typeof Symbol === 'function'
 	: '__orangeOrmDualSyncFaultInjector';
 
 function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase) {
-	const lifecycle = createSyncLifecycle();
+	let recovery;
+	const lifecycle = createSyncLifecycle(() => recovery && recovery.assertReady(), error => recovery && recovery.observeError(error));
 	let syncAuto;
 	let closing;
 	const roleUnsubscribers = new Set();
@@ -210,6 +212,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	function end() {
 		if (closing) return closing;
 		const stopped = lifecycle.close(() => syncAuto && syncAuto.stop());
+		if (recovery) recovery.close();
 		eventListeners.clear();
 		if (externalSyncClient) clearSyncOperationMemory(externalSyncClient);
 		closing = (async () => {
@@ -254,6 +257,10 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			async () => router.__sqliteSync,
 			{ runSync: syncAutomatic }
 		);
+		recovery = createSyncRecovery(lifecycle, auto.stop, resetLocal, recoverLocalSchema, async options => {
+			await coalesceSync(normalizeSyncOptions(options));
+			return getManifest(true);
+		});
 		const syncClient = {
 			sync: syncObserved,
 			syncRow: options => lifecycle.run(bound => {
@@ -263,8 +270,9 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 					[syncAbortSignalSymbol]: bound[syncAbortSignalSymbol] });
 			}, options),
 			ensureLocalSchema: options => lifecycle.run(ensureLocalSchema, options, true),
-			resetLocal: options => lifecycle.run(resetLocal, options, true),
-			recoverLocalSchema: options => lifecycle.run(recoverLocalSchema, options, true),
+			resetLocal: recovery.reset,
+			recoverLocalSchema: recovery.recover,
+			getSchemaRecoveryState: recovery.getState,
 			start: options => lifecycle.start(auto.start, options),
 			stop: () => lifecycle.stop(auto.stop),
 			close: end,
@@ -1568,6 +1576,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 
 	function on(event, listener) {
 		lifecycle.assertOpen();
+		if (event === 'schema-recovery') return recovery.on(listener);
 		if (typeof event !== 'string' || typeof listener !== 'function')
 			return () => {};
 		let listeners = eventListeners.get(event);
@@ -1583,6 +1592,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	}
 
 	function off(event, listener) {
+		if (event === 'schema-recovery') return recovery.off(listener);
 		const listeners = eventListeners.get(event);
 		if (!listeners)
 			return;
@@ -1687,7 +1697,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		catch (_e) {
 			return false;
 		}
-		if (initialReadyEmitted)
+		if (initialReadyEmitted || !lifecycle.active)
 			return false;
 		initialReadyEmitted = true;
 		const manifest = normalizeManifestInfo(manifestInfo) || await getManifest(true);
@@ -1907,7 +1917,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				getDb,
 				roleHttpInterceptor,
 				syncInterceptors,
-				{ fileSnapshotRollback: true, operationMemoryScope: externalSyncClient }
+				{ fileSnapshotRollback: true, recoveryManaged: true, operationMemoryScope: externalSyncClient }
 			);
 			clientByRole.set(role, roleClient);
 			for (const event of eventListeners.keys())

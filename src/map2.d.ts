@@ -1416,14 +1416,29 @@ export interface SyncInitialReadyEvent<M extends Record<string, TableDefinition<
   lastSuccessfulSyncAtMs?: number | null;
 }
 
+export interface SyncSchemaRecoveryState {
+  /** Monotonic within this open database. State is not persisted across reopen. */
+  revision: number;
+  recovering: boolean;
+  blocked: boolean;
+  resetCount: number;
+  discarded: number;
+  error?: unknown;
+}
+
 export interface SyncClient<M extends Record<string, TableDefinition<M>> = any> {
   sync(options?: SyncOptions): Promise<{ applied?: number; [key: string]: unknown }>;
   ensureLocalSchema(options?: SyncOptions): Promise<SyncLocalSchemaResult<M>>;
   resetLocal(options?: SyncResetLocalOptions<M>): Promise<SyncResetLocalResult<M>>;
   /** Drain the old outbox before resetting the schema. Errors retain unresolved writes.
    * HTTP 409 discards only the rejected atomic mutation when discardConflicts is true.
+   * Failure blocks sync/start/row sync until an explicit recovery or reset succeeds.
+   * Set synchronize to include the first download in the recovery fence.
+   * A completed schema reset is not repeated within this open database; retry resumes download.
+   * Recovery stops automatic scheduling; call start() after success to resume it.
    * Explicit resetLocal remains destructive; use this method for schema upgrades. */
-  recoverLocalSchema(options?: SyncOptions & { discardConflicts?: boolean }): Promise<SyncResetLocalResult<M> & { sent: number; discarded: number }>;
+  recoverLocalSchema(options?: SyncOptions & { discardConflicts?: boolean; synchronize?: boolean }): Promise<SyncResetLocalResult<M> & { sent: number; discarded: number }>;
+  getSchemaRecoveryState(): Promise<SyncSchemaRecoveryState>;
   start(): Promise<void>;
   /** Cancel and drain sync work. Keeps listeners and persisted outbox; start() resumes. */
   stop(): Promise<void>;
@@ -1438,6 +1453,8 @@ export interface SyncClient<M extends Record<string, TableDefinition<M>> = any> 
   ): () => void;
   on(event: 'initial-ready', listener: (payload: SyncInitialReadyEvent<M>) => void): () => void;
   on(event: 'sync-progress', listener: (payload: SyncProgressEvent) => void): () => void;
+  /** Replays current state asynchronously, then reports changes, including while stopped. */
+  on(event: 'schema-recovery', listener: (payload: SyncSchemaRecoveryState) => void): () => void;
   on(event: 'error' | 'sync-error', listener: (payload: SyncErrorEvent) => void): () => void;
   off(event: 'sync', listener: (payload: SyncEvent) => void): void;
   off<Context extends Record<string, unknown> = Record<string, unknown>, Memory = unknown>(
@@ -1446,6 +1463,7 @@ export interface SyncClient<M extends Record<string, TableDefinition<M>> = any> 
   ): void;
   off(event: 'initial-ready', listener: (payload: SyncInitialReadyEvent<M>) => void): void;
   off(event: 'sync-progress', listener: (payload: SyncProgressEvent) => void): void;
+  off(event: 'schema-recovery', listener: (payload: SyncSchemaRecoveryState) => void): void;
   off(event: 'error' | 'sync-error', listener: (payload: SyncErrorEvent) => void): void;
   once(event: 'sync', listener: (payload: SyncEvent) => void): () => void;
   once<Context extends Record<string, unknown> = Record<string, unknown>, Memory = unknown>(
@@ -1454,6 +1472,7 @@ export interface SyncClient<M extends Record<string, TableDefinition<M>> = any> 
   ): () => void;
   once(event: 'initial-ready', listener: (payload: SyncInitialReadyEvent<M>) => void): () => void;
   once(event: 'sync-progress', listener: (payload: SyncProgressEvent) => void): () => void;
+  once(event: 'schema-recovery', listener: (payload: SyncSchemaRecoveryState) => void): () => void;
   once(event: 'error' | 'sync-error', listener: (payload: SyncErrorEvent) => void): () => void;
   waitForInitialSync(): Promise<void>;
 }

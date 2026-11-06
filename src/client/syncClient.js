@@ -1,3 +1,4 @@
+const createSyncRecovery = require('./syncRecovery');
 const createSyncLifecycle = require('./syncLifecycle');
 const rowGraph = require('../sync/rowGraph');
 const randomUuid = require('../randomUuid');
@@ -71,7 +72,12 @@ const drainOutboxBeforeResetSymbol = typeof Symbol === 'function'
 	: '__orangeOrmSyncClientDrainOutboxBeforeReset';
 
 function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, internalOptions = {}) {
-	const lifecycle = createSyncLifecycle();
+	let recovery;
+	// Dual replicas share their router's recovery fence, including local resets.
+	const lifecycle = createSyncLifecycle(
+		() => !internalOptions.recoveryManaged && recovery && recovery.assertReady(),
+		error => !internalOptions.recoveryManaged && recovery && recovery.observeError(error)
+	);
 	const sinceByScope = new Map();
 	const ensuredInternalTables = new WeakMap();
 	const syncStateTable = 'orange_sync_state';
@@ -106,12 +112,14 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		sync: options => lifecycle.run(observedSync, options)
 	}, getConfig);
 
+	recovery = createSyncRecovery(lifecycle, auto.stop, lockedResetLocal, queuedRecoverLocalSchema, observedSync);
 	const syncClientApi = {
 		sync: options => lifecycle.run(observedSync, options),
 		syncRow: options => lifecycle.run(observedRowSync, options),
 		ensureLocalSchema: options => lifecycle.run(queuedEnsureLocalSchema, options, true),
-		resetLocal: options => lifecycle.run(lockedResetLocal, options, true),
-		recoverLocalSchema: options => lifecycle.run(queuedRecoverLocalSchema, options, true),
+		resetLocal: internalOptions.recoveryManaged ? options => lifecycle.run(lockedResetLocal, options, true) : recovery.reset,
+		recoverLocalSchema: recovery.recover,
+		getSchemaRecoveryState: recovery.getState,
 		start: options => lifecycle.start(auto.start, options),
 		stop: () => lifecycle.stop(auto.stop),
 		close,
@@ -126,7 +134,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		value: options => lifecycle.run(auto.startFromConfig, options)
 	});
 	Object.defineProperty(syncClientApi, ensureLocalSchemaReadySymbol, {
-		value: options => lifecycle.run(ensureLocalSchemaReady, options, true)
+		value: options => lifecycle.run(ensureLocalSchemaReady, options, true, true)
 	});
 	Object.defineProperty(syncClientApi, syncAndCapturePullJournalSymbol, {
 		value: syncAndCapturePullJournal
@@ -159,6 +167,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 
 	function close() {
 		const closing = lifecycle.close(auto.stop);
+		recovery.close();
 		eventListeners.clear();
 		initialReadyListeners.clear();
 		clearSyncOperationMemory(syncClientApi);
@@ -3519,6 +3528,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 
 	function on(event, listener) {
 		lifecycle.assertOpen();
+		if (event === 'schema-recovery') return recovery.on(listener);
 		if (typeof event !== 'string' || typeof listener !== 'function')
 			return () => {};
 		if (event === 'initial-ready') {
@@ -3536,6 +3546,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 	}
 
 	function off(event, listener) {
+		if (event === 'schema-recovery') return recovery.off(listener);
 		if (event === 'initial-ready') {
 			initialReadyListeners.delete(listener);
 			return;
@@ -3619,7 +3630,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 			updatedAtMs: state.updatedAtMs,
 			source
 		};
-		if (!initialReadyEmitted) {
+		if (!initialReadyEmitted && lifecycle.active) {
 			initialReadyEmitted = true;
 			emitInitialReady(payload);
 		}

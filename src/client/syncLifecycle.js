@@ -9,16 +9,19 @@ const {
 
 // Own every operation, including work still unwinding after an abortable await.
 // No account/auth state belongs here: each database has its own lifecycle.
-function createSyncLifecycle() {
+function createSyncLifecycle(assertReady = () => {}, reportError = () => {}) {
 	const controllers = new Set();
 	const pending = new Set();
 	let paused = false;
 	let closed = false;
 	let stopping;
+	let stopVersion = 0;
 
 	return { run, track, start, stop, close, assertOpen,
+		resume() { assertOpen(); paused = false; },
 		get active() { return !paused && !closed; },
-		get closed() { return closed; }
+		get closed() { return closed; },
+		get stopVersion() { return stopVersion; }
 	};
 
 	function assertOpen() {
@@ -33,9 +36,10 @@ function createSyncLifecycle() {
 		return promise;
 	}
 
-	function run(fn, options = {}, allowPaused = false) {
+	function run(fn, options = {}, allowPaused = false, maintenance = false) {
 		try {
 			assertOpen();
+			if (!maintenance) assertReady();
 			if (stopping || (paused && !allowPaused))
 				throw syncAbortError(undefined, 'Sync client stopped. Call start() to resume.');
 		}
@@ -55,7 +59,11 @@ function createSyncLifecycle() {
 		controllers.add(controller);
 		return track(Promise.resolve().then(() => {
 			throwIfSyncAborted(controller.signal);
+			if (!maintenance) assertReady();
 			return fn({ ...options, [syncAbortSignalSymbol]: controller.signal });
+		}).catch(error => {
+			if (!maintenance) reportError(error);
+			throw error;
 		}).finally(() => {
 			controllers.delete(controller);
 			if (external) external.removeEventListener('abort', abort);
@@ -65,6 +73,7 @@ function createSyncLifecycle() {
 	function start(fn, options) {
 		try {
 			assertOpen();
+			assertReady();
 			if (stopping)
 				throw syncAbortError(undefined, 'Sync client is stopping. Await stop() before start().');
 			paused = false;
@@ -76,6 +85,7 @@ function createSyncLifecycle() {
 	}
 
 	function stop(stopScheduler = () => {}) {
+		stopVersion++;
 		if (stopping) return stopping;
 		paused = true;
 		// Install the fence before abort listeners can synchronously call start().

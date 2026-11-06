@@ -31,10 +31,11 @@ async function fixture(dual) {
 	await setupChangeTracking(remote, remote.tables);
 	await remote.project.insert({ id: 'seed', title: 'Server', description: 'New column' });
 	const requests = [];
-	let status = 0, rejectTitle, omitAck = false;
+	let status = 0, pullStatus = 0, rejectTitle, omitAck = false;
 	const app = express();
 	app.use(express.json());
 	app.use('/rdb', (req, res, next) => {
+		if (pullStatus && req.body.phase !== 'push') return res.status(pullStatus).send('Download unavailable');
 		if (req.body.phase === 'push') {
 			requests.push(req.body);
 			if (status) return res.status(status).send('Temporary rejection');
@@ -58,10 +59,41 @@ async function fixture(dual) {
 		cleanup.push(close);
 		return { db, close };
 	}
-	return { remote, requests, open, setStatus: value => { status = value; }, reject: value => { rejectTitle = value; }, omitAck: value => { omitAck = value; } };
+	return { remote, requests, open, setStatus: value => { status = value; }, setPullStatus: value => { pullStatus = value; }, reject: value => { rejectTitle = value; }, omitAck: value => { omitAck = value; } };
 }
 
 for (const dual of [false, true]) describe(dual ? 'dual replica schema recovery' : 'single replica schema recovery', () => {
+	test('failed recovery fences every public entry point, replays state and retries without another reset', async () => {
+		const f = await fixture(dual), old = f.open();
+		await old.db.syncClient.sync();
+		await old.db.project.insert({ id: 'offline', title: 'Keep me' });
+		await old.close();
+		const next = f.open(true), sync = next.db.syncClient;
+		f.setStatus(503);
+		await expect(sync.recoverLocalSchema({ synchronize: true })).rejects.toMatchObject({ response: { status: 503 } });
+		const count = f.requests.length;
+		for (const work of [() => sync.start(), () => sync.sync(), () => sync.syncRow({ table: 'project', pk: ['seed'] }), () => sync.ensureLocalSchema()])
+			await expect(work()).rejects.toMatchObject({ code: 'ORANGE_SYNC_SCHEMA_RECOVERY_BLOCKED', cause: { response: { status: 503 } } });
+		expect(f.requests).toHaveLength(count);
+		expect(await sync.isRunning()).toBe(false);
+		const states = [];
+		const off = sync.on('schema-recovery', state => states.push(state));
+		await Promise.resolve();
+		expect(states.at(-1)).toMatchObject({ blocked: true, recovering: false, resetCount: 0, error: { response: { status: 503 } } });
+		f.setStatus(0);
+		f.setPullStatus(503);
+		await expect(sync.recoverLocalSchema({ synchronize: true })).rejects.toMatchObject({ response: { status: 503 } });
+		expect(await sync.getSchemaRecoveryState()).toMatchObject({ blocked: true, resetCount: 1 });
+		// A successful drain/reset followed by failed download must not reset again.
+		f.setPullStatus(0);
+		await sync.recoverLocalSchema({ synchronize: true });
+		expect(await sync.getSchemaRecoveryState()).toMatchObject({ blocked: false, recovering: false, resetCount: 1 });
+		await sync.start();
+		expect((await next.db.project.getById('offline')).title).toBe('Keep me');
+		expect(states.filter(state => state.resetCount === 1).length).toBeGreaterThan(0);
+		off();
+	}, 30000);
+
 	test('a pure table addition bootstraps without discarding the pending queue', async () => {
 		const f = await fixture(dual), old = f.open();
 		await old.db.syncClient.sync();
@@ -100,7 +132,7 @@ for (const dual of [false, true]) describe(dual ? 'dual replica schema recovery'
 		for (const status of [401, 403, 429, 500, 503, 400]) {
 			f.setStatus(status);
 			await expect(next.db.syncClient.recoverLocalSchema({ discardConflicts: true })).rejects.toBeDefined();
-			await expect(next.db.syncClient.ensureLocalSchema()).rejects.toMatchObject({ code: 'ORANGE_SYNC_SCHEMA_MISMATCH' });
+			await expect(next.db.syncClient.ensureLocalSchema()).rejects.toMatchObject({ code: 'ORANGE_SYNC_SCHEMA_RECOVERY_BLOCKED' });
 		}
 		f.setStatus(0); f.omitAck(true);
 		await expect(next.db.syncClient.recoverLocalSchema()).rejects.toMatchObject({ code: 'ORANGE_SYNC_RECOVERY_BLOCKED' });

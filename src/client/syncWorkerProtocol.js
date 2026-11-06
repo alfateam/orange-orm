@@ -4,6 +4,7 @@ const alwaysForwardedEvents = Object.freeze([
 	'error',
 	'initial-ready',
 	'sync-progress',
+	'schema-recovery',
 	'operation'
 ]);
 

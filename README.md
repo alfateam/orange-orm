@@ -501,16 +501,17 @@ No OPFS access occurs at module import time.
   accounts so the underlying storage closes as well. `on()` returns an unsubscribe
   function. No explicit worker/event cleanup is needed in the application.
 
-For an incompatible local mapping, stop automatic sync, then use the safe schema
-recovery API (available from `5.6.0-beta-5`):
+For an incompatible local mapping, use the safe schema recovery API (basic
+drain/reset available from `5.6.0-beta-5`). The recovery fence, state API and
+`synchronize` option described here are **unreleased local changes on beta-14**:
 
 ```ts
-await database.syncClient.stop();
 const result = await database.syncClient.recoverLocalSchema({
   discardConflicts: true, // explicit policy: discard only atomic mutations rejected with HTTP 409
-  timeoutMs: 15000
+  timeoutMs: 15000,
+  synchronize: true // keep the recovery fence through the first download
 });
-// Report result.discarded to the user, then download the new snapshot.
+// Report result.discarded to the user, then resume automatic sync.
 await database.syncClient.start();
 ```
 
@@ -526,6 +527,33 @@ from earlier attempts. `resetLocal()` is still an explicitly destructive API.
 Recovery is available on single/dual replicas and across worker RPC; only the active
 dual replica's queue is authoritative. Authentication and deciding when to offer
 login/retry are application responsibilities.
+
+Recovery owns an in-memory fence per open sync client, including worker clients.
+Once a sync entry point detects an incompatible schema or recovery starts, ordinary `start()`, `sync()`, row sync and
+`ensureLocalSchema()` reject with `ORANGE_SYNC_SCHEMA_RECOVERY_BLOCKED` until an
+explicit `recoverLocalSchema()` or `resetLocal()` succeeds. The error's `cause`
+retains the recovery failure. Automatic scheduling is stopped; call `start()`
+after successful recovery to resume it. Local reads remain available where the
+stored schema allows them. Ordinary network/auth failures outside recovery do
+not establish this fence.
+
+Use `getSchemaRecoveryState()` or `on('schema-recovery', listener)` for
+`{ revision, recovering, blocked, resetCount, discarded, error }`. Subscriptions
+asynchronously replay current state and continue while stopped; `close()` removes
+them. `resetCount` changes when a local reset actually completes, even if the
+following download fails. Applications can invalidate view caches on that change.
+State is scoped to this open database and is not persisted across reloads.
+Detecting a mismatch establishes the fence without starting a reset or network
+recovery; the application must opt in and can defer that decision until login.
+
+With `synchronize: true`, recovery includes the first download. An explicit retry
+after a completed schema reset retries the download without resetting again.
+A persistent mismatch then reports `ORANGE_SYNC_SCHEMA_RECOVERY_FAILED`. A
+concurrent recovery/reset rejects with `ORANGE_SYNC_RECOVERY_BUSY`; destructive
+and non-destructive requests are never silently merged. A completed full schema
+reset is performed at most once per open database by `recoverLocalSchema()`;
+explicit `resetLocal()` remains repeatable and destructive. A targeted
+`resetLocal({ tables })` does not count as a full schema recovery.
 
 Schema mismatch errors include `code: 'ORANGE_SYNC_SCHEMA_MISMATCH'`. Nullable
 column additions are structural changes too. A changed table set also checks

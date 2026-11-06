@@ -99,6 +99,8 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 				return { skipped: true };
 			return ensureReady.apply(syncClient, withAbortOptions(args, signal));
 		}
+		if (method === 'getSchemaRecoveryState')
+			return Promise.resolve(syncClient.getSchemaRecoveryState()).then(serializeEventPayload);
 		const fn = syncClient[method];
 		if (typeof fn !== 'function')
 			throw new Error(`Sync worker method "${method}" is not implemented.`);

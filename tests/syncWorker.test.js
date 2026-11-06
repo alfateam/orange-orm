@@ -7,6 +7,26 @@ const { syncAbortSignalSymbol, syncAutoStartSymbol } = require('../src/client/sy
 const { registerSyncOperationMemory } = require('../src/sync/operationContext');
 
 describe('sync worker rpc', () => {
+	test('replays recovery snapshots and preserves errors through getter and events', async () => {
+		let state = { revision: 1, blocked: true, recovering: false, resetCount: 0, discarded: 0,
+			error: Object.assign(new Error('Sign in'), { status: 401, code: 'AUTH', cause: new Error('Expired') }) };
+		const source = createEventSyncClient({ getSchemaRecoveryState: async () => state });
+		const bridge = createBridge(source, { autoStart: false });
+		const client = rdb.createSyncWorkerClient(bridge.worker);
+		const events = [];
+		const off = client.on('schema-recovery', value => events.push(value));
+		await wait(0);
+		expect(events.at(-1).error).toBeInstanceOf(Error);
+		expect(events.at(-1)).toMatchObject({ error: { code: 'AUTH', status: 401, cause: { message: 'Expired' } } });
+		expect((await client.getSchemaRecoveryState()).error).toBeInstanceOf(Error);
+		state = { ...state, revision: 2, blocked: false, resetCount: 1, error: undefined };
+		source.emit('schema-recovery', state);
+		await wait(0);
+		expect(events.at(-1)).toMatchObject({ revision: 2, resetCount: 1, blocked: false });
+		off();
+		await client.close();
+	});
+
 	test('forwards targeted row keys and nested strategies', async () => {
 		const request = { table: 'parent', pk: ['uuid', 2], strategy: { children: { parent: {} } } };
 		const bridge = createBridge({

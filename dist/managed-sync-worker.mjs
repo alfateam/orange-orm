@@ -1897,6 +1897,108 @@ function requireSyncAbort () {
 	return syncAbort;
 }
 
+var syncRecovery;
+var hasRequiredSyncRecovery;
+
+function requireSyncRecovery () {
+	if (hasRequiredSyncRecovery) return syncRecovery;
+	hasRequiredSyncRecovery = 1;
+	const { syncAbortError, syncAbortSignalSymbol } = requireSyncAbort();
+
+	// One recovery fence per open sync client. Account policy and consent stay in apps.
+	function createSyncRecovery(lifecycle, stopScheduler, reset, recover, synchronize) {
+		let state = { revision: 0, recovering: false, blocked: false, resetCount: 0, discarded: 0 };
+		let pending;
+		let lastReset;
+		let schemaResetCompleted = false;
+		let resumeAfterRecovery = false;
+		let recoveryStopVersion;
+		const listeners = new Set();
+		const snapshot = () => ({ ...state });
+		function publish(update) {
+			state = { ...state, ...update, revision: state.revision + 1 };
+			if (!lifecycle.closed) for (const listener of [...listeners]) call(listener);
+		}
+		function call(listener) { try { listener(snapshot()); } catch { /* Isolate observers. */ } }
+		function assertReady() {
+			if (state.recovering || state.blocked) {
+				const error = new Error('Schema recovery requires an explicit recoverLocalSchema() or resetLocal() call.');
+				error.code = 'ORANGE_SYNC_SCHEMA_RECOVERY_BLOCKED';
+				error.cause = state.error;
+				throw error;
+			}
+		}
+		function execute(options = {}, discard = false) {
+			try { lifecycle.assertOpen(); } catch (error) { return Promise.reject(error); }
+			if (pending) {
+				// Never turn a concurrent destructive reset into a non-destructive retry (or vice versa).
+				return Promise.reject(Object.assign(new Error('Schema recovery is already running.'), { code: 'ORANGE_SYNC_RECOVERY_BUSY' }));
+			}
+			// Install the fence before stopping/aborting existing work. Reserve pending
+			// before notifying observers, which may reenter recovery.
+			pending = Promise.resolve().then(async () => {
+				await stopped;
+				lifecycle.assertOpen();
+				if (version !== lifecycle.stopVersion) throw syncAbortError(undefined, 'Schema recovery stopped.');
+				return lifecycle.run(async bound => {
+					if (discard || !schemaResetCompleted) {
+						lastReset = await (discard ? reset : recover)(bound);
+						schemaResetCompleted = !discard || !options.tables;
+						publish({ resetCount: state.resetCount + 1, discarded: state.discarded + (lastReset.discarded || 0) });
+					}
+					let downloaded;
+					if (!discard && options.synchronize) downloaded = await synchronize({
+						timeoutMs: bound.timeoutMs, [syncAbortSignalSymbol]: bound[syncAbortSignalSymbol]
+					});
+					return { ...lastReset, ...downloaded, sent: lastReset.sent || 0, discarded: lastReset.discarded || 0 };
+				}, options, true, true);
+			}).then(result => {
+				if (resumeAfterRecovery && version === lifecycle.stopVersion) lifecycle.resume();
+				publish({ recovering: false, blocked: false, error: undefined });
+				return result;
+			}, error => {
+				if (schemaResetCompleted && error && error.code === 'ORANGE_SYNC_SCHEMA_MISMATCH')
+					error = Object.assign(new Error('Schema still mismatches after recovery. A new application version may be required.'), {
+						code: 'ORANGE_SYNC_SCHEMA_RECOVERY_FAILED', cause: error
+					});
+				publish({ recovering: false, blocked: true, error });
+				throw error;
+			}).finally(() => { pending = undefined; });
+			resumeAfterRecovery = lifecycle.active || (state.blocked && recoveryStopVersion === lifecycle.stopVersion && resumeAfterRecovery);
+			const stopped = lifecycle.stop(stopScheduler);
+			const version = recoveryStopVersion = lifecycle.stopVersion;
+			publish({ recovering: true, blocked: true, error: undefined });
+			return pending;
+		}
+		return {
+			assertReady,
+			observeError(error) {
+				if (lifecycle.closed || state.blocked || state.recovering || !error || error.code !== 'ORANGE_SYNC_SCHEMA_MISMATCH') return;
+				// Detection itself fences callers, even when the application cannot
+				// authorize a recovery attempt yet (for example, expired credentials).
+				resumeAfterRecovery = lifecycle.active;
+				void lifecycle.stop(stopScheduler).catch(() => {});
+				recoveryStopVersion = lifecycle.stopVersion;
+				publish({ blocked: true, error });
+			},
+			getState: async () => { lifecycle.assertOpen(); return snapshot(); },
+			recover: options => execute(options),
+			reset: options => execute(options, true),
+			on(listener) {
+				lifecycle.assertOpen();
+				if (typeof listener !== 'function') return () => {};
+				listeners.add(listener);
+				Promise.resolve().then(() => { if (!lifecycle.closed && listeners.has(listener)) call(listener); });
+				return () => listeners.delete(listener);
+			},
+			off: listener => listeners.delete(listener),
+			close: () => listeners.clear()
+		};
+	}
+	syncRecovery = createSyncRecovery;
+	return syncRecovery;
+}
+
 var syncLifecycle;
 var hasRequiredSyncLifecycle;
 
@@ -1914,16 +2016,19 @@ function requireSyncLifecycle () {
 
 	// Own every operation, including work still unwinding after an abortable await.
 	// No account/auth state belongs here: each database has its own lifecycle.
-	function createSyncLifecycle() {
+	function createSyncLifecycle(assertReady = () => {}, reportError = () => {}) {
 		const controllers = new Set();
 		const pending = new Set();
 		let paused = false;
 		let closed = false;
 		let stopping;
+		let stopVersion = 0;
 
 		return { run, track, start, stop, close, assertOpen,
+			resume() { assertOpen(); paused = false; },
 			get active() { return !paused && !closed; },
-			get closed() { return closed; }
+			get closed() { return closed; },
+			get stopVersion() { return stopVersion; }
 		};
 
 		function assertOpen() {
@@ -1938,9 +2043,10 @@ function requireSyncLifecycle () {
 			return promise;
 		}
 
-		function run(fn, options = {}, allowPaused = false) {
+		function run(fn, options = {}, allowPaused = false, maintenance = false) {
 			try {
 				assertOpen();
+				if (!maintenance) assertReady();
 				if (stopping || (paused && !allowPaused))
 					throw syncAbortError(undefined, 'Sync client stopped. Call start() to resume.');
 			}
@@ -1960,7 +2066,11 @@ function requireSyncLifecycle () {
 			controllers.add(controller);
 			return track(Promise.resolve().then(() => {
 				throwIfSyncAborted(controller.signal);
+				if (!maintenance) assertReady();
 				return fn({ ...options, [syncAbortSignalSymbol]: controller.signal });
+			}).catch(error => {
+				if (!maintenance) reportError(error);
+				throw error;
 			}).finally(() => {
 				controllers.delete(controller);
 				if (external) external.removeEventListener('abort', abort);
@@ -1970,6 +2080,7 @@ function requireSyncLifecycle () {
 		function start(fn, options) {
 			try {
 				assertOpen();
+				assertReady();
 				if (stopping)
 					throw syncAbortError(undefined, 'Sync client is stopping. Await stop() before start().');
 				paused = false;
@@ -1981,6 +2092,7 @@ function requireSyncLifecycle () {
 		}
 
 		function stop(stopScheduler = () => {}) {
+			stopVersion++;
 			if (stopping) return stopping;
 			paused = true;
 			// Install the fence before abort listeners can synchronously call start().
@@ -4402,6 +4514,7 @@ var hasRequiredSyncClient;
 function requireSyncClient () {
 	if (hasRequiredSyncClient) return syncClient.exports;
 	hasRequiredSyncClient = 1;
+	const createSyncRecovery = requireSyncRecovery();
 	const createSyncLifecycle = requireSyncLifecycle();
 	const rowGraph = requireRowGraph();
 	const randomUuid = requireRandomUuid();
@@ -4475,7 +4588,12 @@ function requireSyncClient () {
 		: '__orangeOrmSyncClientDrainOutboxBeforeReset';
 
 	function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, internalOptions = {}) {
-		const lifecycle = createSyncLifecycle();
+		let recovery;
+		// Dual replicas share their router's recovery fence, including local resets.
+		const lifecycle = createSyncLifecycle(
+			() => !internalOptions.recoveryManaged && recovery && recovery.assertReady(),
+			error => !internalOptions.recoveryManaged && recovery && recovery.observeError(error)
+		);
 		const sinceByScope = new Map();
 		const ensuredInternalTables = new WeakMap();
 		const syncStateTable = 'orange_sync_state';
@@ -4510,12 +4628,14 @@ function requireSyncClient () {
 			sync: options => lifecycle.run(observedSync, options)
 		}, getConfig);
 
+		recovery = createSyncRecovery(lifecycle, auto.stop, lockedResetLocal, queuedRecoverLocalSchema, observedSync);
 		const syncClientApi = {
 			sync: options => lifecycle.run(observedSync, options),
 			syncRow: options => lifecycle.run(observedRowSync, options),
 			ensureLocalSchema: options => lifecycle.run(queuedEnsureLocalSchema, options, true),
-			resetLocal: options => lifecycle.run(lockedResetLocal, options, true),
-			recoverLocalSchema: options => lifecycle.run(queuedRecoverLocalSchema, options, true),
+			resetLocal: internalOptions.recoveryManaged ? options => lifecycle.run(lockedResetLocal, options, true) : recovery.reset,
+			recoverLocalSchema: recovery.recover,
+			getSchemaRecoveryState: recovery.getState,
 			start: options => lifecycle.start(auto.start, options),
 			stop: () => lifecycle.stop(auto.stop),
 			close,
@@ -4530,7 +4650,7 @@ function requireSyncClient () {
 			value: options => lifecycle.run(auto.startFromConfig, options)
 		});
 		Object.defineProperty(syncClientApi, ensureLocalSchemaReadySymbol, {
-			value: options => lifecycle.run(ensureLocalSchemaReady, options, true)
+			value: options => lifecycle.run(ensureLocalSchemaReady, options, true, true)
 		});
 		Object.defineProperty(syncClientApi, syncAndCapturePullJournalSymbol, {
 			value: syncAndCapturePullJournal
@@ -4563,6 +4683,7 @@ function requireSyncClient () {
 
 		function close() {
 			const closing = lifecycle.close(auto.stop);
+			recovery.close();
 			eventListeners.clear();
 			initialReadyListeners.clear();
 			clearSyncOperationMemory(syncClientApi);
@@ -7923,6 +8044,7 @@ function requireSyncClient () {
 
 		function on(event, listener) {
 			lifecycle.assertOpen();
+			if (event === 'schema-recovery') return recovery.on(listener);
 			if (typeof event !== 'string' || typeof listener !== 'function')
 				return () => {};
 			if (event === 'initial-ready') {
@@ -7940,6 +8062,7 @@ function requireSyncClient () {
 		}
 
 		function off(event, listener) {
+			if (event === 'schema-recovery') return recovery.off(listener);
 			if (event === 'initial-ready') {
 				initialReadyListeners.delete(listener);
 				return;
@@ -8023,7 +8146,7 @@ function requireSyncClient () {
 				updatedAtMs: state.updatedAtMs,
 				source
 			};
-			if (!initialReadyEmitted) {
+			if (!initialReadyEmitted && lifecycle.active) {
 				initialReadyEmitted = true;
 				emitInitialReady(payload);
 			}
@@ -15091,6 +15214,57 @@ function requireUtils () {
 	}
 
 	/**
+	 * Removes dot segments from the path of a relative reference (a path that does
+	 * not start with "/") without changing what it resolves to against any base.
+	 * Unlike `removeDotSegments`, leading ".." segments that cannot be collapsed
+	 * are kept, the result never becomes root-relative, and a result that would be
+	 * empty or start with an empty segment is prefixed with "." (an empty path
+	 * means "same document" and a leading "//" would introduce an authority).
+	 *
+	 * @param {string} path
+	 * @returns {string}
+	 */
+	function removeDotSegmentsRelative (path) {
+	  if (path === '' || path[0] === '/') {
+	    return removeDotSegments(path)
+	  }
+
+	  const segments = path.split('/');
+	  const last = segments.length - 1;
+	  /** @type {string[]} */
+	  const output = [];
+	  let trailingDirectory = false;
+
+	  for (let i = 0; i <= last; i++) {
+	    const segment = segments[i];
+	    if (segment === '.' || segment === '..') {
+	      if (segment === '..') {
+	        if (output.length !== 0 && output[output.length - 1] !== '..') {
+	          output.pop();
+	        } else {
+	          output.push('..');
+	        }
+	      }
+	      trailingDirectory = i === last;
+	    } else {
+	      output.push(segment);
+	    }
+	  }
+
+	  if (trailingDirectory && output[output.length - 1] !== '..') {
+	    output.push('');
+	  }
+	  if (output.length === 0 || output[0] === '' || output[0].includes(':')) {
+	    // An empty path, a leading empty segment ("//"), or a first segment
+	    // containing ":" (which would be mistaken for a scheme, RFC 3986 section
+	    // 4.2) must stay behind a "." segment so the reference keeps its meaning.
+	    output.unshift('.');
+	  }
+
+	  return output.join('/')
+	}
+
+	/**
 	 * Re-escape RFC 3986 gen-delims that must not appear literally in the host.
 	 * After the URI regex parses, these characters cannot be literal in the host
 	 * field, so any that appear after decoding came from percent-encoding and
@@ -15484,6 +15658,7 @@ function requireUtils () {
 	  encodeFragment,
 	  escapePreservingEscapes,
 	  removeDotSegments,
+	  removeDotSegmentsRelative,
 	  isIPv4,
 	  isUUID,
 	  normalizeIPv6,
@@ -15778,22 +15953,30 @@ function requireFastUri () {
 	if (hasRequiredFastUri) return fastUri.exports;
 	hasRequiredFastUri = 1;
 
-	const { normalizeIPv6, removeDotSegments, recomposeAuthority, normalizePercentEncoding, normalizePathEncoding, serializePathEncoding, normalizeQueryFragmentEncoding, encodeQuery, encodeFragment, reescapeHostDelimiters, isIPv4, nonSimpleDomain } = requireUtils();
+	const { normalizeIPv6, removeDotSegments, removeDotSegmentsRelative, recomposeAuthority, normalizePercentEncoding, normalizePathEncoding, serializePathEncoding, normalizeQueryFragmentEncoding, encodeQuery, encodeFragment, reescapeHostDelimiters, isIPv4, nonSimpleDomain } = requireUtils();
 	const { SCHEMES, getSchemeHandler } = requireSchemes();
 
 	const VALID_SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*$/u;
 	const MALFORMED_SCHEME_ERROR = 'URI scheme is malformed.';
+	const MALFORMED_HOST_ERROR = 'URI host is malformed.';
+	// ASCII characters outside the RFC 3986 reg-name set (unreserved, sub-delims
+	// and "%" for pct-encoded): C0 controls, space, DEL, and "#/:<>?@[\]^`{|}.
+	const FORBIDDEN_DOMAIN_HOST_CHARACTER = /[\0-\x20"#/:<>?@[\\\]^`{|}\x7F]/u;
 
 	/**
+	 * RFC 3986 section 3.1 does not allow percent-encoding in a scheme, so the
+	 * scheme is validated as-is and never decoded. Decoding would let inert input
+	 * such as `%6Aavascript:` become a live `javascript:` scheme.
+	 *
 	 * @param {string} scheme
 	 * @returns {string}
 	 */
-	function decodeValidScheme (scheme) {
-	  const decodedScheme = unescape(String(scheme));
-	  if (!VALID_SCHEME.test(decodedScheme)) {
+	function validateScheme (scheme) {
+	  const stringScheme = String(scheme);
+	  if (!VALID_SCHEME.test(stringScheme)) {
 	    throw new TypeError(MALFORMED_SCHEME_ERROR)
 	  }
-	  return decodedScheme
+	  return stringScheme
 	}
 
 	/**
@@ -15854,6 +16037,12 @@ function requireFastUri () {
 	  const resolvedHost = resolved.host;
 	  const resolvedHostIsIP = resolvedHost !== undefined && resolvedHost !== '' &&
 	    (isIPv4(resolvedHost) || normalizeIPv6(resolvedHost).isIPV6);
+	  // Inputs are parsed scheme-neutrally, so delimiters and controls in a domain
+	  // host are only detected here, once the final scheme is known. They always
+	  // fail closed, including in percent-encoded hosts.
+	  if (hasForbiddenDomainHost(resolved, options || {}, resolvedSchemeHandler, resolvedHostIsIP)) {
+	    throw new Error(MALFORMED_HOST_ERROR)
+	  }
 	  canonicalizeHost(resolved, options || {}, resolvedSchemeHandler, resolvedHostIsIP);
 	  // Percent escapes in an ASCII reg-name are encoded data. The WHATWG hostname
 	  // parser can reject them even though fast-uri preserves them safely as RFC
@@ -15911,14 +16100,17 @@ function requireFastUri () {
 	        if (relative.path[0] === '/') {
 	          target.path = removeDotSegments(relative.path);
 	        } else {
-	          if ((base.userinfo !== undefined || base.host !== undefined || base.port !== undefined) && !base.path) {
+	          const baseHasAuthority = base.userinfo !== undefined || base.host !== undefined || base.port !== undefined;
+	          if (baseHasAuthority && !base.path) {
 	            target.path = '/' + relative.path;
 	          } else if (!base.path) {
 	            target.path = relative.path;
 	          } else {
 	            target.path = base.path.slice(0, base.path.lastIndexOf('/') + 1) + relative.path;
 	          }
-	          target.path = removeDotSegments(target.path);
+	          target.path = base.scheme === undefined && !baseHasAuthority && target.path[0] !== '/'
+	            ? removeDotSegmentsRelative(target.path)
+	            : removeDotSegments(target.path);
 	        }
 	        target.query = relative.query;
 	      }
@@ -15974,7 +16166,7 @@ function requireFastUri () {
 	  const uriTokens = [];
 
 	  if (component.scheme) {
-	    component.scheme = decodeValidScheme(component.scheme);
+	    component.scheme = validateScheme(component.scheme);
 	  }
 
 	  // find scheme handler
@@ -15984,7 +16176,11 @@ function requireFastUri () {
 	  if (schemeHandler && schemeHandler.serialize) schemeHandler.serialize(component, options);
 
 	  const hasAuthority = component.userinfo !== undefined || component.host !== undefined || component.port !== undefined;
-	  const pathNoScheme = !options.skipEscape && component.scheme === undefined && !hasAuthority;
+	  // A reference with no emitted scheme is path-noscheme: a bare ':' in its
+	  // first path segment would reparse as a scheme (RFC 3986 3.3/4.2). Enforced
+	  // under skipEscape too (resolve()), so the reapply below gates on this flag.
+	  const schemelessReference = (component.scheme === undefined || options.reference === 'suffix') && !hasAuthority;
+	  const pathNoScheme = !options.skipEscape && schemelessReference;
 
 	  if (component.path !== undefined) {
 	    if (!options.skipEscape) {
@@ -15996,7 +16192,7 @@ function requireFastUri () {
 
 	  if (options.reference !== 'suffix' && component.scheme) {
 	    // Scheme handlers may replace the scheme during serialization.
-	    component.scheme = decodeValidScheme(component.scheme);
+	    component.scheme = validateScheme(component.scheme);
 	    uriTokens.push(component.scheme, ':');
 	  }
 
@@ -16016,13 +16212,18 @@ function requireFastUri () {
 	    let s = component.path;
 
 	    if (!options.absolutePath && (!schemeHandler || !schemeHandler.absolutePath)) {
-	      s = removeDotSegments(s);
+	      // A relative-path reference keeps its unresolvable leading ".." segments
+	      // and must never become root-relative (RFC 3986 section 5.2.4 applies to
+	      // merged target paths, not to the reference itself).
+	      s = schemelessReference && s[0] !== '/'
+	        ? removeDotSegmentsRelative(s)
+	        : removeDotSegments(s);
 	    }
 
 	    // Dot-segment removal can expose a colon that was not originally in the
 	    // first segment (for example, "./a:b"). Reapply path-noscheme encoding so
 	    // the serialized relative reference cannot be reparsed as a URI scheme.
-	    if (pathNoScheme) {
+	    if (schemelessReference) {
 	      s = serializePathEncoding(s, true);
 	    }
 
@@ -16137,6 +16338,11 @@ function requireFastUri () {
 	 * @returns {boolean} whether host conversion failed
 	 */
 	function canonicalizeHost (parsed, options, schemeHandler, isIP) {
+	  if (hasForbiddenDomainHost(parsed, options, schemeHandler, isIP)) {
+	    parsed.error = parsed.error || MALFORMED_HOST_ERROR;
+	    return true
+	  }
+
 	  if (
 	    !options.unicodeSupport &&
 	    (!schemeHandler || !schemeHandler.unicodeSupport) &&
@@ -16146,14 +16352,60 @@ function requireFastUri () {
 	    isIP === false &&
 	    nonSimpleDomain(parsed.host)
 	  ) {
+	    let url;
 	    try {
-	      parsed.host = new URL('http://' + parsed.host).hostname;
+	      url = new URL('http://' + parsed.host);
 	    } catch (e) {
 	      parsed.error = parsed.error || "Host's domain name can not be converted to ASCII: " + e;
 	      return true
 	    }
+	    // The WHATWG parser must have read the whole input as a host. Anything
+	    // else means it found a delimiter fast-uri did not, so its hostname would
+	    // describe a different authority.
+	    if (!isHostOnlyURL(url)) {
+	      parsed.error = parsed.error || MALFORMED_HOST_ERROR;
+	      return true
+	    }
+	    parsed.host = url.hostname;
 	  }
 	  return false
+	}
+
+	/**
+	 * Whether a domain host contains an ASCII character that RFC 3986 does not
+	 * allow in a reg-name (unreserved, sub-delims, or pct-encoded). Such a host is
+	 * rejected instead of being handed to the WHATWG URL parser, which would treat
+	 * "@" as a userinfo delimiter (silently dropping the data before it) and strip
+	 * TAB, LF, and CR. Non-ASCII characters remain allowed for IDNs.
+	 *
+	 * @param {import('./types/index').URIComponent} parsed
+	 * @param {import('./types/index').Options} options
+	 * @param {{ domainHost?: boolean }|undefined} schemeHandler
+	 * @param {boolean} isIP
+	 * @returns {boolean}
+	 */
+	function hasForbiddenDomainHost (parsed, options, schemeHandler, isIP) {
+	  return Boolean(
+	    parsed.host &&
+	    isIP === false &&
+	    !isIPLiteral(parsed.host) &&
+	    (options.domainHost || (schemeHandler && schemeHandler.domainHost)) &&
+	    FORBIDDEN_DOMAIN_HOST_CHARACTER.test(parsed.host)
+	  )
+	}
+
+	/**
+	 * @param {URL} url
+	 * @returns {boolean}
+	 */
+	function isHostOnlyURL (url) {
+	  return url.username === '' &&
+	    url.password === '' &&
+	    url.port === '' &&
+	    url.pathname === '/' &&
+	    url.search === '' &&
+	    url.hash === '' &&
+	    url.hostname !== ''
 	}
 
 	/**
@@ -16238,9 +16490,8 @@ function requireFastUri () {
 	    parsed.fragment = matches[8];
 
 	    if (parsed.scheme !== undefined) {
-	      const decodedScheme = unescape(parsed.scheme);
-	      if (VALID_SCHEME.test(decodedScheme)) {
-	        parsed.scheme = decodedScheme.toLowerCase();
+	      if (VALID_SCHEME.test(parsed.scheme)) {
+	        parsed.scheme = parsed.scheme.toLowerCase();
 	      } else {
 	        parsed.error = parsed.error || MALFORMED_SCHEME_ERROR;
 	        malformedScheme = true;
@@ -16274,7 +16525,7 @@ function requireFastUri () {
 	        parsed.host = isIP ? ipv6result.host : ipv6result.host.toLowerCase();
 
 	        if (malformedIPLiteral) {
-	          parsed.error = parsed.error || 'URI host is malformed.';
+	          parsed.error = parsed.error || MALFORMED_HOST_ERROR;
 	          malformedAuthorityOrPort = true;
 	        }
 	      } else {
@@ -16304,13 +16555,21 @@ function requireFastUri () {
 	      malformedHost = canonicalizeHost(parsed, options, schemeHandler, isIP);
 	    }
 
-	    if (!schemeHandler || (schemeHandler && !schemeHandler.skipNormalize)) {
-	      if (uri.indexOf('%') !== -1) {
-	        if (parsed.host !== undefined && !malformedIPLiteral) {
-	          const host = isIP ? parsed.host : normalizePercentEncoding(parsed.host, true);
-	          parsed.host = reescapeHostDelimiters(host, isIP);
-	        }
+	    if (uri.indexOf('%') !== -1 && parsed.host !== undefined && !malformedIPLiteral) {
+	      let host = isIP ? parsed.host : normalizePercentEncoding(parsed.host, true);
+	      if (!isIP) {
+	        // Fold reg-name case after decoding unreserved octets. The second
+	        // pass only restores uppercase hex in escapes that remain encoded.
+	        host = normalizePercentEncoding(host.toLowerCase());
 	      }
+	      // Resolution parses both inputs with the internal `null` scheme before
+	      // the effective scheme is known. Keep raw host delimiters for that step
+	      // so resolve() can reject them for domain-host schemes; the resolved
+	      // authority is encoded when it is serialized.
+	      parsed.host = isIP || options.scheme !== 'null' ? reescapeHostDelimiters(host, isIP) : host;
+	    }
+
+	    if (!schemeHandler || (schemeHandler && !schemeHandler.skipNormalize)) {
 	      if (parsed.path) {
 	        parsed.path = normalizePathEncoding(parsed.path);
 	      }
@@ -34355,6 +34614,7 @@ function requireSyncWorkerProtocol () {
 		'error',
 		'initial-ready',
 		'sync-progress',
+		'schema-recovery',
 		'operation'
 	]);
 
@@ -34556,6 +34816,8 @@ function requireSyncWorkerHandler () {
 					return { skipped: true };
 				return ensureReady.apply(syncClient, withAbortOptions(args, signal));
 			}
+			if (method === 'getSchemaRecoveryState')
+				return Promise.resolve(syncClient.getSchemaRecoveryState()).then(serializeEventPayload);
 			const fn = syncClient[method];
 			if (typeof fn !== 'function')
 				throw new Error(`Sync worker method "${method}" is not implemented.`);
@@ -37867,6 +38129,7 @@ function requireSyncWorkerClient () {
 		const interceptors = createHttpInterceptor();
 		let hasInitialReady = false;
 		let lastInitialReady;
+		let lastRecovery;
 		let closed = false;
 		let closing;
 		let terminalError;
@@ -37883,6 +38146,7 @@ function requireSyncWorkerClient () {
 			ensureLocalSchema: request.bind(null, 'ensureLocalSchema'),
 			resetLocal: request.bind(null, 'resetLocal'),
 			recoverLocalSchema: request.bind(null, 'recoverLocalSchema'),
+			getSchemaRecoveryState: () => request('getSchemaRecoveryState').then(deserializeEventPayload),
 			start: request.bind(null, 'start'),
 			stop: request.bind(null, 'stop'),
 			isRunning: request.bind(null, 'isRunning'),
@@ -37946,6 +38210,13 @@ function requireSyncWorkerClient () {
 			eventListeners.add(listener);
 			if (!isAlwaysForwardedEvent(event))
 				request('on', event).catch(() => {});
+			if (event === 'schema-recovery') {
+				const previous = lastRecovery;
+				request('getSchemaRecoveryState').then(deserializeEventPayload).then(state => {
+					if (!closed && eventListeners.has(listener) && (!lastRecovery || lastRecovery === previous))
+						callListener(listener, state);
+				}).catch(() => {});
+			}
 			if (event === 'initial-ready' && hasInitialReady) {
 				const readyPayload = lastInitialReady;
 				Promise.resolve().then(() => {
@@ -37992,6 +38263,7 @@ function requireSyncWorkerClient () {
 			listeners.clear();
 			hasInitialReady = false;
 			lastInitialReady = undefined;
+			lastRecovery = undefined;
 			// Wait for rollback/storage work in the worker before terminating it.
 			closing = request('close').finally(() => {
 				worker.removeEventListener('message', onMessage);
@@ -38021,6 +38293,7 @@ function requireSyncWorkerClient () {
 					hasInitialReady = true;
 					lastInitialReady = payload;
 				}
+				if (message.event === 'schema-recovery') lastRecovery = payload;
 				emit(message.event, payload);
 				return;
 			}
@@ -38335,6 +38608,7 @@ function requireDualSyncDatabase () {
 	const { appendRoleSuffix, toSecondaryDataPoolOptions, toCachePoolOptions } = requireStorageLayout();
 	const rowGraph = requireRowGraph();
 	const { clearSyncOperationMemory } = requireOperationContext();
+	const createSyncRecovery = requireSyncRecovery();
 	const createSyncLifecycle = requireSyncLifecycle();
 	const hostLocal = requireHostLocal();
 	const express = requireHostExpress();
@@ -38400,7 +38674,8 @@ function requireDualSyncDatabase () {
 		: '__orangeOrmDualSyncFaultInjector';
 
 	function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase) {
-		const lifecycle = createSyncLifecycle();
+		let recovery;
+		const lifecycle = createSyncLifecycle(() => recovery && recovery.assertReady(), error => recovery && recovery.observeError(error));
 		let syncAuto;
 		let closing;
 		const roleUnsubscribers = new Set();
@@ -38544,6 +38819,7 @@ function requireDualSyncDatabase () {
 		function end() {
 			if (closing) return closing;
 			const stopped = lifecycle.close(() => syncAuto && syncAuto.stop());
+			if (recovery) recovery.close();
 			eventListeners.clear();
 			if (externalSyncClient) clearSyncOperationMemory(externalSyncClient);
 			closing = (async () => {
@@ -38588,6 +38864,10 @@ function requireDualSyncDatabase () {
 				async () => router.__sqliteSync,
 				{ runSync: syncAutomatic }
 			);
+			recovery = createSyncRecovery(lifecycle, auto.stop, resetLocal, recoverLocalSchema, async options => {
+				await coalesceSync(normalizeSyncOptions(options));
+				return getManifest(true);
+			});
 			const syncClient = {
 				sync: syncObserved,
 				syncRow: options => lifecycle.run(bound => {
@@ -38597,8 +38877,9 @@ function requireDualSyncDatabase () {
 						[syncAbortSignalSymbol]: bound[syncAbortSignalSymbol] });
 				}, options),
 				ensureLocalSchema: options => lifecycle.run(ensureLocalSchema, options, true),
-				resetLocal: options => lifecycle.run(resetLocal, options, true),
-				recoverLocalSchema: options => lifecycle.run(recoverLocalSchema, options, true),
+				resetLocal: recovery.reset,
+				recoverLocalSchema: recovery.recover,
+				getSchemaRecoveryState: recovery.getState,
 				start: options => lifecycle.start(auto.start, options),
 				stop: () => lifecycle.stop(auto.stop),
 				close: end,
@@ -39902,6 +40183,7 @@ function requireDualSyncDatabase () {
 
 		function on(event, listener) {
 			lifecycle.assertOpen();
+			if (event === 'schema-recovery') return recovery.on(listener);
 			if (typeof event !== 'string' || typeof listener !== 'function')
 				return () => {};
 			let listeners = eventListeners.get(event);
@@ -39917,6 +40199,7 @@ function requireDualSyncDatabase () {
 		}
 
 		function off(event, listener) {
+			if (event === 'schema-recovery') return recovery.off(listener);
 			const listeners = eventListeners.get(event);
 			if (!listeners)
 				return;
@@ -40021,7 +40304,7 @@ function requireDualSyncDatabase () {
 			catch (_e) {
 				return false;
 			}
-			if (initialReadyEmitted)
+			if (initialReadyEmitted || !lifecycle.active)
 				return false;
 			initialReadyEmitted = true;
 			const manifest = normalizeManifestInfo(manifestInfo) || await getManifest(true);
@@ -40241,7 +40524,7 @@ function requireDualSyncDatabase () {
 					getDb,
 					roleHttpInterceptor,
 					syncInterceptors,
-					{ fileSnapshotRollback: true, operationMemoryScope: externalSyncClient }
+					{ fileSnapshotRollback: true, recoveryManaged: true, operationMemoryScope: externalSyncClient }
 				);
 				clientByRole.set(role, roleClient);
 				for (const event of eventListeners.keys())

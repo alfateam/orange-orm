@@ -23,6 +23,7 @@ function createDbWorkerClient(worker) {
 	const interceptors = createHttpInterceptor();
 	let hasInitialReady = false;
 	let lastInitialReady;
+	let lastRecovery;
 	let closed = false;
 	let closing;
 	let terminalError;
@@ -47,6 +48,7 @@ function createDbWorkerClient(worker) {
 			ensureLocalSchema: syncRequest.bind(null, 'ensureLocalSchema'),
 			resetLocal: syncRequest.bind(null, 'resetLocal'),
 			recoverLocalSchema: syncRequest.bind(null, 'recoverLocalSchema'),
+			getSchemaRecoveryState: () => syncRequest('getSchemaRecoveryState').then(deserializeEventPayload),
 			start: syncRequest.bind(null, 'start'),
 			stop: syncRequest.bind(null, 'stop'),
 			isRunning: syncRequest.bind(null, 'isRunning'),
@@ -148,6 +150,13 @@ function createDbWorkerClient(worker) {
 		eventListeners.add(listener);
 		if (!isAlwaysForwardedEvent(event))
 			request('sync.on', {}, event).catch(() => {});
+		if (event === 'schema-recovery') {
+			const previous = lastRecovery;
+			syncRequest('getSchemaRecoveryState').then(deserializeEventPayload).then(state => {
+				if (!closed && eventListeners.has(listener) && (!lastRecovery || lastRecovery === previous))
+					callListener(listener, state);
+			}).catch(() => {});
+		}
 		if (event === 'initial-ready' && hasInitialReady) {
 			const readyPayload = lastInitialReady;
 			Promise.resolve().then(() => {
@@ -189,6 +198,7 @@ function createDbWorkerClient(worker) {
 		listeners.clear();
 		hasInitialReady = false;
 		lastInitialReady = undefined;
+		lastRecovery = undefined;
 		closing = request('close', {}).finally(() => {
 			worker.removeEventListener('message', onMessage);
 			worker.removeEventListener('error', onWorkerError);
@@ -216,6 +226,7 @@ function createDbWorkerClient(worker) {
 				hasInitialReady = true;
 				lastInitialReady = payload;
 			}
+			if (message.event === 'schema-recovery') lastRecovery = payload;
 			emit(message.event, payload);
 			return;
 		}
