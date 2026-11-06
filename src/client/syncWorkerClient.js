@@ -34,6 +34,7 @@ function createSyncWorkerClient(worker, options = {}) {
 		worker.start();
 
 	const client = {
+		__orangeSetVisible: request.bind(null, '__orangeSetVisible'),
 		sync: request.bind(null, 'sync'),
 		syncRow: request.bind(null, 'syncRow'),
 		ensureLocalSchema: request.bind(null, 'ensureLocalSchema'),

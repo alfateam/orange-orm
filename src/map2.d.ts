@@ -1485,6 +1485,15 @@ export interface SqliteOPFSPoolOptions<M extends Record<string, any> = any> exte
   sync?: string | SyncConfig<M>;
   vfs?: 'opfs-sahpool' | 'opfs-wl';
   opfsSahPool?: OpfsSahPoolOptions;
+  /** Opt-in background suspension. Omitted/false preserves existing behavior. Requires opfs-sahpool. */
+  lifecycle?: {
+    suspendWhenHidden?: boolean;
+    /** Optional host/native visibility source; defaults to document.visibilityState. */
+    visibility?: {
+      isVisible(): boolean;
+      subscribe(listener: (visible: boolean) => void): () => void;
+    };
+  };
   busyTimeoutMs?: number;
   opfsAccessTimeoutMs?: number;
 }

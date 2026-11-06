@@ -142,7 +142,7 @@ function createSyncAuto(syncClient, getConfig, options = {}) {
 		activeRun = run;
 		run.promise = runCycle(controller.signal)
 			.then((result) => {
-				if (initial)
+				if (initial && !(result && result.skipped === 'background'))
 					initialSyncCompleted = true;
 				return result;
 			})
@@ -157,6 +157,7 @@ function createSyncAuto(syncClient, getConfig, options = {}) {
 
 	async function runCycle(signal) {
 		throwIfSyncAborted(signal);
+		if (options.canRun && !options.canRun()) return { skipped: 'background' };
 		const config = normalizeAutoConfig(await awaitWithSyncAbort(getConfig(), signal), { forceEnabled: forceRunning });
 		throwIfSyncAborted(signal);
 		const syncOptions = { [syncAbortSignalSymbol]: signal };

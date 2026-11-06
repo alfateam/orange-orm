@@ -1,5 +1,9 @@
 <!-- Bleau recovery release note: 2026-10-24 -->
 
+`5.6.0-beta-16` adds opt-in [OPFS background suspension](docs/sqlite-background-lifecycle.md), which
+closes idle SAH-pool connections while hidden and reopens them on demand. It is
+disabled by default. This is a preventive option; it does not repair stuck locks.
+
 The isolated `5.6.0-beta-12` release is based on the published beta-11 package
 plus two fixes: lazy database providers use the resolved local owner for schema
 readiness, and Safari `TypeError: Load failed` retains incremental-sync recovery.

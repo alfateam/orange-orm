@@ -116,6 +116,7 @@ export interface PoolOptions<M extends Record<string, any> = any> {
 export interface SqliteOPFSPoolOptions<M extends Record<string, any> = any> extends PoolOptions<M> {
 	sync?: string | SyncConfig<M>;
 	vfs?: 'opfs-sahpool' | 'opfs-wl';
+	lifecycle?: import('./map2').SqliteOPFSPoolOptions<M>['lifecycle'];
 	opfsSahPool?: {
 		name?: string;
 		directory?: string;

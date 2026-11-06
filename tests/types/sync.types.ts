@@ -1,5 +1,15 @@
 import type { DBClient, SyncInitialReadyEvent } from '../../src/map2';
 import orange from '../../src';
+import type { SqliteOPFSPoolOptions as LegacySqliteOptions } from '../../src/map';
+
+const backgroundOptions: LegacySqliteOptions = {
+  vfs: 'opfs-sahpool',
+  lifecycle: { suspendWhenHidden: true, visibility: {
+    isVisible: () => true,
+    subscribe: listener => { listener(false); return () => {}; }
+  } }
+};
+orange.sqliteOPFS('lifecycle.sqlite3', backgroundOptions);
 
 type Model = {
 	item: {

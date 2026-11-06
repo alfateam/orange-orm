@@ -1,3 +1,4 @@
+const backgroundLifecycle = require('./backgroundLifecycle');
 const pools = require('../pools');
 const newId = require('../newId');
 const createSqliteOPFSWorkerClient = require('./workerClient');
@@ -28,6 +29,11 @@ function newPool(connectionString, poolOptions) {
 	c.__orangeSuspendDatabase = suspendDatabase;
 	c.__orangeCloneDatabaseTo = cloneDatabaseTo;
 	c.__orangeConnectWorkerPort = connectWorkerPort;
+	c.__orangeSetBackground = background => client.setBackground(background);
+	c.__orangeHoldBackground = () => client.holdBackground();
+	const unobserveBackground = backgroundLifecycle.observe(poolOptions, visible => {
+		void c.__orangeSetBackground(!visible).catch(() => {});
+	});
 
 	if (client.ready && typeof client.ready.then === 'function') {
 		client.ready.then((result) => {
@@ -62,6 +68,7 @@ function newPool(connectionString, poolOptions) {
 	c.end = function() {
 		if (closing) return closing;
 		ended = true;
+		unobserveBackground();
 		clearTimeout(prewarmTimer);
 		rejectQueuedWriters();
 		const closes = [];

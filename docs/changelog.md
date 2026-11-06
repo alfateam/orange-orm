@@ -1,10 +1,22 @@
 ## Changelog
-__Unreleased — sync serialization (2026-11-05)__
+__5.6.0-beta-16__
+
+Add optional `lifecycle.suspendWhenHidden` for `sqliteOPFS` with `opfs-sahpool`.
+Skip new sync cycles while hidden, finish active sync/SQL work, then close SQLite
+and pause the SAH pool. Reopen the same files on the next local operation,
+retaining pending writes and restoring foreign-key enforcement. Hosts can supply
+native visibility; managed sync forwards it to the workers.
+
+The option defaults to false and preserves the existing behavior when omitted.
+It does not change the lock protocol, force worker restarts, reset data or
+guarantee cleanup before OS suspension. See
+[background suspension](sqlite-background-lifecycle.md) for limitations.
+
+__5.6.0-beta-13 — sync serialization (2026-11-05)__
 
 Initial snapshots and incremental row batches use the existing DTO path without
 wrapping rows in editable proxies. Filters, transaction hooks, paging and wire
-data are unchanged; ordinary ORM reads retain change tracking. This is a
-source-only local change, not yet bundled or published.
+data are unchanged; ordinary ORM reads retain change tracking.
 
 __5.6.0-beta-8__
 

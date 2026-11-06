@@ -2436,7 +2436,7 @@ function requireSyncAuto () {
 			activeRun = run;
 			run.promise = runCycle(controller.signal)
 				.then((result) => {
-					if (initial)
+					if (initial && !(result && result.skipped === 'background'))
 						initialSyncCompleted = true;
 					return result;
 				})
@@ -2451,6 +2451,7 @@ function requireSyncAuto () {
 
 		async function runCycle(signal) {
 			throwIfSyncAborted(signal);
+			if (options.canRun && !options.canRun()) return { skipped: 'background' };
 			const config = normalizeAutoConfig(await awaitWithSyncAbort(getConfig(), signal), { forceEnabled: forceRunning });
 			throwIfSyncAborted(signal);
 			const syncOptions = { [syncAbortSignalSymbol]: signal };
@@ -35063,6 +35064,55 @@ function requireSyncWorkerHandler () {
 	return syncWorkerHandler;
 }
 
+/* global document */
+
+var backgroundLifecycle;
+var hasRequiredBackgroundLifecycle;
+
+function requireBackgroundLifecycle () {
+	if (hasRequiredBackgroundLifecycle) return backgroundLifecycle;
+	hasRequiredBackgroundLifecycle = 1;
+	// The host owns visibility. Workers receive state, never DOM or native APIs.
+	function isEnabled(options) {
+		return !!(options && options.lifecycle && options.lifecycle.suspendWhenHidden === true);
+	}
+
+	function observe(options, listener) {
+		if (!isEnabled(options)) return () => {};
+		const source = options.lifecycle.visibility;
+		if (source) {
+			const unsubscribe = source.subscribe(listener);
+			listener(source.isVisible());
+			return unsubscribe;
+		}
+		if (typeof document === 'undefined') return () => {};
+		const changed = () => listener(document.visibilityState !== 'hidden');
+		document.addEventListener('visibilitychange', changed);
+		changed();
+		return () => document.removeEventListener('visibilitychange', changed);
+	}
+
+	function initialVisibility(options) {
+		if (!isEnabled(options)) return true;
+		if (typeof options.__orangeVisible === 'boolean') return options.__orangeVisible;
+		const source = options.lifecycle.visibility;
+		if (source) return source.isVisible();
+		return typeof document === 'undefined' || document.visibilityState !== 'hidden';
+	}
+
+	function validate(options) {
+		if (!isEnabled(options)) return;
+		if (options.vfs !== 'opfs-sahpool')
+			throw new Error('lifecycle.suspendWhenHidden requires vfs: "opfs-sahpool".');
+		const source = options.lifecycle.visibility;
+		if (source && (typeof source.isVisible !== 'function' || typeof source.subscribe !== 'function'))
+			throw new Error('lifecycle.visibility requires isVisible() and subscribe(listener).');
+	}
+
+	backgroundLifecycle = { isEnabled, observe, initialVisibility, validate };
+	return backgroundLifecycle;
+}
+
 var createDomain_1;
 var hasRequiredCreateDomain;
 
@@ -36349,7 +36399,15 @@ function requireInlineWorker () {
 		let dbOpenOptions;
 		let dbOpenInfo;
 		let dbVfsSuspender;
+		let dbInTransaction = () => false;
 		let operationQueue = Promise.resolve();
+		let background = false;
+		let pendingOperations = 0;
+		let backgroundError;
+		let wasBackgroundSuspended = false;
+		let backgroundForeignKeys = 0;
+		const backgroundHolds = new Set();
+		let nextBackgroundHold = 1;
 		let activeLeaseId;
 		let nextLeaseId = 1;
 		const checkoutQueue = [];
@@ -36407,14 +36465,39 @@ function requireInlineWorker () {
 		}
 
 		function handleRequest(message, target) {
+			// Update immediately so a foreground event can cancel a queued pause.
+			if (message.method === 'setBackground') background = !!message.background;
 			if (message.method === 'checkout')
 				return handleCheckout(message, target);
 			if (message.method === 'release')
 				return handleRelease(message, target);
+			pendingOperations++;
 			operationQueue = operationQueue
 				.then(() => dispatchTimed(message))
 				.then(({ result, elapsedMs }) => postResponse(target, message.id, result, undefined, elapsedMs))
-				.catch((error) => postResponse(target, message.id, undefined, error));
+				.catch((error) => postResponse(target, message.id, undefined, error))
+				.finally(() => { pendingOperations--; suspendWhenIdle(); });
+		}
+
+		function suspendWhenIdle() {
+			if (!background || !db || backgroundHolds.size || activeLeaseId !== undefined || checkoutQueue.length || pendingOperations) return;
+			pendingOperations++;
+			operationQueue = operationQueue.then(async () => {
+				if (!background || !db || backgroundHolds.size || activeLeaseId !== undefined || checkoutQueue.length || dbInTransaction()) return;
+				try {
+					// Orange changes this connection setting during synchronization.
+					backgroundForeignKeys = Number(db.selectValue('PRAGMA foreign_keys')) || 0;
+					await suspendDatabase();
+					backgroundError = undefined;
+					wasBackgroundSuspended = true;
+					rootTarget.postMessage({ type: 'orange-sqlite-opfs-lifecycle', phase: 'suspended' });
+				} catch (error) {
+					// A VFS close failure leaves handle ownership uncertain. Surface it on
+					// the next operation, rather than reopening over potentially live handles.
+					backgroundError = error;
+					rootTarget.postMessage({ type: 'orange-sqlite-opfs-lifecycle', phase: 'error', error: serializeError(error) });
+				}
+			}).finally(() => { pendingOperations--; });
 		}
 
 		function handleCheckout(message, target) {
@@ -36439,7 +36522,8 @@ function requireInlineWorker () {
 					postResponse(target, message.id, result, undefined, 0);
 					grantNextCheckout();
 				})
-				.catch((error) => postResponse(target, message.id, undefined, error));
+				.catch((error) => postResponse(target, message.id, undefined, error))
+				.finally(() => suspendWhenIdle());
 		}
 
 		function grantNextCheckout() {
@@ -36492,6 +36576,12 @@ function requireInlineWorker () {
 		}
 
 		async function dispatch(message) {
+			if (message.method === 'setBackground') return { background };
+			if (message.method === 'holdBackground') {
+				const holdId = nextBackgroundHold++; backgroundHolds.add(holdId); return { holdId };
+			}
+			if (message.method === 'releaseBackground') { backgroundHolds.delete(message.holdId); return; }
+			if (backgroundError && message.method !== 'close') throw backgroundError;
 			if (message.method === 'open')
 				return openDb(message.connectionString, message.busyTimeoutMs, message.vfs, message.opfsSahPoolOptions, message.opfsAccessTimeoutMs);
 			if (message.method === 'close')
@@ -36523,6 +36613,9 @@ function requireInlineWorker () {
 			const filename = normalizeFilename(connectionString);
 			const dbInfo = await createDb(sqlite3, filename, vfs, opfsSahPoolOptions, opfsAccessTimeoutMs);
 			db = dbInfo.db;
+			dbInTransaction = sqlite3.capi && typeof sqlite3.capi.sqlite3_get_autocommit === 'function'
+				? () => !sqlite3.capi.sqlite3_get_autocommit(db.pointer)
+				: () => false;
 			dbVfsSuspender = dbInfo.suspend;
 			db.exec('PRAGMA busy_timeout=' + (Number.parseInt(busyTimeoutMs, 10) || 5000));
 			dbOpenInfo = {
@@ -36531,6 +36624,11 @@ function requireInlineWorker () {
 				vfs: dbInfo.vfs,
 				filename: db.filename
 			};
+			if (wasBackgroundSuspended) {
+				db.exec('PRAGMA foreign_keys=' + backgroundForeignKeys);
+				wasBackgroundSuspended = false;
+				rootTarget.postMessage({ type: 'orange-sqlite-opfs-lifecycle', phase: 'resumed' });
+			}
 			return dbOpenInfo;
 		}
 
@@ -36883,6 +36981,8 @@ function requireWorkerClient () {
 			connectPort,
 			cloneDatabaseTo,
 			suspendDatabase,
+			setBackground: background => request('setBackground', { background: !!background }),
+			holdBackground,
 			checkout,
 			close,
 			getOpenInfo,
@@ -36917,6 +37017,16 @@ function requireWorkerClient () {
 					targetOpfsSahPoolOptions: targetOptions.opfsSahPoolOptions
 				}))
 				.then(response => response.result);
+		}
+
+		async function holdBackground() {
+			const { result } = await request('holdBackground');
+			let released = false;
+			return () => {
+				if (released) return Promise.resolve();
+				released = true;
+				return request('releaseBackground', { holdId: result.holdId });
+			};
 		}
 
 		function suspendDatabase() {
@@ -37225,7 +37335,15 @@ let db;
 let dbOpenOptions;
 let dbOpenInfo;
 let dbVfsSuspender;
+let dbInTransaction = () => false;
 let operationQueue = Promise.resolve();
+let background = false;
+let pendingOperations = 0;
+let backgroundError;
+let wasBackgroundSuspended = false;
+let backgroundForeignKeys = 0;
+const backgroundHolds = new Set();
+let nextBackgroundHold = 1;
 let activeLeaseId;
 let nextLeaseId = 1;
 const checkoutQueue = [];
@@ -37257,14 +37375,39 @@ function attachPort(port) {
 }
 
 function handleRequest(message, target) {
+	// Update immediately so a foreground event can cancel a queued pause.
+	if (message.method === 'setBackground') background = !!message.background;
 	if (message.method === 'checkout')
 		return handleCheckout(message, target);
 	if (message.method === 'release')
 		return handleRelease(message, target);
+	pendingOperations++;
 	operationQueue = operationQueue
 		.then(() => dispatchTimed(message))
 		.then(({ result, elapsedMs }) => postResponse(target, message.id, result, undefined, elapsedMs))
-		.catch((error) => postResponse(target, message.id, undefined, error));
+		.catch((error) => postResponse(target, message.id, undefined, error))
+		.finally(() => { pendingOperations--; suspendWhenIdle(); });
+}
+
+function suspendWhenIdle() {
+	if (!background || !db || backgroundHolds.size || activeLeaseId !== undefined || checkoutQueue.length || pendingOperations) return;
+	pendingOperations++;
+	operationQueue = operationQueue.then(async () => {
+		if (!background || !db || backgroundHolds.size || activeLeaseId !== undefined || checkoutQueue.length || dbInTransaction()) return;
+		try {
+			// Orange changes this connection setting during synchronization.
+			backgroundForeignKeys = Number(db.selectValue('PRAGMA foreign_keys')) || 0;
+			await suspendDatabase();
+			backgroundError = undefined;
+			wasBackgroundSuspended = true;
+			self.postMessage({ type: 'orange-sqlite-opfs-lifecycle', phase: 'suspended' });
+		} catch (error) {
+			// A VFS close failure leaves handle ownership uncertain. Surface it on
+			// the next operation, rather than reopening over potentially live handles.
+			backgroundError = error;
+			self.postMessage({ type: 'orange-sqlite-opfs-lifecycle', phase: 'error', error: serializeError(error) });
+		}
+	}).finally(() => { pendingOperations--; });
 }
 
 function handleCheckout(message, target) {
@@ -37289,7 +37432,8 @@ function handleRelease(message, target) {
 			postResponse(target, message.id, result, undefined, 0);
 			grantNextCheckout();
 		})
-		.catch((error) => postResponse(target, message.id, undefined, error));
+		.catch((error) => postResponse(target, message.id, undefined, error))
+		.finally(() => suspendWhenIdle());
 }
 
 function grantNextCheckout() {
@@ -37328,6 +37472,12 @@ async function dispatchTimed(message) {
 }
 
 async function dispatch(message) {
+	if (message.method === 'setBackground') return { background };
+	if (message.method === 'holdBackground') {
+		const holdId = nextBackgroundHold++; backgroundHolds.add(holdId); return { holdId };
+	}
+	if (message.method === 'releaseBackground') { backgroundHolds.delete(message.holdId); return; }
+	if (backgroundError && message.method !== 'close') throw backgroundError;
 	if (message.method === 'open')
 		return openDb(message.connectionString, message.busyTimeoutMs, message.vfs, message.opfsSahPoolOptions, message.opfsAccessTimeoutMs);
 	if (message.method === 'close')
@@ -37359,6 +37509,9 @@ async function openDb(connectionString, busyTimeoutMs = 5000, vfs, opfsSahPoolOp
 	const filename = normalizeFilename(connectionString);
 	const dbInfo = await createDb(sqlite3, filename, vfs, opfsSahPoolOptions, opfsAccessTimeoutMs);
 	db = dbInfo.db;
+	dbInTransaction = sqlite3.capi && typeof sqlite3.capi.sqlite3_get_autocommit === 'function'
+		? () => !sqlite3.capi.sqlite3_get_autocommit(db.pointer)
+		: () => false;
 	dbVfsSuspender = dbInfo.suspend;
 	db.exec('PRAGMA busy_timeout=' + (Number.parseInt(busyTimeoutMs, 10) || 5000));
 	dbOpenInfo = {
@@ -37367,6 +37520,11 @@ async function openDb(connectionString, busyTimeoutMs = 5000, vfs, opfsSahPoolOp
 		vfs: dbInfo.vfs,
 		filename: db.filename
 	};
+	if (wasBackgroundSuspended) {
+		db.exec('PRAGMA foreign_keys=' + backgroundForeignKeys);
+		wasBackgroundSuspended = false;
+		self.postMessage({ type: 'orange-sqlite-opfs-lifecycle', phase: 'resumed' });
+	}
 	return dbOpenInfo;
 }
 
@@ -37640,6 +37798,7 @@ var hasRequiredNewPool;
 function requireNewPool () {
 	if (hasRequiredNewPool) return newPool_1;
 	hasRequiredNewPool = 1;
+	const backgroundLifecycle = requireBackgroundLifecycle();
 	const pools = requirePools();
 	const newId = requireNewId();
 	const createSqliteOPFSWorkerClient = requireWorkerClient();
@@ -37670,6 +37829,11 @@ function requireNewPool () {
 		c.__orangeSuspendDatabase = suspendDatabase;
 		c.__orangeCloneDatabaseTo = cloneDatabaseTo;
 		c.__orangeConnectWorkerPort = connectWorkerPort;
+		c.__orangeSetBackground = background => client.setBackground(background);
+		c.__orangeHoldBackground = () => client.holdBackground();
+		const unobserveBackground = backgroundLifecycle.observe(poolOptions, visible => {
+			void c.__orangeSetBackground(!visible).catch(() => {});
+		});
 
 		if (client.ready && typeof client.ready.then === 'function') {
 			client.ready.then((result) => {
@@ -37704,6 +37868,7 @@ function requireNewPool () {
 		c.end = function() {
 			if (closing) return closing;
 			ended = true;
+			unobserveBackground();
 			clearTimeout(prewarmTimer);
 			rejectQueuedWriters();
 			const closes = [];
@@ -38141,6 +38306,7 @@ function requireSyncWorkerClient () {
 			worker.start();
 
 		const client = {
+			__orangeSetVisible: request.bind(null, '__orangeSetVisible'),
 			sync: request.bind(null, 'sync'),
 			syncRow: request.bind(null, 'syncRow'),
 			ensureLocalSchema: request.bind(null, 'ensureLocalSchema'),
@@ -38574,6 +38740,10 @@ function requireManagedSyncWorkerClient () {
 		delete options.workerUrl;
 		delete options.inlineWorker;
 		delete options.closeDbOnClose;
+		if (options.lifecycle) {
+			delete options.lifecycle.visibility;
+			options.__orangeSharedSqlWorkers = true;
+		}
 		if (options.sync && options.sync === Object(options.sync) && !Array.isArray(options.sync))
 			options.sync.worker = false;
 		return options;
@@ -38606,6 +38776,7 @@ function requireDualSyncDatabase () {
 	if (hasRequiredDualSyncDatabase) return dualSyncDatabase.exports;
 	hasRequiredDualSyncDatabase = 1;
 	const { appendRoleSuffix, toSecondaryDataPoolOptions, toCachePoolOptions } = requireStorageLayout();
+	const backgroundLifecycle = requireBackgroundLifecycle();
 	const rowGraph = requireRowGraph();
 	const { clearSyncOperationMemory } = requireOperationContext();
 	const createSyncRecovery = requireSyncRecovery();
@@ -38678,6 +38849,9 @@ function requireDualSyncDatabase () {
 		const lifecycle = createSyncLifecycle(() => recovery && recovery.assertReady(), error => recovery && recovery.observeError(error));
 		let syncAuto;
 		let closing;
+		const suspendWhenHidden = backgroundLifecycle.isEnabled(poolOptions);
+		let visible = backgroundLifecycle.initialVisibility(poolOptions);
+		let unobserveBackground = () => {};
 		const roleUnsubscribers = new Set();
 		const roleConnectionStrings = {
 			[roleA]: connectionString,
@@ -38748,8 +38922,32 @@ function requireDualSyncDatabase () {
 		});
 		router.poolFactory = router;
 		installSyncProgressInterceptors();
+		unobserveBackground = backgroundLifecycle.observe(poolOptions, setVisible);
 
 		return router;
+
+		async function withBackgroundHold(fn) {
+			const releases = [];
+			try {
+				for (const db of [getRoleDb(roleA), getRoleDb(roleB), getCacheDb()])
+					releases.push(await db.poolFactory.__orangeHoldBackground());
+				return await fn();
+			} finally {
+				await Promise.all(releases.map(release => release()));
+			}
+		}
+
+		function setVisible(value) {
+			if (!suspendWhenHidden || closing) return;
+			const wasVisible = visible;
+			visible = !!value;
+			for (const db of (poolOptions.__orangeSharedSqlWorkers ? [] : [...dbByRole.values(), cacheDb].filter(Boolean)))
+				void db.poolFactory.__orangeSetBackground(!visible).catch(error => emit('error', error));
+			if (managedSyncClient)
+				void managedSyncClient.__orangeSetVisible(visible).catch(error => emit('error', error));
+			else if (visible && !wasVisible && syncAuto)
+				void syncAuto.isRunning().then(running => running && syncAuto.runNow()).catch(() => {});
+		}
 
 		function transaction(options, fn) {
 			lifecycle.assertOpen();
@@ -38818,6 +39016,7 @@ function requireDualSyncDatabase () {
 
 		function end() {
 			if (closing) return closing;
+			unobserveBackground();
 			const stopped = lifecycle.close(() => syncAuto && syncAuto.stop());
 			if (recovery) recovery.close();
 			eventListeners.clear();
@@ -38846,7 +39045,7 @@ function requireDualSyncDatabase () {
 					managedSyncClient = createManagedSyncWorkerClient({
 						client: rootClient,
 						connectionString,
-						poolOptions,
+						poolOptions: suspendWhenHidden ? { ...poolOptions, __orangeVisible: visible } : poolOptions,
 						syncConfig: poolOptions.sync,
 						databases: [
 							{ connectionString: roleConnectionStrings[roleA], db: getRoleDb(roleA) },
@@ -38862,13 +39061,14 @@ function requireDualSyncDatabase () {
 			const auto = syncAuto = createSyncAuto(
 				{ sync: syncObserved },
 				async () => router.__sqliteSync,
-				{ runSync: syncAutomatic }
+				{ runSync: syncAutomatic, canRun: () => !suspendWhenHidden || visible }
 			);
 			recovery = createSyncRecovery(lifecycle, auto.stop, resetLocal, recoverLocalSchema, async options => {
 				await coalesceSync(normalizeSyncOptions(options));
 				return getManifest(true);
 			});
 			const syncClient = {
+				__orangeSetVisible: setVisible,
 				sync: syncObserved,
 				syncRow: options => lifecycle.run(bound => {
 					const plan = rowGraph.planGraph(rootClient.tables, bound.table, bound.strategy);
@@ -38979,6 +39179,7 @@ function requireDualSyncDatabase () {
 		}
 
 		function queueSync(normalizedOptions, schedule = {}) {
+			if (suspendWhenHidden && !visible) return Promise.resolve({ skipped: 'background' });
 			const signal = normalizedOptions[syncAbortSignalSymbol];
 			queuedSyncCount += 1;
 			emitSyncProgress('queued', { queueDepth: queuedSyncCount });
@@ -38986,13 +39187,17 @@ function requireDualSyncDatabase () {
 			const run = awaitWithSyncAbort(syncTail, signal).then(() => {
 				leftQueue = true;
 				queuedSyncCount = Math.max(0, queuedSyncCount - 1);
+				if (suspendWhenHidden && !visible) return { skipped: 'background' };
 				emitSyncProgress('waiting-for-sync-lock', { queueDepth: queuedSyncCount });
 				return awaitSyncWork(observe('sync', () => runWithCrossTabLock(
 					dualSyncLockName,
 					toDualSyncLockConfig(poolOptions && poolOptions.sync, normalizedOptions),
 					() => {
 						throwIfSyncAborted(signal);
-						return syncScheduled(normalizedOptions, schedule);
+						if (suspendWhenHidden && !visible) return { skipped: 'background' };
+						return suspendWhenHidden
+							? withBackgroundHold(() => syncScheduled(normalizedOptions, schedule))
+							: syncScheduled(normalizedOptions, schedule);
 					}
 				)), signal);
 			}).catch((error) => {
@@ -40502,6 +40707,7 @@ function requireDualSyncDatabase () {
 		function getRoleDb(role) {
 			if (!dbByRole.has(role)) {
 				const db = createSingleDatabase(roleConnectionStrings[role], getRolePoolOptions(role));
+				if (suspendWhenHidden && !poolOptions.__orangeSharedSqlWorkers) void db.poolFactory.__orangeSetBackground(!visible).catch(error => emit('error', error));
 				db.__orangeSyncIdentity = `sqliteOPFS:${connectionString}:dual:${role}`;
 				dbByRole.set(role, db);
 			}
@@ -40970,8 +41176,10 @@ function requireDualSyncDatabase () {
 		}
 
 		function getCacheDb() {
-			if (!cacheDb)
+			if (!cacheDb) {
 				cacheDb = createSingleDatabase(cacheConnectionString, cachePoolOptions);
+				if (suspendWhenHidden && !poolOptions.__orangeSharedSqlWorkers) void cacheDb.poolFactory.__orangeSetBackground(!visible).catch(error => emit('error', error));
+			}
 			return cacheDb;
 		}
 
@@ -41353,6 +41561,7 @@ function requireDualSyncDatabase () {
 			...poolOptions,
 			sync: stripRouterSyncOptions(poolOptions.sync)
 		};
+		delete options.lifecycle;
 		if (!options.vfs)
 			options.vfs = 'opfs-wl';
 		return options;
@@ -41480,6 +41689,7 @@ var hasRequiredNewDatabase;
 function requireNewDatabase () {
 	if (hasRequiredNewDatabase) return newDatabase_1;
 	hasRequiredNewDatabase = 1;
+	const backgroundLifecycle = requireBackgroundLifecycle();
 	let createDomain = requireCreateDomain();
 	let newTransaction = requireNewTransaction();
 	let _begin = requireBegin();
@@ -41498,6 +41708,7 @@ function requireNewDatabase () {
 		if (!connectionString)
 			throw new Error('Connection string cannot be empty');
 		poolOptions = poolOptions || { min: 1 };
+		backgroundLifecycle.validate(poolOptions);
 		if (shouldUseDualSyncDatabase(poolOptions))
 			return newDualSyncDatabase(connectionString, poolOptions, newSingleDatabase);
 		return newSingleDatabase(connectionString, poolOptions);

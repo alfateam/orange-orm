@@ -5,7 +5,15 @@ let db;
 let dbOpenOptions;
 let dbOpenInfo;
 let dbVfsSuspender;
+let dbInTransaction = () => false;
 let operationQueue = Promise.resolve();
+let background = false;
+let pendingOperations = 0;
+let backgroundError;
+let wasBackgroundSuspended = false;
+let backgroundForeignKeys = 0;
+const backgroundHolds = new Set();
+let nextBackgroundHold = 1;
 let activeLeaseId;
 let nextLeaseId = 1;
 const checkoutQueue = [];
@@ -37,14 +45,38 @@ function attachPort(port) {
 }
 
 function handleRequest(message, target) {
+	if (message.method === 'setBackground') background = !!message.background;
 	if (message.method === 'checkout')
 		return handleCheckout(message, target);
 	if (message.method === 'release')
 		return handleRelease(message, target);
+	pendingOperations++;
 	operationQueue = operationQueue
 		.then(() => dispatch(message))
 		.then((result) => postResponse(target, message.id, result))
-		.catch((error) => postResponse(target, message.id, undefined, error));
+		.catch((error) => postResponse(target, message.id, undefined, error))
+		.finally(() => { pendingOperations--; suspendWhenIdle(); });
+}
+
+function suspendWhenIdle() {
+	if (!background || !db || backgroundHolds.size || activeLeaseId !== undefined || checkoutQueue.length || pendingOperations) return;
+	pendingOperations++;
+	operationQueue = operationQueue.then(async () => {
+		if (!background || !db || backgroundHolds.size || activeLeaseId !== undefined || checkoutQueue.length || dbInTransaction()) return;
+		try {
+			// Orange changes this connection setting during synchronization.
+			backgroundForeignKeys = Number(db.selectValue('PRAGMA foreign_keys')) || 0;
+			await suspendDatabase();
+			backgroundError = undefined;
+			wasBackgroundSuspended = true;
+			self.postMessage({ type: 'orange-sqlite-opfs-lifecycle', phase: 'suspended' });
+		} catch (error) {
+			// A VFS close failure leaves handle ownership uncertain. Surface it on
+			// the next operation, rather than reopening over potentially live handles.
+			backgroundError = error;
+			self.postMessage({ type: 'orange-sqlite-opfs-lifecycle', phase: 'error', error: serializeError(error) });
+		}
+	}).finally(() => { pendingOperations--; });
 }
 
 function handleCheckout(message, target) {
@@ -69,7 +101,8 @@ function handleRelease(message, target) {
 			postResponse(target, message.id, result);
 			grantNextCheckout();
 		})
-		.catch((error) => postResponse(target, message.id, undefined, error));
+		.catch((error) => postResponse(target, message.id, undefined, error))
+		.finally(() => suspendWhenIdle());
 }
 
 function grantNextCheckout() {
@@ -99,6 +132,13 @@ function shiftNextCheckout() {
 }
 
 async function dispatch(message) {
+	if (message.method === 'setBackground') return { background };
+	if (message.method === 'holdBackground') {
+		const holdId = nextBackgroundHold++; backgroundHolds.add(holdId); return { holdId };
+	}
+	if (message.method === 'releaseBackground') { backgroundHolds.delete(message.holdId); return; }
+	if (backgroundError && message.method !== 'close') throw backgroundError;
+
 	if (message.method === 'open')
 		return openDb(message.connectionString, message.busyTimeoutMs, message.vfs, message.opfsSahPoolOptions, message.opfsAccessTimeoutMs);
 	if (message.method === 'close')
@@ -130,6 +170,9 @@ async function openDb(connectionString, busyTimeoutMs = 5000, vfs, opfsSahPoolOp
 	const filename = normalizeFilename(connectionString);
 	const dbInfo = await createDb(sqlite3, filename, vfs, opfsSahPoolOptions, opfsAccessTimeoutMs);
 	db = dbInfo.db;
+	dbInTransaction = sqlite3.capi && typeof sqlite3.capi.sqlite3_get_autocommit === 'function'
+		? () => !sqlite3.capi.sqlite3_get_autocommit(db.pointer)
+		: () => false;
 	dbVfsSuspender = dbInfo.suspend;
 	db.exec(`PRAGMA busy_timeout=${Number.parseInt(busyTimeoutMs, 10) || 5000}`);
 	dbOpenInfo = {
@@ -138,6 +181,11 @@ async function openDb(connectionString, busyTimeoutMs = 5000, vfs, opfsSahPoolOp
 		vfs: dbInfo.vfs,
 		filename: db.filename
 	};
+	if (wasBackgroundSuspended) {
+		db.exec('PRAGMA foreign_keys=' + backgroundForeignKeys);
+		wasBackgroundSuspended = false;
+		self.postMessage({ type: 'orange-sqlite-opfs-lifecycle', phase: 'resumed' });
+	}
 	return dbOpenInfo;
 }
 

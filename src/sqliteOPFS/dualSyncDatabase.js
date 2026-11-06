@@ -1,4 +1,5 @@
 const { appendRoleSuffix, toSecondaryDataPoolOptions, toCachePoolOptions } = require('./storageLayout');
+const backgroundLifecycle = require('./backgroundLifecycle');
 const rowGraph = require('../sync/rowGraph');
 const { clearSyncOperationMemory } = require('../sync/operationContext');
 const createSyncRecovery = require('../client/syncRecovery');
@@ -71,6 +72,9 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	const lifecycle = createSyncLifecycle(() => recovery && recovery.assertReady(), error => recovery && recovery.observeError(error));
 	let syncAuto;
 	let closing;
+	const suspendWhenHidden = backgroundLifecycle.isEnabled(poolOptions);
+	let visible = backgroundLifecycle.initialVisibility(poolOptions);
+	let unobserveBackground = () => {};
 	const roleUnsubscribers = new Set();
 	const roleConnectionStrings = {
 		[roleA]: connectionString,
@@ -141,8 +145,32 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	});
 	router.poolFactory = router;
 	installSyncProgressInterceptors();
+	unobserveBackground = backgroundLifecycle.observe(poolOptions, setVisible);
 
 	return router;
+
+	async function withBackgroundHold(fn) {
+		const releases = [];
+		try {
+			for (const db of [getRoleDb(roleA), getRoleDb(roleB), getCacheDb()])
+				releases.push(await db.poolFactory.__orangeHoldBackground());
+			return await fn();
+		} finally {
+			await Promise.all(releases.map(release => release()));
+		}
+	}
+
+	function setVisible(value) {
+		if (!suspendWhenHidden || closing) return;
+		const wasVisible = visible;
+		visible = !!value;
+		for (const db of (poolOptions.__orangeSharedSqlWorkers ? [] : [...dbByRole.values(), cacheDb].filter(Boolean)))
+			void db.poolFactory.__orangeSetBackground(!visible).catch(error => emit('error', error));
+		if (managedSyncClient)
+			void managedSyncClient.__orangeSetVisible(visible).catch(error => emit('error', error));
+		else if (visible && !wasVisible && syncAuto)
+			void syncAuto.isRunning().then(running => running && syncAuto.runNow()).catch(() => {});
+	}
 
 	function transaction(options, fn) {
 		lifecycle.assertOpen();
@@ -211,6 +239,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 
 	function end() {
 		if (closing) return closing;
+		unobserveBackground();
 		const stopped = lifecycle.close(() => syncAuto && syncAuto.stop());
 		if (recovery) recovery.close();
 		eventListeners.clear();
@@ -239,7 +268,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				managedSyncClient = createManagedSyncWorkerClient({
 					client: rootClient,
 					connectionString,
-					poolOptions,
+					poolOptions: suspendWhenHidden ? { ...poolOptions, __orangeVisible: visible } : poolOptions,
 					syncConfig: poolOptions.sync,
 					databases: [
 						{ connectionString: roleConnectionStrings[roleA], db: getRoleDb(roleA) },
@@ -255,13 +284,14 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		const auto = syncAuto = createSyncAuto(
 			{ sync: syncObserved },
 			async () => router.__sqliteSync,
-			{ runSync: syncAutomatic }
+			{ runSync: syncAutomatic, canRun: () => !suspendWhenHidden || visible }
 		);
 		recovery = createSyncRecovery(lifecycle, auto.stop, resetLocal, recoverLocalSchema, async options => {
 			await coalesceSync(normalizeSyncOptions(options));
 			return getManifest(true);
 		});
 		const syncClient = {
+			__orangeSetVisible: setVisible,
 			sync: syncObserved,
 			syncRow: options => lifecycle.run(bound => {
 				const plan = rowGraph.planGraph(rootClient.tables, bound.table, bound.strategy);
@@ -372,6 +402,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	}
 
 	function queueSync(normalizedOptions, schedule = {}) {
+		if (suspendWhenHidden && !visible) return Promise.resolve({ skipped: 'background' });
 		const signal = normalizedOptions[syncAbortSignalSymbol];
 		queuedSyncCount += 1;
 		emitSyncProgress('queued', { queueDepth: queuedSyncCount });
@@ -379,13 +410,17 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		const run = awaitWithSyncAbort(syncTail, signal).then(() => {
 			leftQueue = true;
 			queuedSyncCount = Math.max(0, queuedSyncCount - 1);
+			if (suspendWhenHidden && !visible) return { skipped: 'background' };
 			emitSyncProgress('waiting-for-sync-lock', { queueDepth: queuedSyncCount });
 			return awaitSyncWork(observe('sync', () => runWithCrossTabLock(
 				dualSyncLockName,
 				toDualSyncLockConfig(poolOptions && poolOptions.sync, normalizedOptions),
 				() => {
 					throwIfSyncAborted(signal);
-					return syncScheduled(normalizedOptions, schedule);
+					if (suspendWhenHidden && !visible) return { skipped: 'background' };
+					return suspendWhenHidden
+						? withBackgroundHold(() => syncScheduled(normalizedOptions, schedule))
+						: syncScheduled(normalizedOptions, schedule);
 				}
 			)), signal);
 		}).catch((error) => {
@@ -1895,6 +1930,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	function getRoleDb(role) {
 		if (!dbByRole.has(role)) {
 			const db = createSingleDatabase(roleConnectionStrings[role], getRolePoolOptions(role));
+			if (suspendWhenHidden && !poolOptions.__orangeSharedSqlWorkers) void db.poolFactory.__orangeSetBackground(!visible).catch(error => emit('error', error));
 			db.__orangeSyncIdentity = `sqliteOPFS:${connectionString}:dual:${role}`;
 			dbByRole.set(role, db);
 		}
@@ -2363,8 +2399,10 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	}
 
 	function getCacheDb() {
-		if (!cacheDb)
+		if (!cacheDb) {
 			cacheDb = createSingleDatabase(cacheConnectionString, cachePoolOptions);
+			if (suspendWhenHidden && !poolOptions.__orangeSharedSqlWorkers) void cacheDb.poolFactory.__orangeSetBackground(!visible).catch(error => emit('error', error));
+		}
 		return cacheDb;
 	}
 
@@ -2746,6 +2784,7 @@ function toDataPoolOptions(poolOptions = {}) {
 		...poolOptions,
 		sync: stripRouterSyncOptions(poolOptions.sync)
 	};
+	delete options.lifecycle;
 	if (!options.vfs)
 		options.vfs = 'opfs-wl';
 	return options;

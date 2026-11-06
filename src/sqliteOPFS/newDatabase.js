@@ -1,3 +1,4 @@
+const backgroundLifecycle = require('./backgroundLifecycle');
 let createDomain = require('../createDomain');
 let newTransaction = require('./newTransaction');
 let _begin = require('../table/begin');
@@ -16,6 +17,7 @@ function newDatabase(connectionString, poolOptions) {
 	if (!connectionString)
 		throw new Error('Connection string cannot be empty');
 	poolOptions = poolOptions || { min: 1 };
+	backgroundLifecycle.validate(poolOptions);
 	if (shouldUseDualSyncDatabase(poolOptions))
 		return newDualSyncDatabase(connectionString, poolOptions, newSingleDatabase);
 	return newSingleDatabase(connectionString, poolOptions);

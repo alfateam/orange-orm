@@ -97,6 +97,10 @@ function toManagedSqliteOptions(poolOptions) {
 	delete options.workerUrl;
 	delete options.inlineWorker;
 	delete options.closeDbOnClose;
+	if (options.lifecycle) {
+		delete options.lifecycle.visibility;
+		options.__orangeSharedSqlWorkers = true;
+	}
 	if (options.sync && options.sync === Object(options.sync) && !Array.isArray(options.sync))
 		options.sync.worker = false;
 	return options;
