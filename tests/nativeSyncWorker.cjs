@@ -21,5 +21,14 @@ globalThis.fetch = async (...args) => {
 	}
 	return response;
 };
-parentPort.on('message', message => globalThis.onmessage({ data: message }));
+let sqlPorts = [];
+parentPort.on('message', message => {
+	if (message.type === 'orange-managed-sync-init') sqlPorts = message.sqlConnections.map(entry => entry.port);
+	if (message.type === 'test-disconnect-sql') {
+		for (const port of sqlPorts) port.close();
+		parentPort.postMessage({ type: 'test-sql-disconnected' });
+		return;
+	}
+	globalThis.onmessage({ data: message });
+});
 require('../src/client/managedSyncWorkerEntry');

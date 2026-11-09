@@ -58,6 +58,9 @@ declare namespace r {
     function connectSqliteOPFSWorker(worker: Worker): MessagePort;
     function createSyncWorkerClient(worker: Worker | MessagePort, options?: {
         requestTimeoutMs?: number;
+        /** Foreground shutdown grace period. Defaults to 10000 ms. */
+        closeTimeoutMs?: number;
+        visibility?: { isVisible(): boolean; subscribe(listener: (visible: boolean) => void): () => void };
     }): MapSyncClient;
     function createSyncWorkerHandler(syncClient: MapSyncClient, options?: {
         autoStart?: boolean;

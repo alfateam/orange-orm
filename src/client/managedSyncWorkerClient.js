@@ -21,7 +21,16 @@ function createManagedSyncWorkerClient(options) {
 		sqlConnections
 	}, sqlConnections.map(entry => entry.port));
 	const client = createSyncWorkerClient(worker, {
-		requestTimeoutMs: workerConfig.requestTimeoutMs
+		requestTimeoutMs: workerConfig.requestTimeoutMs,
+		closeTimeoutMs: workerConfig.closeTimeoutMs,
+		visibility: workerConfig.visibility || options.poolOptions?.lifecycle?.visibility,
+		__managedHealth: {
+			healthCheck: workerConfig.healthCheck,
+			visibility: workerConfig.visibility || options.poolOptions?.lifecycle?.visibility
+		},
+		// A dead sync port may still own a SQL checkout. Retire the owned SQL
+		// workers as well, rejecting their pending calls without replaying writes.
+		onTerminal: () => Promise.all((options.databases || []).map(entry => entry.db.end()))
 	});
 	Object.defineProperty(client, '__orangeManagedSyncWorker', {
 		value: true,

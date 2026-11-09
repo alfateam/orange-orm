@@ -8,13 +8,13 @@ const { createSyncAuto } = require('../src/client/syncAuto');
 const closes = [];
 afterEach(async () => { while (closes.length) await closes.pop()(); });
 
-function fixture() {
+function fixture({ beforeUnpause = () => {} } = {}) {
 	const events = [], sql = [];
 	let paused = false, open = 0, failPause = false, inTransaction = false, foreignKeys = 0;
 	const pool = {
 		vfsName: 'opfs-sahpool-fixture',
 		isPaused: () => paused,
-		unpauseVfs() { events.push('unpause'); paused = false; },
+		async unpauseVfs() { events.push('unpause'); await beforeUnpause(); paused = false; },
 		pauseVfs() {
 			expect(open).toBe(0);
 			if (failPause) throw new Error('handle close failed');
@@ -71,6 +71,37 @@ describe('opt-in OPFS background lifecycle', () => {
 		await f.client.setBackground(false); await query(f.client, 'SELECT 1');
 		expect(f.foreignKeys()).toBe(1);
 		expect(f.events).toEqual(['open', 'close', 'pause', 'unpause', 'open']);
+	});
+
+	test.each([true, false])('SQL waits for delayed SAH-pool resume when sync port arrives first: %s', async syncFirst => {
+		let release, enter;
+		const gate = new Promise(resolve => { release = resolve; });
+		const entered = new Promise(resolve => { enter = resolve; });
+		const f = fixture({ beforeUnpause: () => { enter(); return gate; } });
+		const other = createClient('background.sqlite3', { worker: connectPort(f.worker), vfs: 'opfs-sahpool', closeDbOnClose: false });
+		closes.push(() => other.close());
+		await Promise.all([f.client.ready, other.ready]);
+		await f.client.setBackground(true); await tick();
+		expect(f.events).toEqual(['open', 'close', 'pause']);
+		await f.client.setBackground(false);
+		const first = query(syncFirst ? other : f.client, 'SELECT 1');
+		try {
+			await entered;
+			const second = query(syncFirst ? f.client : other, 'SELECT 2');
+			// A live transport can answer while storage is still unavailable. SQL
+			// on either port must stay behind the same unfinished resume operation.
+			let healthy = false;
+			f.worker.addEventListener('message', event => { if (event.data.type === 'orange-sqlite-health-response') healthy = true; });
+			f.worker.postMessage({ type: 'orange-sqlite-health-request', id: 77 });
+			await tick();
+			expect(healthy).toBe(true);
+			expect(f.sql).toEqual([]);
+			expect(f.events).toEqual(['open', 'close', 'pause', 'unpause']);
+			release();
+			await Promise.all([first, second]);
+			expect(f.sql).toEqual(['SELECT 1', 'SELECT 2']);
+			expect(f.events).toEqual(['open', 'close', 'pause', 'unpause', 'open']);
+		} finally { release(); await first; }
 	});
 
 	test('does not close between statements in a transaction held by a different port', async () => {

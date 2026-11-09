@@ -245,14 +245,32 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		eventListeners.clear();
 		if (externalSyncClient) clearSyncOperationMemory(externalSyncClient);
 		closing = (async () => {
-			await stopped;
-			if (managedSyncClient) await managedSyncClient.close();
+			let failure;
+			if (managedSyncClient) {
+				try { await managedSyncClient.close(); } catch (error) { failure = error; }
+			} else await stopped;
 			for (const unsubscribe of roleUnsubscribers) unsubscribe();
 			roleUnsubscribers.clear();
-			for (const client of clientByRole.values()) await client.syncClient.close();
 			if (externalSyncUnsubscribe) externalSyncUnsubscribe();
 			if (manifestChannel) manifestChannel.close();
-			await Promise.all([...dbByRole.values(), cacheDb].filter(Boolean).map(db => db.end()));
+			const cleanup = Promise.allSettled([
+				stopped,
+				...[...clientByRole.values()].map(client => client.syncClient.close()),
+				...[...dbByRole.values(), cacheDb].filter(Boolean).map(db => db.end())
+			]).then(results => {
+				const rejected = results.find(result => result.status === 'rejected');
+				if (rejected) throw rejected.reason;
+			});
+			try {
+				if (managedSyncClient) {
+					const config = poolOptions.sync.worker || {};
+					const error = Object.assign(new Error('Database cleanup is still draining; storage has not been reopened.'), { code: 'ORANGE_DATABASE_CLEANUP_PENDING' });
+					await require('../client/workerDeadline').withDeadline(cleanup,
+						Number.isFinite(config.closeTimeoutMs) && config.closeTimeoutMs > 0 ? config.closeTimeoutMs : 10000,
+						config.visibility || poolOptions.lifecycle?.visibility, error);
+				} else await cleanup;
+			} catch (error) { failure ||= error; }
+			if (failure) throw failure;
 		})();
 		return closing;
 	}

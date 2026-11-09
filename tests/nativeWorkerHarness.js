@@ -14,6 +14,18 @@ module.exports = function nativeWorkerHarness() {
 		postMessage: native.postMessage.bind(native),
 		terminate() { terminated = true; Atomics.store(new Int32Array(gate), 0, 0); return native.terminate(); },
 		crash() { return native.terminate(); },
+		// Model a platform losing the worker without delivering an error event.
+		vanish() { terminated = true; return native.terminate(); },
+		disconnectSql() {
+			return new Promise(resolve => {
+				const listener = event => {
+					if (event.data.type !== 'test-sql-disconnected') return;
+					events.removeEventListener('message', listener); resolve();
+				};
+				events.addEventListener('message', listener);
+				native.postMessage({ type: 'test-disconnect-sql' });
+			});
+		},
 		pauseProcessing() {
 			Atomics.store(new Int32Array(gate), 0, 1);
 			return new Promise(resolve => {

@@ -2,6 +2,7 @@ const rdb = require('./managedSyncWorkerRdb');
 const mapFromSyncSchema = require('./mapFromSyncSchema');
 
 let handler;
+let healthResponder;
 const pendingEvents = [];
 
 globalThis.onmessage = function(event) {
@@ -10,6 +11,7 @@ globalThis.onmessage = function(event) {
 		initialize(message);
 		return;
 	}
+	if (healthResponder && healthResponder(message)) return;
 	if (!handler) {
 		pendingEvents.push(event);
 		return;
@@ -23,6 +25,7 @@ function initialize(message) {
 	const portByConnectionString = new Map(
 		(message.sqlConnections || []).map(entry => [entry.connectionString, entry.port])
 	);
+	healthResponder = require('./managedSyncHealthResponder')([...portByConnectionString.values()], message => globalThis.postMessage(message));
 	const map = mapFromSyncSchema(rdb, message.schema);
 	const db = map({
 		db: con => message.sqliteBackend === 'native'

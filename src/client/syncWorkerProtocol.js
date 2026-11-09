@@ -5,7 +5,8 @@ const alwaysForwardedEvents = Object.freeze([
 	'initial-ready',
 	'sync-progress',
 	'schema-recovery',
-	'operation'
+	'operation',
+	'worker-health'
 ]);
 
 const errorMarker = '__orangeSyncWorkerError';

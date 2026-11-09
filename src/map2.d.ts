@@ -1255,6 +1255,12 @@ export interface SyncConfig<M extends Record<string, any> = any> extends Partial
   worker?: boolean | {
     url?: string | URL;
     requestTimeoutMs?: number;
+    /** Foreground shutdown grace period. Defaults to 10000 ms. */
+    closeTimeoutMs?: number;
+    /** Managed worker transport probes: defaults to 15s intervals and 30s reply deadlines. */
+    healthCheck?: false | { intervalMs?: number; timeoutMs?: number };
+    /** Host visibility for health/shutdown deadlines, independent of OPFS suspension. */
+    visibility?: { isVisible(): boolean; subscribe(listener: (visible: boolean) => void): () => void };
     createWorker?: () => Worker | MessagePort;
   };
   pull?: string | SyncPullOverrideConfig<M>;
@@ -1315,6 +1321,12 @@ export interface SyncEvent {
    * Absent for general sync, shared references, reparenting, or preceding pushes.
    * Applications must still account for their own reverse/shared dependencies. */
   scope?: SyncRowScope;
+}
+
+export interface SyncWorkerHealthEvent {
+  phase: 'checking' | 'responsive' | 'unresponsive';
+  requestId: number;
+  reason?: 'startup' | 'periodic' | 'resume';
 }
 
 export interface SyncProgressEvent {
@@ -1447,6 +1459,7 @@ export interface SyncClient<M extends Record<string, TableDefinition<M>> = any> 
   isRunning(): Promise<boolean>;
   interceptors: SyncInterceptors;
   on(event: 'sync', listener: (payload: SyncEvent) => void): () => void;
+  on(event: 'worker-health', listener: (payload: SyncWorkerHealthEvent) => void): () => void;
   on<Context extends Record<string, unknown> = Record<string, unknown>, Memory = unknown>(
     event: 'operation' | `operation:${string}`,
     listener: (payload: SyncOperationEvent<Context, Memory>) => void
@@ -1457,6 +1470,7 @@ export interface SyncClient<M extends Record<string, TableDefinition<M>> = any> 
   on(event: 'schema-recovery', listener: (payload: SyncSchemaRecoveryState) => void): () => void;
   on(event: 'error' | 'sync-error', listener: (payload: SyncErrorEvent) => void): () => void;
   off(event: 'sync', listener: (payload: SyncEvent) => void): void;
+  off(event: 'worker-health', listener: (payload: SyncWorkerHealthEvent) => void): void;
   off<Context extends Record<string, unknown> = Record<string, unknown>, Memory = unknown>(
     event: 'operation' | `operation:${string}`,
     listener: (payload: SyncOperationEvent<Context, Memory>) => void
@@ -1466,6 +1480,7 @@ export interface SyncClient<M extends Record<string, TableDefinition<M>> = any> 
   off(event: 'schema-recovery', listener: (payload: SyncSchemaRecoveryState) => void): void;
   off(event: 'error' | 'sync-error', listener: (payload: SyncErrorEvent) => void): void;
   once(event: 'sync', listener: (payload: SyncEvent) => void): () => void;
+  once(event: 'worker-health', listener: (payload: SyncWorkerHealthEvent) => void): () => void;
   once<Context extends Record<string, unknown> = Record<string, unknown>, Memory = unknown>(
     event: 'operation' | `operation:${string}`,
     listener: (payload: SyncOperationEvent<Context, Memory>) => void

@@ -47,11 +47,15 @@ function createInlineSqliteOPFSWorker(options = {}) {
 
 	function postMessage(message, transfer) {
 		if (closed || !message || message.type !== 'orange-sqlite-opfs-request')
-			return handleControlMessage(message, transfer);
+			return handleControlMessage(message, transfer, rootTarget);
 		handleRequest(message, rootTarget);
 	}
 
-	function handleControlMessage(message, transfer) {
+	function handleControlMessage(message, transfer, target) {
+		if (!closed && message?.type === 'orange-sqlite-health-request') {
+			target.postMessage({ type: 'orange-sqlite-health-response', id: message.id });
+			return;
+		}
 		if (closed || !message || message.type !== 'orange-sqlite-opfs-connect')
 			return;
 		const port = transfer && transfer[0] || message.port;
@@ -68,7 +72,7 @@ function createInlineSqliteOPFSWorker(options = {}) {
 	function handleIncoming(event, target) {
 		const message = event && event.data;
 		if (!message || message.type !== 'orange-sqlite-opfs-request')
-			return handleControlMessage(message);
+			return handleControlMessage(message, undefined, target);
 		handleRequest(message, target);
 	}
 

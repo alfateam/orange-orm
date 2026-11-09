@@ -4,6 +4,7 @@ const {
 	withSyncOperationMemory
 } = require('../sync/operationContext');
 const createHttpInterceptor = require('./httpInterceptor');
+const { withDeadline } = require('./workerDeadline');
 const { ensureLocalSchemaReadySymbol } = require('./syncClient');
 const {
 	deserializeError,
@@ -26,6 +27,8 @@ function createSyncWorkerClient(worker, options = {}) {
 	let closed = false;
 	let closing;
 	let terminalError;
+	let terminated = false;
+	let health;
 
 	worker.addEventListener('message', onMessage);
 	worker.addEventListener('error', onWorkerError);
@@ -34,6 +37,7 @@ function createSyncWorkerClient(worker, options = {}) {
 		worker.start();
 
 	const client = {
+		__orangeFail: error => onWorkerError({ error }),
 		__orangeSetVisible: request.bind(null, '__orangeSetVisible'),
 		sync: request.bind(null, 'sync'),
 		syncRow: request.bind(null, 'syncRow'),
@@ -54,6 +58,8 @@ function createSyncWorkerClient(worker, options = {}) {
 	};
 
 	worker.postMessage({ type: 'orange-sync-worker-ready' });
+	if (options.__managedHealth)
+		health = require('./managedWorkerHealth')(worker, options.__managedHealth, client.__orangeFail, emit);
 	return client;
 
 	function request(method, ...args) {
@@ -146,6 +152,7 @@ function createSyncWorkerClient(worker, options = {}) {
 	function close() {
 		if (closing) return closing;
 		closed = true;
+		if (health) health.close();
 		clearSyncOperationMemory(client);
 		const closeError = new Error('Sync worker client closed.');
 		for (const [id, entry] of pending) {
@@ -159,12 +166,16 @@ function createSyncWorkerClient(worker, options = {}) {
 		lastInitialReady = undefined;
 		lastRecovery = undefined;
 		// Wait for rollback/storage work in the worker before terminating it.
-		closing = request('close').finally(() => {
+		const timeoutMs = normalizePositiveInteger(options.closeTimeoutMs) || 10000;
+		const timeoutError = Object.assign(new Error('Sync worker shutdown timed out; worker terminated.'), { code: 'ORANGE_WORKER_CLOSE_TIMEOUT' });
+		closing = withDeadline(request('close'), timeoutMs, options.visibility, timeoutError).catch(error => {
+			onWorkerError({ error });
+			throw error;
+		}).finally(() => {
 			worker.removeEventListener('message', onMessage);
 			worker.removeEventListener('error', onWorkerError);
 			worker.removeEventListener('messageerror', onWorkerError);
-			if (typeof worker.terminate === 'function') worker.terminate();
-			else if (typeof worker.close === 'function') worker.close();
+			terminateWorker();
 		});
 		// Older callers may ignore close's return value. Awaiting it still reports failure.
 		closing.catch(() => {});
@@ -172,9 +183,11 @@ function createSyncWorkerClient(worker, options = {}) {
 	}
 
 	function onMessage(event) {
+		if (terminalError) return;
 		const message = event && event.data;
 		if (!message || message.type === undefined)
 			return;
+		if (health) health.receive(message);
 		if (message.type === 'orange-sync-worker-interceptor-request') {
 			if (closed) return;
 			void handleInterceptorRequest(message);
@@ -217,13 +230,26 @@ function createSyncWorkerClient(worker, options = {}) {
 			return;
 		const error = toWorkerError(event);
 		terminalError = error;
+		if (health) health.close();
+		terminateWorker();
 		for (const entry of pending.values()) {
 			if (entry.timeoutId)
 				clearTimeout(entry.timeoutId);
 			entry.reject(error);
 		}
 		pending.clear();
+		if (typeof options.onTerminal === 'function') {
+			try { Promise.resolve(options.onTerminal(error)).catch(() => {}); }
+			catch (_) { /* The original transport error remains authoritative. */ }
+		}
 		emit('error', { method: 'worker', error });
+	}
+
+	function terminateWorker() {
+		if (terminated) return;
+		terminated = true;
+		if (typeof worker.terminate === 'function') worker.terminate();
+		else if (typeof worker.close === 'function') worker.close();
 	}
 
 	function emit(event, payload) {

@@ -14314,11 +14314,17 @@ function requireClient () {
 		function close() {
 			if (closing) return closing;
 			closing = (async () => {
-				if (typeof client.syncClient.close === 'function') await client.syncClient.close();
-				else if (typeof client.syncClient.stop === 'function') await client.syncClient.stop();
-				const db = await getDb();
-				if (db && typeof db.end === 'function') await db.end();
-				closed = true;
+				let failure;
+				try {
+					if (typeof client.syncClient.close === 'function') await client.syncClient.close();
+					else if (typeof client.syncClient.stop === 'function') await client.syncClient.stop();
+				} catch (error) { failure = error; }
+				try {
+					const db = await getDb();
+					if (db && typeof db.end === 'function') await db.end();
+				} catch (error) { failure ||= error; }
+				finally { closed = true; }
+				if (failure) throw failure;
 			})();
 			return closing;
 		}
@@ -24552,7 +24558,8 @@ function requireSyncWorkerProtocol () {
 		'initial-ready',
 		'sync-progress',
 		'schema-recovery',
-		'operation'
+		'operation',
+		'worker-health'
 	]);
 
 	const errorMarker = '__orangeSyncWorkerError';
@@ -25517,6 +25524,136 @@ function requireDbWorkerHandler () {
 	return dbWorkerHandler;
 }
 
+/* global document */
+
+var workerVisibility;
+var hasRequiredWorkerVisibility;
+
+function requireWorkerVisibility () {
+	if (hasRequiredWorkerVisibility) return workerVisibility;
+	hasRequiredWorkerVisibility = 1;
+	// This source only observes the host. It does not suspend or reopen storage.
+	workerVisibility = function workerVisibility(source) {
+		if (source) return source;
+		return {
+			isVisible: () => typeof document === 'undefined' || document.visibilityState !== 'hidden',
+			subscribe(listener) {
+				if (typeof document === 'undefined') return () => {};
+				const changed = () => listener(document.visibilityState !== 'hidden');
+				document.addEventListener('visibilitychange', changed);
+				return () => document.removeEventListener('visibilitychange', changed);
+			}
+		};
+	};
+	return workerVisibility;
+}
+
+var workerDeadline;
+var hasRequiredWorkerDeadline;
+
+function requireWorkerDeadline () {
+	if (hasRequiredWorkerDeadline) return workerDeadline;
+	hasRequiredWorkerDeadline = 1;
+	const workerVisibility = requireWorkerVisibility();
+
+	// Background time is not evidence of a dead worker. Also grant a fresh deadline
+	// after a large scheduler gap, even if the platform omitted visibility events.
+	function deadline(callback, timeoutMs, source) {
+		const visibility = workerVisibility(source);
+		const tickMs = Math.min(1000, timeoutMs);
+		let timer, stopped = false, remaining = timeoutMs, last = Date.now();
+		let visible = visibility.isVisible();
+		const unsubscribe = visibility.subscribe(value => {
+			visible = !!value;
+			remaining = timeoutMs;
+			last = Date.now();
+			clearTimeout(timer);
+			if (visible) schedule();
+		});
+		if (visible) schedule();
+		return cancel;
+		function schedule() {
+			if (stopped) return;
+			clearTimeout(timer);
+			timer = setTimeout(tick, Math.min(tickMs, remaining));
+			if (timer.unref) timer.unref();
+		}
+		function tick() {
+			if (stopped) return;
+			const now = Date.now(), elapsed = now - last;
+			last = now;
+			if (!visibility.isVisible()) { visible = false; remaining = timeoutMs; schedule(); return; }
+			if (!visible || elapsed > Math.max(2000, tickMs * 3) || elapsed < 0) remaining = timeoutMs;
+			else remaining -= elapsed;
+			visible = true;
+			if (remaining <= 0) { cancel(); callback(); }
+			else schedule();
+		}
+		function cancel() { if (stopped) return; stopped = true; clearTimeout(timer); unsubscribe(); }
+	}
+
+	function withDeadline(promise, timeoutMs, source, error) {
+		let cancel;
+		const timeout = new Promise((_, reject) => { cancel = deadline(() => reject(error), timeoutMs, source); });
+		return Promise.race([promise, timeout]).finally(() => cancel());
+	}
+
+	workerDeadline = { deadline, withDeadline };
+	return workerDeadline;
+}
+
+var managedWorkerHealth;
+var hasRequiredManagedWorkerHealth;
+
+function requireManagedWorkerHealth () {
+	if (hasRequiredManagedWorkerHealth) return managedWorkerHealth;
+	hasRequiredManagedWorkerHealth = 1;
+	const workerVisibility = requireWorkerVisibility();
+	const { deadline } = requireWorkerDeadline();
+
+	managedWorkerHealth = function managedWorkerHealth(worker, options, fail, emit) {
+		const config = options.healthCheck === false ? null : options.healthCheck || {};
+		if (!config) return { close() {}, receive() {} };
+		const visibility = workerVisibility(options.visibility);
+		const intervalMs = positive(config.intervalMs, 15000), timeoutMs = positive(config.timeoutMs, 30000);
+		let stopped = false, sequence = 0, active, cancel = () => {};
+		let visible = visibility.isVisible();
+		const unsubscribe = visibility.subscribe(value => {
+			const resumed = !visible && !!value;
+			visible = !!value;
+			if (!visible) { cancel(); active = undefined; }
+			else if (resumed) probe('resume');
+		});
+		// Defer until managed initialization and subscription setup have completed.
+		if (visible) cancel = deadline(() => probe('startup'), 1, visibility);
+		return { close, receive };
+		function probe(reason) {
+			if (stopped || !visibility.isVisible()) return;
+			cancel();
+			active = ++sequence;
+			emit('worker-health', { phase: 'checking', requestId: active, reason });
+			cancel = deadline(() => {
+				const error = Object.assign(new Error('Sync worker or SQL transport stopped responding.'), { code: 'ORANGE_WORKER_UNRESPONSIVE' });
+				emit('worker-health', { phase: 'unresponsive', requestId: active });
+				close(); fail(error);
+			}, timeoutMs, visibility);
+			try { worker.postMessage({ type: 'orange-managed-sync-health-request', id: active }); }
+			catch (error) { close(); fail(error); }
+		}
+		function receive(message) {
+			if (stopped || active === undefined || message.type !== 'orange-managed-sync-health-response' || message.id !== active) return;
+			cancel();
+			emit('worker-health', { phase: 'responsive', requestId: active });
+			active = undefined;
+			cancel = deadline(() => probe('periodic'), intervalMs, visibility);
+		}
+		function close() { if (stopped) return; stopped = true; active = undefined; cancel(); unsubscribe(); }
+	};
+
+	function positive(value, fallback) { return Number.isFinite(value) && value > 0 ? value : fallback; }
+	return managedWorkerHealth;
+}
+
 var syncWorkerClient;
 var hasRequiredSyncWorkerClient;
 
@@ -25529,6 +25666,7 @@ function requireSyncWorkerClient () {
 		withSyncOperationMemory
 	} = requireOperationContext();
 	const createHttpInterceptor = requireHttpInterceptor();
+	const { withDeadline } = requireWorkerDeadline();
 	const { ensureLocalSchemaReadySymbol } = requireSyncClient();
 	const {
 		deserializeError,
@@ -25551,6 +25689,8 @@ function requireSyncWorkerClient () {
 		let closed = false;
 		let closing;
 		let terminalError;
+		let terminated = false;
+		let health;
 
 		worker.addEventListener('message', onMessage);
 		worker.addEventListener('error', onWorkerError);
@@ -25559,6 +25699,7 @@ function requireSyncWorkerClient () {
 			worker.start();
 
 		const client = {
+			__orangeFail: error => onWorkerError({ error }),
 			__orangeSetVisible: request.bind(null, '__orangeSetVisible'),
 			sync: request.bind(null, 'sync'),
 			syncRow: request.bind(null, 'syncRow'),
@@ -25579,6 +25720,8 @@ function requireSyncWorkerClient () {
 		};
 
 		worker.postMessage({ type: 'orange-sync-worker-ready' });
+		if (options.__managedHealth)
+			health = requireManagedWorkerHealth()(worker, options.__managedHealth, client.__orangeFail, emit);
 		return client;
 
 		function request(method, ...args) {
@@ -25671,6 +25814,7 @@ function requireSyncWorkerClient () {
 		function close() {
 			if (closing) return closing;
 			closed = true;
+			if (health) health.close();
 			clearSyncOperationMemory(client);
 			const closeError = new Error('Sync worker client closed.');
 			for (const [id, entry] of pending) {
@@ -25684,12 +25828,16 @@ function requireSyncWorkerClient () {
 			lastInitialReady = undefined;
 			lastRecovery = undefined;
 			// Wait for rollback/storage work in the worker before terminating it.
-			closing = request('close').finally(() => {
+			const timeoutMs = normalizePositiveInteger(options.closeTimeoutMs) || 10000;
+			const timeoutError = Object.assign(new Error('Sync worker shutdown timed out; worker terminated.'), { code: 'ORANGE_WORKER_CLOSE_TIMEOUT' });
+			closing = withDeadline(request('close'), timeoutMs, options.visibility, timeoutError).catch(error => {
+				onWorkerError({ error });
+				throw error;
+			}).finally(() => {
 				worker.removeEventListener('message', onMessage);
 				worker.removeEventListener('error', onWorkerError);
 				worker.removeEventListener('messageerror', onWorkerError);
-				if (typeof worker.terminate === 'function') worker.terminate();
-				else if (typeof worker.close === 'function') worker.close();
+				terminateWorker();
 			});
 			// Older callers may ignore close's return value. Awaiting it still reports failure.
 			closing.catch(() => {});
@@ -25697,9 +25845,11 @@ function requireSyncWorkerClient () {
 		}
 
 		function onMessage(event) {
+			if (terminalError) return;
 			const message = event && event.data;
 			if (!message || message.type === undefined)
 				return;
+			if (health) health.receive(message);
 			if (message.type === 'orange-sync-worker-interceptor-request') {
 				if (closed) return;
 				void handleInterceptorRequest(message);
@@ -25742,13 +25892,26 @@ function requireSyncWorkerClient () {
 				return;
 			const error = toWorkerError(event);
 			terminalError = error;
+			if (health) health.close();
+			terminateWorker();
 			for (const entry of pending.values()) {
 				if (entry.timeoutId)
 					clearTimeout(entry.timeoutId);
 				entry.reject(error);
 			}
 			pending.clear();
+			if (typeof options.onTerminal === 'function') {
+				try { Promise.resolve(options.onTerminal(error)).catch(() => {}); }
+				catch (_) { /* The original transport error remains authoritative. */ }
+			}
 			emit('error', { method: 'worker', error });
+		}
+
+		function terminateWorker() {
+			if (terminated) return;
+			terminated = true;
+			if (typeof worker.terminate === 'function') worker.terminate();
+			else if (typeof worker.close === 'function') worker.close();
 		}
 
 		function emit(event, payload) {
@@ -26368,11 +26531,15 @@ function requireInlineWorker () {
 
 		function postMessage(message, transfer) {
 			if (closed || !message || message.type !== 'orange-sqlite-opfs-request')
-				return handleControlMessage(message, transfer);
+				return handleControlMessage(message, transfer, rootTarget);
 			handleRequest(message, rootTarget);
 		}
 
-		function handleControlMessage(message, transfer) {
+		function handleControlMessage(message, transfer, target) {
+			if (!closed && message?.type === 'orange-sqlite-health-request') {
+				target.postMessage({ type: 'orange-sqlite-health-response', id: message.id });
+				return;
+			}
 			if (closed || !message || message.type !== 'orange-sqlite-opfs-connect')
 				return;
 			const port = transfer && transfer[0] || message.port;
@@ -26389,7 +26556,7 @@ function requireInlineWorker () {
 		function handleIncoming(event, target) {
 			const message = event && event.data;
 			if (!message || message.type !== 'orange-sqlite-opfs-request')
-				return handleControlMessage(message);
+				return handleControlMessage(message, undefined, target);
 			handleRequest(message, target);
 		}
 
@@ -27286,6 +27453,10 @@ function handleIncoming(event, target) {
 	const message = event && event.data;
 	if (!message)
 		return;
+	if (message.type === 'orange-sqlite-health-request') {
+		target.postMessage({ type: 'orange-sqlite-health-response', id: message.id });
+		return;
+	}
 	if (message.type === 'orange-sqlite-opfs-connect') {
 		const port = event.ports && event.ports[0] || message.port;
 		if (port)
@@ -27924,6 +28095,10 @@ function requireWorkerBridge () {
 		return { port: port2, close };
 
 		function onMessage({ data }) {
+			if (!stopped && data?.type === 'orange-sqlite-health-request') {
+				port.postMessage({ type: 'orange-sqlite-health-response', id: data.id });
+				return;
+			}
 			if (data && data.type === 'orange-native-close') { void close().catch(() => {}); return; }
 			if (!data || data.type !== 'orange-native-request') return;
 			const work = tail.then(async () => {
@@ -34841,54 +35016,60 @@ function requireManagedSync () {
 	if (hasRequiredManagedSync) return managedSync;
 	hasRequiredManagedSync = 1;
 	const createSyncWorkerClient = requireSyncWorkerClient();
+	const { withDeadline } = requireWorkerDeadline();
 
 	managedSync = function createNativeManagedSync(options, helpers) {
 		// Never traverse or transfer the native plugin proxy into the worker.
 		const { capacitorSQLite: _plugin, ...serializableOptions } = options.poolOptions;
 		const bridges = [];
-		let worker, client, closing, cleanup;
+		let worker, client, closing, cleanup, retirement;
+		const config = helpers.normalizeWorkerConfig(options.syncConfig.worker);
+		const visibility = config.visibility || options.poolOptions.lifecycle?.visibility;
+		const closeTimeoutMs = Number.isFinite(config.closeTimeoutMs) && config.closeTimeoutMs > 0 ? config.closeTimeoutMs : 10000;
 		function dispose() {
 			if (cleanup) return cleanup;
-			if (worker) {
-				worker.removeEventListener('error', onError);
-				worker.removeEventListener('messageerror', onError);
-				worker.terminate();
-			}
+			if (worker && !client) worker.terminate();
 			cleanup = Promise.all(bridges.map(bridge => bridge.close()));
 			return cleanup;
 		}
-		function onError() { void dispose().catch(() => {}); }
+		function retire(error) {
+			if (retirement) return retirement;
+			for (const entry of options.databases) entry.db.poolFactory.__orangeFail(error);
+			// Keep native reservations until queued native work actually drains.
+			retirement = dispose().then(() => Promise.all(options.databases.map(entry => entry.db.end())));
+			retirement.catch(() => {});
+			return retirement;
+		}
 		try {
-			const config = helpers.normalizeWorkerConfig(options.syncConfig.worker);
 			const schema = helpers.buildManagedSyncSchema(options.client, options.syncConfig);
 			const sqliteOptions = helpers.toManagedSqliteOptions(serializableOptions);
 			worker = helpers.createManagedWorker(config);
-			worker.addEventListener('error', onError);
-			worker.addEventListener('messageerror', onError);
 			const sqlConnections = options.databases.map(entry => {
 				const bridge = entry.db.poolFactory.__orangeConnectNativeWorker();
 				bridges.push(bridge);
 				return { connectionString: entry.connectionString, port: bridge.port };
 			});
-			client = createSyncWorkerClient(worker, { requestTimeoutMs: config.requestTimeoutMs });
+			client = createSyncWorkerClient(worker, {
+				requestTimeoutMs: config.requestTimeoutMs, closeTimeoutMs, visibility,
+				__managedHealth: { healthCheck: config.healthCheck, visibility },
+				onTerminal: retire
+			});
 			worker.postMessage({ type: 'orange-managed-sync-init', sqliteBackend: 'native',
 				connectionString: options.connectionString, sqliteOptions, schema, sqlConnections
 			}, sqlConnections.map(entry => entry.port));
 		} catch (error) {
+			if (client) client.__orangeFail(error);
 			void dispose().finally(() => Promise.all(options.databases.map(entry => entry.db.end()))).catch(() => {});
 			throw error;
 		}
 		const closeClient = client.close;
 		client.close = function() {
 			return closing ||= (async () => {
-				try { await closeClient(); }
-				catch (error) {
-					await dispose();
-					// The router's normal close aborts on this error, so clean up its
-					// native pools here after rolling back abandoned worker leases.
-					await Promise.all(options.databases.map(entry => entry.db.end()));
-					throw error;
-				} finally { await dispose(); }
+				let failure;
+				try { await closeClient(); } catch (error) { failure = error; }
+				const cleanupError = Object.assign(new Error('Native SQL cleanup is still draining; connections remain reserved.'), { code: 'ORANGE_NATIVE_CLEANUP_PENDING' });
+				await withDeadline(failure ? retire(failure) : dispose(), closeTimeoutMs, visibility, cleanupError);
+				if (failure) throw failure;
 			})();
 		};
 		Object.defineProperty(client, '__orangeManagedSyncWorker', { value: true });
@@ -34926,7 +35107,16 @@ function requireManagedSyncWorkerClient () {
 			sqlConnections
 		}, sqlConnections.map(entry => entry.port));
 		const client = createSyncWorkerClient(worker, {
-			requestTimeoutMs: workerConfig.requestTimeoutMs
+			requestTimeoutMs: workerConfig.requestTimeoutMs,
+			closeTimeoutMs: workerConfig.closeTimeoutMs,
+			visibility: workerConfig.visibility || options.poolOptions?.lifecycle?.visibility,
+			__managedHealth: {
+				healthCheck: workerConfig.healthCheck,
+				visibility: workerConfig.visibility || options.poolOptions?.lifecycle?.visibility
+			},
+			// A dead sync port may still own a SQL checkout. Retire the owned SQL
+			// workers as well, rejecting their pending calls without replaying writes.
+			onTerminal: () => Promise.all((options.databases || []).map(entry => entry.db.end()))
 		});
 		Object.defineProperty(client, '__orangeManagedSyncWorker', {
 			value: true,
@@ -35288,14 +35478,32 @@ function requireDualSyncDatabase () {
 			eventListeners.clear();
 			if (externalSyncClient) clearSyncOperationMemory(externalSyncClient);
 			closing = (async () => {
-				await stopped;
-				if (managedSyncClient) await managedSyncClient.close();
+				let failure;
+				if (managedSyncClient) {
+					try { await managedSyncClient.close(); } catch (error) { failure = error; }
+				} else await stopped;
 				for (const unsubscribe of roleUnsubscribers) unsubscribe();
 				roleUnsubscribers.clear();
-				for (const client of clientByRole.values()) await client.syncClient.close();
 				if (externalSyncUnsubscribe) externalSyncUnsubscribe();
 				if (manifestChannel) manifestChannel.close();
-				await Promise.all([...dbByRole.values(), cacheDb].filter(Boolean).map(db => db.end()));
+				const cleanup = Promise.allSettled([
+					stopped,
+					...[...clientByRole.values()].map(client => client.syncClient.close()),
+					...[...dbByRole.values(), cacheDb].filter(Boolean).map(db => db.end())
+				]).then(results => {
+					const rejected = results.find(result => result.status === 'rejected');
+					if (rejected) throw rejected.reason;
+				});
+				try {
+					if (managedSyncClient) {
+						const config = poolOptions.sync.worker || {};
+						const error = Object.assign(new Error('Database cleanup is still draining; storage has not been reopened.'), { code: 'ORANGE_DATABASE_CLEANUP_PENDING' });
+						await requireWorkerDeadline().withDeadline(cleanup,
+							Number.isFinite(config.closeTimeoutMs) && config.closeTimeoutMs > 0 ? config.closeTimeoutMs : 10000,
+							config.visibility || poolOptions.lifecycle?.visibility, error);
+					} else await cleanup;
+				} catch (error) { failure ||= error; }
+				if (failure) throw failure;
 			})();
 			return closing;
 		}

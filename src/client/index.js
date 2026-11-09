@@ -103,11 +103,17 @@ function rdbClient(options = {}) {
 	function close() {
 		if (closing) return closing;
 		closing = (async () => {
-			if (typeof client.syncClient.close === 'function') await client.syncClient.close();
-			else if (typeof client.syncClient.stop === 'function') await client.syncClient.stop();
-			const db = await getDb();
-			if (db && typeof db.end === 'function') await db.end();
-			closed = true;
+			let failure;
+			try {
+				if (typeof client.syncClient.close === 'function') await client.syncClient.close();
+				else if (typeof client.syncClient.stop === 'function') await client.syncClient.stop();
+			} catch (error) { failure = error; }
+			try {
+				const db = await getDb();
+				if (db && typeof db.end === 'function') await db.end();
+			} catch (error) { failure ||= error; }
+			finally { closed = true; }
+			if (failure) throw failure;
 		})();
 		return closing;
 	}

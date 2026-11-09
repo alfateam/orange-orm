@@ -1,7 +1,7 @@
 # Optional Capacitor SQLite
 
 Local experimental adapter, based on beta-16. Not published or device-verified.
-The `sqliteOPFS` implementation is unchanged. The existing `sqlite` connector
+The existing `sqlite` connector
 accepts `capacitor:<name>` and a `capacitorSQLite` plugin option:
 
 ```js
@@ -50,7 +50,7 @@ and failed copies roll back before detaching. Virtual tables are rejected.
 This does not copy files or use the plugin's unrelated JSON synchronization API.
 
 Validation uses the real SQLite engine on disk with a simulated plugin contract,
-including iOS metadata rows and unordered row keys, plus the unchanged OPFS tests.
+including iOS metadata rows and unordered row keys, alongside OPFS lifecycle tests.
 The native adapter rebuilds every iOS result row in `ios_columns` order before
 Orange decodes it; dropping metadata alone can feed numeric fields to UUID decoders.
 This applies to SELECT and RETURNING results. Native command results also retain
@@ -92,6 +92,30 @@ reject pending sync calls, stop the worker and drain outstanding native calls
 before rolling back abandoned transactions and releasing leases. A failed worker
 is not silently replaced; close/reopen permits normal persisted-state recovery.
 The worker never receives a Capacitor proxy, OPFS handle or native file handle.
+
+Managed workers now probe the complete message path through the sync worker and
+each SQL bridge at startup, every 15 seconds while visible, and on foreground
+return. Replies have a 30-second foreground deadline. Hidden time is excluded;
+large scheduler gaps also grant a fresh deadline. A probe verifies transport
+liveness without acquiring a transaction; it does not prove that a native SQL
+operation has finished. A healthy worker is retained across resume.
+
+Missing replies produce `ORANGE_WORKER_UNRESPONSIVE`, reject pending sync RPCs,
+terminate the sync worker and retire its native pools. Native calls already in
+flight must drain before rollback and release. Close has a 10-second foreground
+worker deadline (`ORANGE_WORKER_CLOSE_TIMEOUT`) and bounded cleanup waits. If
+native cleanup cannot finish, `ORANGE_NATIVE_CLEANUP_PENDING` is reported while
+cleanup continues and the database names remain reserved. No timeout releases a
+connection underneath native SQL. Close/reopen is explicit: no uncertain writes
+are automatically replayed, and no database files are deleted.
+
+Configure `sync.worker` with `closeTimeoutMs`,
+`healthCheck: { intervalMs, timeoutMs }` (or `false`), and optionally
+`visibility: { isVisible(), subscribe(listener) }`. Default visibility comes from
+the document; native apps can supply their combined page/app visibility source.
+Subscribe to `syncClient.on('worker-health', listener)` for checking, responsive
+and unresponsive events with request IDs. SQL bridges and native plugin calls
+still require separate diagnosis if the transport responds but work stalls.
 
 This moves JavaScript sync work off the UI thread; bridge message serialization,
 user interceptors and UI updates still run in the WebView. It is not an OS service

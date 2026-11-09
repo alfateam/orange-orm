@@ -27,6 +27,10 @@ function handleIncoming(event, target) {
 	const message = event && event.data;
 	if (!message)
 		return;
+	if (message.type === 'orange-sqlite-health-request') {
+		target.postMessage({ type: 'orange-sqlite-health-response', id: message.id });
+		return;
+	}
 	if (message.type === 'orange-sqlite-opfs-connect') {
 		const port = event.ports && event.ports[0] || message.port;
 		if (port)

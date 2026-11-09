@@ -27,9 +27,9 @@ async function fixture() {
 	close.push(() => new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())));
 	const plugin = nativePlugin(directory);
 	const workers = [];
-	function open(name = 'app') {
+	function open(name = 'app', workerOptions = {}) {
 		const db = map({ db: con => con.sqlite(`capacitor:${name}`, {
-			capacitorSQLite: plugin, sync: { url: `http://127.0.0.1:${server.address().port}/rdb`, auto: false, worker: { createWorker: () => { const worker = createWorker(); workers.push(worker); return worker; } }, tables: ['project'] }
+			capacitorSQLite: plugin, sync: { url: `http://127.0.0.1:${server.address().port}/rdb`, auto: false, worker: { ...workerOptions, createWorker: () => { const worker = createWorker(); workers.push(worker); return worker; } }, tables: ['project'] }
 		}) });
 		close.push(() => db.close().catch(() => {})); return db;
 	}
@@ -123,4 +123,55 @@ test('worker crash drains native work, rolls back and permits reopening with off
 	db = open(); await db.syncClient.sync();
 	expect((await db.project.getById('offline')).title).toBe('Keep me');
 	expect((await db.project.getById('server')).title).toBe('After crash');
+}, 30000);
+
+const monitoredWorker = { healthCheck: { intervalMs: 30, timeoutMs: 1500 }, closeTimeoutMs: 1000 };
+test('silent SQL-port loss is detected even with a live sync worker; reopening retains the outbox', async () => {
+	const { open, workers, remote } = await fixture();
+	let db = open('app', monitoredWorker);
+	await db.syncClient.sync();
+	await db.project.insert({ id: 'offline', title: 'Retain' });
+	await workers[0].disconnectSql();
+	const health = [];
+	db.syncClient.on('worker-health', event => health.push(event.phase));
+	await expect(db.syncClient.sync()).rejects.toMatchObject({ code: 'ORANGE_WORKER_UNRESPONSIVE' });
+	await expect(db.close()).rejects.toMatchObject({ code: 'ORANGE_WORKER_UNRESPONSIVE' });
+	expect(health).toContain('unresponsive');
+	db = open();
+	expect((await db.project.getById('offline')).title).toBe('Retain');
+	await db.syncClient.sync();
+	expect((await remote.project.getById('offline')).title).toBe('Retain');
+}, 30000);
+
+test('silent worker loss during a native write does not release its connection before the write drains', async () => {
+	const { open, workers, plugin, remote } = await fixture();
+	let db = open('app', monitoredWorker);
+	await db.syncClient.sync();
+	await db.project.insert({ id: 'offline', title: 'Keep' });
+	await remote.project.update({ title: 'Changed' }, remote.project.id.equal('server'));
+	let enter, release;
+	const entered = new Promise(resolve => { enter = resolve; });
+	const held = new Promise(resolve => { release = resolve; });
+	const run = plugin.run;
+	let injected = false;
+	plugin.run = async args => {
+		const result = await run.call(plugin, args);
+		if (!injected && /INSERT INTO "project"/i.test(args.statement)) { injected = true; enter(); await held; }
+		return result;
+	};
+	const outcome = db.syncClient.sync().catch(error => error);
+	try {
+		await entered;
+		await workers[0].vanish();
+		expect((await outcome).code).toBe('ORANGE_WORKER_UNRESPONSIVE');
+		const closed = db.close().catch(error => error);
+		expect((await closed).code).toBe('ORANGE_NATIVE_CLEANUP_PENDING');
+		expect(() => open()).toThrow('already in use');
+	} finally { release(); plugin.run = run; }
+	// Background cleanup must release the registry only after rollback completes.
+	await new Promise(resolve => setTimeout(resolve, 100));
+	db = open();
+	expect((await db.project.getById('offline')).title).toBe('Keep');
+	await db.syncClient.sync();
+	expect((await db.project.getById('server')).title).toBe('Changed');
 }, 30000);

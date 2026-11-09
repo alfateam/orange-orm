@@ -10,6 +10,10 @@ module.exports = function createWorkerBridge(pool) {
 	return { port: port2, close };
 
 	function onMessage({ data }) {
+		if (!stopped && data?.type === 'orange-sqlite-health-request') {
+			port.postMessage({ type: 'orange-sqlite-health-response', id: data.id });
+			return;
+		}
 		if (data && data.type === 'orange-native-close') { void close().catch(() => {}); return; }
 		if (!data || data.type !== 'orange-native-request') return;
 		const work = tail.then(async () => {
