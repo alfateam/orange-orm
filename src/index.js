@@ -35,6 +35,7 @@ connectViaPool.createSyncWorkerHandler = require('./client/syncWorkerHandler');
 connectViaPool.createSqliteOPFSWorker = require('./sqliteOPFS/createWorker');
 connectViaPool.connectSqliteOPFSWorker = require('./sqliteOPFS/connectWorkerPort');
 connectViaPool.deleteSqliteOPFS = require('./sqliteOPFS/deleteDatabase');
+connectViaPool.deleteSqliteNative = require('./sqliteNative/deleteDatabase');
 connectViaPool.assertSyncReady = require('./sync/setupChangeTracking').assertSyncReady;
 connectViaPool.table = require('./table');
 connectViaPool.filter = require('./emptyFilter');
@@ -117,7 +118,9 @@ Object.defineProperty(connectViaPool, 'sqlite', {
 			else
 				throw new Error('SQLite is not supported in this environment');
 		}
-		return _sqlite;
+		return (connectionString, options) => connectionString && connectionString.startsWith('capacitor:')
+			? require('./sqliteNative/newDatabase')(connectionString, options)
+			: _sqlite(connectionString, options);
 	}
 });
 

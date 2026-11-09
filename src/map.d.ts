@@ -110,6 +110,10 @@ export interface Pool {
 }
 
 export interface PoolOptions<M extends Record<string, any> = any> {
+  /** Native SQLite only: use sqlite('capacitor:name', { capacitorSQLite, sync }). */
+  capacitorSQLite?: import('./sqliteNative/plugin').NativeSQLitePlugin;
+  sync?: string | SyncConfig<M>;
+
 	size?: number;
 }
 

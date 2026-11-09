@@ -24,6 +24,11 @@ declare namespace r {
     function pglite(config?: PGliteOptions | string | undefined, options?: PoolOptions): Pool;
     function sqlite(connectionString: string, options?: PoolOptions): Pool;
     function sqliteOPFS(connectionString: string, options?: SqliteOPFSPoolOptions): Pool;
+    /** Delete closed native storage, including both replicas and delta storage when sync is true. */
+    function deleteSqliteNative(connectionString: string, options: {
+        capacitorSQLite: import('./sqliteNative/plugin').NativeSQLitePlugin;
+        sync?: boolean;
+    }): Promise<void>;
     /** Delete closed OPFS storage, including both replicas and delta storage when sync is true. */
     function deleteSqliteOPFS(connectionString: string, options: {
         vfs: 'opfs-sahpool' | 'opfs-wl';

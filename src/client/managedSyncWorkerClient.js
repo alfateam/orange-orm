@@ -2,6 +2,10 @@ const createSyncWorkerClient = require('./syncWorkerClient');
 const { buildSyncSchema } = require('./syncSchema');
 
 function createManagedSyncWorkerClient(options) {
+	if (options.poolOptions && options.poolOptions.capacitorSQLite)
+		return require('../sqliteNative/managedSync')(options, {
+			buildManagedSyncSchema, createManagedWorker, normalizeWorkerConfig, toManagedSqliteOptions
+		});
 	const workerConfig = normalizeWorkerConfig(options && options.syncConfig && options.syncConfig.worker);
 	const schema = buildManagedSyncSchema(options.client, options.syncConfig);
 	const worker = createManagedWorker(workerConfig);

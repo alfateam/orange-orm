@@ -37793,11 +37793,11 @@ function serializeError(error) {
 }
 
 var newPool_1;
-var hasRequiredNewPool;
+var hasRequiredNewPool$1;
 
-function requireNewPool () {
-	if (hasRequiredNewPool) return newPool_1;
-	hasRequiredNewPool = 1;
+function requireNewPool$1 () {
+	if (hasRequiredNewPool$1) return newPool_1;
+	hasRequiredNewPool$1 = 1;
 	const backgroundLifecycle = requireBackgroundLifecycle();
 	const pools = requirePools();
 	const newId = requireNewId();
@@ -38635,6 +38635,69 @@ function requireSyncWorkerClient () {
 	return syncWorkerClient;
 }
 
+var managedSync;
+var hasRequiredManagedSync;
+
+function requireManagedSync () {
+	if (hasRequiredManagedSync) return managedSync;
+	hasRequiredManagedSync = 1;
+	const createSyncWorkerClient = requireSyncWorkerClient();
+
+	managedSync = function createNativeManagedSync(options, helpers) {
+		// Never traverse or transfer the native plugin proxy into the worker.
+		const { capacitorSQLite: _plugin, ...serializableOptions } = options.poolOptions;
+		const bridges = [];
+		let worker, client, closing, cleanup;
+		function dispose() {
+			if (cleanup) return cleanup;
+			if (worker) {
+				worker.removeEventListener('error', onError);
+				worker.removeEventListener('messageerror', onError);
+				worker.terminate();
+			}
+			cleanup = Promise.all(bridges.map(bridge => bridge.close()));
+			return cleanup;
+		}
+		function onError() { void dispose().catch(() => {}); }
+		try {
+			const config = helpers.normalizeWorkerConfig(options.syncConfig.worker);
+			const schema = helpers.buildManagedSyncSchema(options.client, options.syncConfig);
+			const sqliteOptions = helpers.toManagedSqliteOptions(serializableOptions);
+			worker = helpers.createManagedWorker(config);
+			worker.addEventListener('error', onError);
+			worker.addEventListener('messageerror', onError);
+			const sqlConnections = options.databases.map(entry => {
+				const bridge = entry.db.poolFactory.__orangeConnectNativeWorker();
+				bridges.push(bridge);
+				return { connectionString: entry.connectionString, port: bridge.port };
+			});
+			client = createSyncWorkerClient(worker, { requestTimeoutMs: config.requestTimeoutMs });
+			worker.postMessage({ type: 'orange-managed-sync-init', sqliteBackend: 'native',
+				connectionString: options.connectionString, sqliteOptions, schema, sqlConnections
+			}, sqlConnections.map(entry => entry.port));
+		} catch (error) {
+			void dispose().finally(() => Promise.all(options.databases.map(entry => entry.db.end()))).catch(() => {});
+			throw error;
+		}
+		const closeClient = client.close;
+		client.close = function() {
+			return closing ||= (async () => {
+				try { await closeClient(); }
+				catch (error) {
+					await dispose();
+					// The router's normal close aborts on this error, so clean up its
+					// native pools here after rolling back abandoned worker leases.
+					await Promise.all(options.databases.map(entry => entry.db.end()));
+					throw error;
+				} finally { await dispose(); }
+			})();
+		};
+		Object.defineProperty(client, '__orangeManagedSyncWorker', { value: true });
+		return client;
+	};
+	return managedSync;
+}
+
 var managedSyncWorkerClient;
 var hasRequiredManagedSyncWorkerClient;
 
@@ -38645,6 +38708,10 @@ function requireManagedSyncWorkerClient () {
 	const { buildSyncSchema } = requireSyncSchema();
 
 	function createManagedSyncWorkerClient(options) {
+		if (options.poolOptions && options.poolOptions.capacitorSQLite)
+			return requireManagedSync()(options, {
+				buildManagedSyncSchema, createManagedWorker, normalizeWorkerConfig, toManagedSqliteOptions
+			});
 		const workerConfig = normalizeWorkerConfig(options && options.syncConfig && options.syncConfig.worker);
 		const schema = buildManagedSyncSchema(options.client, options.syncConfig);
 		const worker = createManagedWorker(workerConfig);
@@ -41683,19 +41750,19 @@ function requireDualSyncDatabase () {
 	return dualSyncDatabase.exports;
 }
 
-var newDatabase_1;
-var hasRequiredNewDatabase;
+var newDatabase_1$1;
+var hasRequiredNewDatabase$1;
 
-function requireNewDatabase () {
-	if (hasRequiredNewDatabase) return newDatabase_1;
-	hasRequiredNewDatabase = 1;
+function requireNewDatabase$1 () {
+	if (hasRequiredNewDatabase$1) return newDatabase_1$1;
+	hasRequiredNewDatabase$1 = 1;
 	const backgroundLifecycle = requireBackgroundLifecycle();
 	let createDomain = requireCreateDomain();
 	let newTransaction = requireNewTransaction();
 	let _begin = requireBegin();
 	let commit = requireCommit();
 	let rollback = requireRollback();
-	let newPool = requireNewPool();
+	let newPool = requireNewPool$1();
 	let express = requireHostExpress();
 	let hono = requireHostHono();
 	let hostLocal = requireHostLocal();
@@ -41825,6 +41892,573 @@ function requireNewDatabase () {
 		return !!sync;
 	}
 
+	newDatabase_1$1 = newDatabase;
+	return newDatabase_1$1;
+}
+
+var newPool = {exports: {}};
+
+var workerBridge;
+var hasRequiredWorkerBridge;
+
+function requireWorkerBridge () {
+	if (hasRequiredWorkerBridge) return workerBridge;
+	hasRequiredWorkerBridge = 1;
+	const { serializeError } = requireSyncWorkerProtocol();
+
+	// Runs in the WebView. The worker gets SQL leases, never a Capacitor proxy or
+	// filesystem handle. A lease owns the same pool queue used by GUI transactions.
+	workerBridge = function createWorkerBridge(pool) {
+		const { port1: port, port2 } = new MessageChannel();
+		let tail = Promise.resolve(), closing, stopped = false, lease;
+		port.addEventListener('message', onMessage);
+		port.start();
+		return { port: port2, close };
+
+		function onMessage({ data }) {
+			if (data && data.type === 'orange-native-close') { void close().catch(() => {}); return; }
+			if (!data || data.type !== 'orange-native-request') return;
+			const work = tail.then(async () => {
+				if (stopped) throw new Error('Native SQL bridge closed.');
+				return dispatch(data.method, data.args || []);
+			});
+			tail = work.catch(() => {});
+			work.then(result => reply(data.id, result), error => reply(data.id, undefined, error));
+		}
+		function reply(id, result, error) {
+			if (stopped) return;
+			try { port.postMessage({ type: 'orange-native-response', id, result, error: error && serializeError(error) }); }
+			catch (_error) { void close().catch(() => {}); }
+		}
+		async function dispatch(method, args) {
+			if (method === 'checkout' || method === 'acquire') {
+				if (lease) throw new Error('Native SQL lease already held.');
+				lease = method === 'acquire'
+					? { release: await pool.__orangeAcquireDatabaseAccess() }
+					: await new Promise((resolve, reject) => pool.connect((error, client, release) => error ? reject(error) : resolve({ client, release })));
+				return;
+			}
+			if (method === 'release') {
+				await releaseLease();
+				return;
+			}
+			if (method === 'query' || method === 'command') {
+				if (!lease || !lease.client) throw new Error('Native SQL query requires a checkout.');
+				const sql = args[0].trim();
+				if (/^(?:BEGIN|SAVEPOINT)\b/i.test(sql)) lease.transaction = true;
+				const result = await query(lease.client, args[0], args[1], method === 'command');
+				if (/^(?:COMMIT|END|ROLLBACK)\s*;?$/i.test(sql)) lease.transaction = false;
+				return result;
+			}
+			if (method === 'suspend') {
+				if (!lease || lease.client) throw new Error('Native suspend requires an access lease.');
+				return pool.__orangeSuspendDatabase();
+			}
+			if (method === 'clone') {
+				if (lease) throw new Error('Native clone cannot run within a transaction.');
+				return pool.__orangeCloneDatabaseTo(args[0]);
+			}
+			throw new Error(`Unknown native SQL bridge method: ${method}`);
+		}
+		async function releaseLease() {
+			if (!lease) return;
+			const held = lease;
+			lease = undefined;
+			try {
+				if (held.client && held.transaction) {
+					// A normal COMMIT leaves nothing to roll back. This also protects the
+					// next checkout after a failed transaction or a terminated sync worker.
+					try { await query(held.client, 'ROLLBACK', []); }
+					catch (error) {
+						if (!/no transaction is active|no active transaction/i.test(error.message || '')) {
+							try { await pool.__orangeSuspendDatabase(); }
+							catch (closeError) { pool.__orangeFail(closeError); throw closeError; }
+						}
+					}
+				}
+			} finally { await held.release(); }
+		}
+		function close() {
+			if (closing) return closing;
+			stopped = true;
+			port.removeEventListener('message', onMessage);
+			try { port.postMessage({ type: 'orange-native-terminal', error: serializeError(new Error('Native SQL bridge closed.')) }); } catch (_) { /* Worker already gone. */ }
+			closing = tail.then(releaseLease).finally(() => port.close());
+			return closing;
+		}
+	};
+
+	function query(client, sql, parameters = [], command = false) {
+		return new Promise((resolve, reject) => client[command ? 'executeCommand' : 'executeQuery']({ sql: () => sql, parameters }, (error, rows) => error ? reject(error) : resolve(rows)));
+	}
+	return workerBridge;
+}
+
+var hasRequiredNewPool;
+
+function requireNewPool () {
+	if (hasRequiredNewPool) return newPool.exports;
+	hasRequiredNewPool = 1;
+	const pools = requirePools();
+	const newId = requireNewId();
+	const log = requireLog();
+
+	// One checkout owns the connection for the entire ORM transaction. No unrelated
+	// read or write can enter between BEGIN and COMMIT, including during an await.
+	const registries = new WeakMap();
+	function newPool$1(connectionString, options) {
+		const plugin = options.capacitorSQLite;
+		const database = databaseName(connectionString);
+		let registry = registries.get(plugin);
+		if (!registry) registries.set(plugin, registry = new Map());
+		if (registry.has(database)) throw new Error(`Native SQLite database is already in use: ${database}`);
+		const args = { database, readonly: false };
+		const id = newId();
+		let created = false, opened = false, ended = false, closing, tail = Promise.resolve();
+		let filename, terminalError;
+		const pool = { connect, end, __orangeAcquireDatabaseAccess: acquire,
+			__orangeSuspendDatabase: suspend, __orangeCloneDatabaseTo: clone, clonePath,
+			__orangeConnectNativeWorker: () => requireWorkerBridge()(pool),
+			__orangeFail: error => { terminalError ||= error; } };
+		registry.set(database, pool);
+		pools[id] = pool;
+		return pool;
+
+		function acquire() {
+			if (ended) return Promise.reject(new Error('Native SQLite pool is closed.'));
+			let release;
+			const held = new Promise(resolve => { release = resolve; });
+			const previous = tail;
+			tail = previous.then(() => held);
+			return previous.then(() => {
+				if (terminalError) { release(); throw terminalError; }
+				return release;
+			});
+		}
+
+		async function open() {
+			if (!created) {
+				const config = { ...args, version: 1, encrypted: false, mode: 'no-encryption' };
+				try { await plugin.createConnection(config); }
+				catch (error) {
+					// A WebView restart can lose this registry while the native plugin
+					// retains its handles. This pool already reserved the name above;
+					// another live pool in this host cannot enter this recovery path.
+					// Close only this handle, rolling back abandoned work but retaining
+					// committed data. Never reset the plugin's global connection list.
+					if (error?.message !== `CreateConnection: Connection ${database} already exists`) throw error;
+					await plugin.closeConnection(args);
+					// One attempt only; cleanup/recreation failures must propagate.
+					await plugin.createConnection(config);
+				}
+				created = true;
+			}
+			if (opened) return;
+			try {
+				await plugin.open(args);
+				opened = true;
+				const rows = normalizeRows((await plugin.query({ ...args, statement: 'PRAGMA journal_mode=WAL', values: [] })).values);
+				if (String(rows[0] && Object.values(rows[0])[0]).toLowerCase() !== 'wal')
+					throw new Error('Native SQLite could not enable WAL.');
+				// FULL protects committed offline edits against power loss. Do not use OFF.
+				await plugin.execute({ ...args, statements: 'PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;', transaction: false });
+				const url = (await plugin.getUrl(args)).url;
+				if (!url) throw new Error('Native SQLite did not return its database path.');
+				filename = url.startsWith('file:') ? decodeURIComponent(new URL(url).pathname) : url;
+			} catch (error) {
+				if (opened) await suspend();
+				throw error;
+			}
+		}
+
+		async function suspend() {
+			if (!opened) return;
+			await plugin.close(args);
+			opened = false;
+		}
+
+		function connect(callback) {
+			acquire().then(async release => {
+				try { await open(); }
+				catch (error) { release(); callback(error); return; }
+				let released = false;
+				const done = () => { if (!released) { released = true; release(); } };
+				const execute = (command, query, cb) => {
+					const sql = query.sql(), parameters = query.parameters || [];
+					const complete = log.startQuery({ sql, parameters });
+					run(sql, parameters, command).then(rows => { complete(); cb(null, rows); }, error => { complete(error); cb(error); });
+				};
+				try { callback(null, { executeQuery: execute.bind(null, false), executeCommand: execute.bind(null, true) }, done); }
+				catch (error) { done(); throw error; }
+			}, error => callback(error));
+		}
+
+		async function run(sql, parameters = [], command = false) {
+			const values = parameters.map(value => value instanceof Uint8Array ? Array.from(value) : value);
+			// Native iOS includes column-order metadata alongside unordered row objects.
+			const statement = sql.replace(/^(?:\s+|--[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/)+/, '');
+			if (/^(?:SELECT|WITH|PRAGMA|EXPLAIN)\b/i.test(statement))
+				return normalizeRows((await plugin.query({ ...args, statement: sql, values })).values);
+			if (values.length || /^(?:INSERT|UPDATE|DELETE|REPLACE)\b/i.test(statement)) {
+				const result = await plugin.run({ ...args, statement: sql, values, transaction: false, returnMode: /\bRETURNING\b/i.test(statement) ? 'all' : 'no' });
+				if (command) return { rowsAffected: result.changes.changes, lastInsertRowid: result.changes.lastId };
+				return normalizeRows(result.changes && result.changes.values);
+			}
+			await plugin.execute({ ...args, statements: sql, transaction: false });
+			return [];
+		}
+
+		async function clone(targetConnectionString) {
+			const target = registry.get(databaseName(targetConnectionString));
+			if (!target || target === pool) throw new Error('Native SQLite clone requires a separate reserved target.');
+			// The router reserves the target. Copy through SQLite so committed WAL pages,
+			// blobs and large tables never cross the JSON bridge. Only the target is written;
+			// its schema and data are replaced in one crash-atomic transaction.
+			const release = await acquire();
+			let attached = false, transaction = false, foreignKeys = 1;
+			try {
+				await open();
+				foreignKeys = Number((await run('PRAGMA foreign_keys'))[0].foreign_keys);
+				const schema = await run("SELECT type, name, sql FROM main.sqlite_master WHERE name NOT LIKE 'sqlite_%' AND sql IS NOT NULL ORDER BY type, name");
+				if (schema.some(row => /^CREATE\s+VIRTUAL\s/i.test(row.sql)))
+					throw new Error('Native replica cloning does not support virtual tables.');
+				const path = await target.clonePath();
+				await run(`ATTACH DATABASE '${path.replace(/'/g, "''")}' AS orange_clone`);
+				attached = true;
+				await run('PRAGMA foreign_keys=OFF');
+				await run('BEGIN IMMEDIATE');
+				transaction = true;
+				const old = await run("SELECT type, name FROM orange_clone.sqlite_master WHERE name NOT LIKE 'sqlite_%' AND type IN ('view', 'trigger', 'table') ORDER BY CASE type WHEN 'view' THEN 0 WHEN 'trigger' THEN 1 ELSE 2 END");
+				for (const row of old) await run(`DROP ${row.type.toUpperCase()} IF EXISTS orange_clone.${quote(row.name)}`);
+				for (const row of schema.filter(row => row.type === 'table')) {
+					await run(qualifySchema(row));
+					const columns = await run(`PRAGMA main.table_xinfo(${quote(row.name)})`);
+					const names = columns.filter(column => !column.hidden).map(column => quote(column.name)).join(',');
+					await run(`INSERT INTO orange_clone.${quote(row.name)} (${names}) SELECT ${names} FROM main.${quote(row.name)}`);
+				}
+				if ((await run("SELECT name FROM main.sqlite_master WHERE name='sqlite_sequence'")).length) {
+					await run('DELETE FROM orange_clone.sqlite_sequence');
+					await run('INSERT INTO orange_clone.sqlite_sequence SELECT * FROM main.sqlite_sequence');
+				}
+				for (const row of schema.filter(row => row.type !== 'table')) await run(qualifySchema(row));
+				await run('COMMIT');
+				transaction = false;
+			} finally {
+				try {
+					if (transaction) await run('ROLLBACK');
+				} finally {
+					try { if (attached) await run('DETACH DATABASE orange_clone'); }
+					finally {
+						try { if (opened) await run(`PRAGMA foreign_keys=${foreignKeys}`); }
+						finally { release(); }
+					}
+				}
+			}
+		}
+
+		async function clonePath() {
+			await open();
+			await suspend();
+			return filename;
+		}
+
+		function end() {
+			if (closing) return closing;
+			ended = true;
+			closing = tail.then(async () => {
+				if (created) await plugin.closeConnection(args);
+				registry.delete(database);
+				delete pools[id];
+			});
+			return closing;
+		}
+	}
+
+	function quote(value) { return '"' + value.replace(/"/g, '""') + '"'; }
+
+	function qualifySchema(row) {
+		const header = /^(CREATE\s+(?:UNIQUE\s+)?(?:TABLE|INDEX|VIEW|TRIGGER)\s+(?:IF\s+NOT\s+EXISTS\s+)?)(?:"(?:[^"]|"")*"|'(?:[^']|'')*'|`(?:[^`]|``)*`|\[[^\]]*\]|[^\s(]+)/i;
+		if (!header.test(row.sql)) throw new Error(`Unsupported native SQLite schema: ${row.name}`);
+		return row.sql.replace(header, (_match, prefix) => `${prefix}orange_clone.${quote(row.name)}`);
+	}
+
+	function databaseName(connectionString) {
+		if (typeof connectionString !== 'string' || !/^capacitor:[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(connectionString))
+			throw new Error('Native SQLite requires capacitor:<database-name> without directories.');
+		// Keep the whole logical name (including .sqlite3); the plugin adds SQLite.db.
+		// Reject .db because the plugin strips it and would alias two distinct names.
+		const name = connectionString.slice('capacitor:'.length);
+		if (name.endsWith('.db')) throw new Error('Use a native database name without the .db suffix.');
+		return name;
+	}
+
+	function normalizeRows(rows) {
+		const result = rows || [];
+		if (result.length && Object.keys(result[0]).length === 1 && Array.isArray(result[0].ios_columns)) {
+			// Swift dictionaries do not preserve SELECT order. Orange decodes columns
+			// positionally, so rebuild every row using the plugin's ordered names.
+			const columns = result[0].ios_columns;
+			return result.slice(1).map(row => Object.fromEntries(columns.map(name => [name, row[name]])));
+		}
+		return result;
+	}
+
+	newPool.exports = newPool$1;
+	newPool.exports.databaseName = databaseName;
+
+	// Internal guard shared with deletion; not part of the public Orange API.
+	newPool.exports.assertDatabasesClosed = function(plugin, names) {
+		const registry = registries.get(plugin);
+		if (names.some(name => registry && registry.has(name)))
+			throw new Error('Close all native SQLite clients before deleting their storage.');
+	};
+	return newPool.exports;
+}
+
+var remotePool;
+var hasRequiredRemotePool;
+
+function requireRemotePool () {
+	if (hasRequiredRemotePool) return remotePool;
+	hasRequiredRemotePool = 1;
+	const { deserializeError } = requireSyncWorkerProtocol();
+
+	// Runs in the sync worker. Local queuing prevents a second checkout from
+	// overtaking release on the host's native connection queue.
+	remotePool = function remotePool(port) {
+		if (!port) throw new Error('Missing native SQL worker port.');
+		let tail = Promise.resolve(), ended = false, closing, terminal, nextId = 1;
+		const pending = new Map();
+		const unlocks = new Set();
+		port.addEventListener('message', onMessage);
+		port.addEventListener('messageerror', onError);
+		port.start();
+		return {
+			connect,
+			__orangeAcquireDatabaseAccess: () => acquire('acquire'),
+			__orangeSuspendDatabase: () => request('suspend'),
+			__orangeCloneDatabaseTo: target => queued(() => request('clone', target)),
+			end
+		};
+
+		function request(method, ...args) {
+			if (terminal) return Promise.reject(terminal);
+			const id = nextId++;
+			return new Promise((resolve, reject) => {
+				pending.set(id, { resolve, reject });
+				try { port.postMessage({ type: 'orange-native-request', id, method, args }); }
+				catch (error) { pending.delete(id); reject(error); }
+			});
+		}
+		function queued(fn) {
+			if (ended) return Promise.reject(new Error('Native SQL worker pool closed.'));
+			const result = tail.then(fn);
+			tail = result.catch(() => {});
+			return result;
+		}
+		function acquire(method) {
+			if (ended) return Promise.reject(new Error('Native SQL worker pool closed.'));
+			let unlock;
+			const held = new Promise(resolve => { unlock = resolve; });
+			const acquired = tail.then(() => request(method));
+			tail = acquired.then(() => held, () => {});
+			return acquired.then(() => {
+				unlocks.add(unlock);
+				let released;
+				return () => released ||= request('release').finally(() => { unlocks.delete(unlock); unlock(); });
+			});
+		}
+		function connect(callback) {
+			acquire('checkout').then(release => {
+				const executeQuery = (query, cb) => request('query', query.sql(), query.parameters || []).then(rows => cb(null, rows), error => cb(error));
+				const executeCommand = (query, cb) => request('command', query.sql(), query.parameters || []).then(result => cb(null, result), error => cb(error));
+				callback(null, { executeQuery, executeCommand }, () => { void release().catch(onError); });
+			}, error => callback(error));
+		}
+		function onMessage({ data }) {
+			if (!data) return;
+			if (data.type === 'orange-native-terminal') { fail(deserializeError(data.error)); return; }
+			if (data.type !== 'orange-native-response') return;
+			const entry = pending.get(data.id);
+			if (!entry) return;
+			pending.delete(data.id);
+			if (data.error) entry.reject(deserializeError(data.error));
+			else entry.resolve(data.result);
+		}
+		function onError(error) { fail(error instanceof Error ? error : new Error('Native SQL worker port failed.')); }
+		function fail(error) {
+			if (!terminal) {
+				try { port.postMessage({ type: 'orange-native-close' }); } catch (_) { /* Host already gone. */ }
+			}
+			terminal ||= error;
+			for (const entry of pending.values()) entry.reject(terminal);
+			pending.clear();
+			for (const unlock of unlocks) unlock();
+			unlocks.clear();
+		}
+		function end() {
+			if (closing) return closing;
+			ended = true;
+			closing = tail.finally(() => {
+				fail(new Error('Native SQL worker pool closed.'));
+				port.removeEventListener('message', onMessage);
+				port.removeEventListener('messageerror', onError);
+				port.close();
+			});
+			return closing;
+		}
+	};
+	return remotePool;
+}
+
+var newDatabase_1;
+var hasRequiredNewDatabase;
+
+function requireNewDatabase () {
+	if (hasRequiredNewDatabase) return newDatabase_1;
+	hasRequiredNewDatabase = 1;
+	let createDomain = requireCreateDomain();
+	let newTransaction = requireNewTransaction();
+	let _begin = requireBegin();
+	let commit = requireCommit();
+	let rollback = requireRollback();
+	let newPool = requireNewPool();
+	let express = requireHostExpress();
+	let hono = requireHostHono();
+	let hostLocal = requireHostLocal();
+	let doQuery = requireQuery();
+	let doSqliteFunction = requireSqliteFunction();
+	let releaseDbClient = requireReleaseDbClient();
+	let newDualSyncDatabase = requireDualSyncDatabase();
+
+	function newDatabase(connectionString, poolOptions) {
+		if (!connectionString)
+			throw new Error('Connection string cannot be empty');
+		poolOptions = poolOptions || { min: 1 };
+		if (!connectionString.startsWith('capacitor:'))
+			throw new Error('Native SQLite requires a capacitor: connection string.');
+		if (!poolOptions.capacitorSQLite && !poolOptions.__orangeNativePorts)
+			throw new Error('Native SQLite requires options.capacitorSQLite (CapacitorSQLite plugin).');
+		if (poolOptions.sync) {
+			const sync = typeof poolOptions.sync === 'string' ? { url: poolOptions.sync } : poolOptions.sync;
+			poolOptions = { ...poolOptions, sync };
+		}
+		if (shouldUseDualSyncDatabase(poolOptions))
+			return newDualSyncDatabase(connectionString, poolOptions, newSingleDatabase);
+		return newSingleDatabase(connectionString, poolOptions);
+	}
+
+	function newSingleDatabase(connectionString, poolOptions) {
+		var pool = poolOptions.__orangeNativePorts
+			? requireRemotePool()(poolOptions.__orangeNativePorts.get(connectionString))
+			: newPool(connectionString, poolOptions);
+		pool.__sqliteSync = poolOptions && poolOptions.sync;
+		pool.__orangeSyncIdentity = `sqlite:${connectionString}`;
+
+		let c = { poolFactory: pool, hostLocal, express, hono };
+		c.__orangeSyncIdentity = pool.__orangeSyncIdentity;
+
+		c.transaction = function(options, fn) {
+			if ((arguments.length === 1) && (typeof options === 'function')) {
+				fn = options;
+				options = undefined;
+			}
+			let domain = createDomain();
+
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
+
+			function begin() {
+				return _begin(domain, options);
+			}
+
+			async function runInTransaction() {
+				let result;
+				let transaction = newTransaction(domain, pool, options);
+				await new Promise(transaction)
+					.then(begin)
+					.then(() => fn(domain))
+					.then((res) => result = res)
+					.then(() => commit(domain))
+					.then(null, (e) => rollback(domain, e));
+				return result;
+			}
+		};
+
+		c.createTransaction = function(options) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool, options);
+			let p = domain.run(() => new Promise(transaction).then(begin));
+
+			function run(fn) {
+				return p.then(() => fn(domain));
+			}
+			run.rollback = rollback.bind(null, domain);
+			run.commit = commit.bind(null, domain);
+			return run;
+
+			function begin() {
+				return _begin(domain, options);
+			}
+		};
+
+		c.query = function(query, options) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool, options);
+			let p = domain.run(() => new Promise(transaction)
+				.then(() => doQuery(domain, query).then(onResult, onError)));
+			return p;
+
+			function onResult(result) {
+				releaseDbClient(domain);
+				return result;
+			}
+
+			function onError(e) {
+				releaseDbClient(domain);
+				throw e;
+			}
+		};
+
+		c.sqliteFunction = function(...args) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction)
+				.then(() => doSqliteFunction(domain, ...args).then(onResult, onError)));
+			return p;
+
+			function onResult(result) {
+				releaseDbClient(domain);
+				return result;
+			}
+
+			function onError(e) {
+				releaseDbClient(domain);
+				throw e;
+			}
+		};
+
+		c.rollback = rollback;
+		c.commit = commit;
+		c.__sqliteSync = poolOptions && poolOptions.sync;
+
+		c.end = function() {
+			return pool.end ? pool.end() : Promise.resolve();
+		};
+
+		c.accept = function(caller) {
+			caller.visitSqlite();
+		};
+
+		return c;
+	}
+
+	function shouldUseDualSyncDatabase(poolOptions) {
+		const sync = poolOptions && poolOptions.sync;
+		return !!sync;
+	}
+
 	newDatabase_1 = newDatabase;
 	return newDatabase_1;
 }
@@ -41838,13 +42472,14 @@ function requireManagedSyncWorkerRdb () {
 	const client = requireClient();
 	const map = requireMap();
 	const createSyncWorkerHandler = requireSyncWorkerHandler();
-	const newSqliteOPFSDatabase = requireNewDatabase();
+	const newSqliteOPFSDatabase = requireNewDatabase$1();
 
 	function managedSyncWorkerRdb() {
 		return client.apply(null, arguments);
 	}
 
 	managedSyncWorkerRdb.map = map.bind(null, managedSyncWorkerRdb);
+	managedSyncWorkerRdb.sqlite = requireNewDatabase();
 	managedSyncWorkerRdb.sqliteOPFS = newSqliteOPFSDatabase;
 	managedSyncWorkerRdb.createSyncWorkerHandler = createSyncWorkerHandler;
 
@@ -41996,7 +42631,12 @@ function requireManagedSyncWorkerEntry () {
 		);
 		const map = mapFromSyncSchema(rdb, message.schema);
 		const db = map({
-			db: con => con.sqliteOPFS(message.connectionString, {
+			db: con => message.sqliteBackend === 'native'
+				? con.sqlite(message.connectionString, {
+					...message.sqliteOptions,
+					__orangeNativePorts: portByConnectionString
+				})
+				: con.sqliteOPFS(message.connectionString, {
 				...(message.sqliteOptions || {}),
 				createWorker(connectionString) {
 					const port = portByConnectionString.get(connectionString);

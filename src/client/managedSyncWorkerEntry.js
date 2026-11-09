@@ -25,7 +25,12 @@ function initialize(message) {
 	);
 	const map = mapFromSyncSchema(rdb, message.schema);
 	const db = map({
-		db: con => con.sqliteOPFS(message.connectionString, {
+		db: con => message.sqliteBackend === 'native'
+			? con.sqlite(message.connectionString, {
+				...message.sqliteOptions,
+				__orangeNativePorts: portByConnectionString
+			})
+			: con.sqliteOPFS(message.connectionString, {
 			...(message.sqliteOptions || {}),
 			createWorker(connectionString) {
 				const port = portByConnectionString.get(connectionString);

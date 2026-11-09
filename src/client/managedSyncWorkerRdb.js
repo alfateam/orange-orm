@@ -8,6 +8,7 @@ function managedSyncWorkerRdb() {
 }
 
 managedSyncWorkerRdb.map = map.bind(null, managedSyncWorkerRdb);
+managedSyncWorkerRdb.sqlite = require('../sqliteNative/newDatabase');
 managedSyncWorkerRdb.sqliteOPFS = newSqliteOPFSDatabase;
 managedSyncWorkerRdb.createSyncWorkerHandler = createSyncWorkerHandler;
 
