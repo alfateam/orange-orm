@@ -65,20 +65,38 @@ function requireGetTSDefinition () {
 			return `
 export interface ${Name}Table {
 	count(filter?: RawFilter): Promise<number>;
-	getMany<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<${Name}AdHocArray<Strategy>>;
 	getAll(): Promise<${Name}Array>;
 	getAll(fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
-	getMany(filter?: RawFilter): Promise<${Name}Array>;
-	getMany(filter: RawFilter, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
-	getMany(${name}s: Array<${Name}>): Promise<${Name}Array>;
-	getMany(${name}s: Array<${Name}>, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
-	getOne<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<${Name}AdHocRow<Strategy>>;
-	getOne(filter?: RawFilter): Promise<${Name}Row>;
-	getOne(filter?: RawFilter, fetchingStrategy?: ${Name}Strategy): Promise<${Name}Row>;
-	getOne(${name}: ${Name}): Promise<${Name}Row>;
-	getOne(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
-	getById(${getIdArgs(table)}): Promise<${Name}Row>;
-	getById(${getIdArgs(table)}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+	getMany: {
+		<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<${Name}AdHocArray<Strategy>>;
+		(filter?: RawFilter): Promise<${Name}Array>;
+		(filter: RawFilter, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+		(${name}s: Array<${Name}>): Promise<${Name}Array>;
+		(${name}s: Array<${Name}>, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+		plain<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<Array<${Name} & AdHocProperties<Strategy>>>;
+		plain(filter?: RawFilter): Promise<${Name}[]>;
+		plain<Strategy extends ${Name}Strategy>(filter: RawFilter, fetchingStrategy: Strategy): Promise<Array<${Name} & AdHocProperties<Strategy>>>;
+		plain(${name}s: Array<${Name}>): Promise<${Name}[]>;
+		plain<Strategy extends ${Name}Strategy>(${name}s: Array<${Name}>, fetchingStrategy: Strategy): Promise<Array<${Name} & AdHocProperties<Strategy>>>;
+	};
+	getOne: {
+		<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<${Name}AdHocRow<Strategy>>;
+		(filter?: RawFilter): Promise<${Name}Row>;
+		(filter?: RawFilter, fetchingStrategy?: ${Name}Strategy): Promise<${Name}Row>;
+		(${name}: ${Name}): Promise<${Name}Row>;
+		(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+		plain<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<(${Name} & AdHocProperties<Strategy>) | undefined>;
+		plain(filter?: RawFilter): Promise<${Name} | undefined>;
+		plain<Strategy extends ${Name}Strategy>(filter: RawFilter | undefined, fetchingStrategy: Strategy): Promise<(${Name} & AdHocProperties<Strategy>) | undefined>;
+		plain(${name}: ${Name}): Promise<${Name} | undefined>;
+		plain<Strategy extends ${Name}Strategy>(${name}: ${Name}, fetchingStrategy: Strategy): Promise<(${Name} & AdHocProperties<Strategy>) | undefined>;
+	};
+	getById: {
+		(${getIdArgs(table)}): Promise<${Name}Row>;
+		(${getIdArgs(table)}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+		plain(${getIdArgs(table)}): Promise<${Name} | undefined>;
+		plain<Strategy extends ${Name}Strategy>(${getIdArgs(table)}, fetchingStrategy: Strategy): Promise<(${Name} & AdHocProperties<Strategy>) | undefined>;
+	};
 
 	replace(${name}s: ${Name}[] | ${Name}): Promise<void>;
 	replace(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
@@ -6270,6 +6288,8 @@ function requireExecutePath () {
 					const target = strategy[name];
 					if (isAdHocRelation(target))
 						continue;
+					if (isHttp && name === 'where')
+						validateArgs(target);
 					if (isFilter(target))
 						strategy[name] = await parseFilter(strategy[name], filterTable, scope);
 					else
@@ -6292,7 +6312,7 @@ function requireExecutePath () {
 		}
 
 		function validateStrategy(table, strategy, tables) {
-			if (!strategy || !table)
+			if (!strategy || typeof strategy !== 'object' || !table)
 				return;
 
 			for (let p in strategy) {
@@ -14606,6 +14626,9 @@ function requireClient () {
 			Object.defineProperty(tableOptions, 'tables', { value: options.tables, enumerable: false });
 			Object.defineProperty(tableOptions, 'tableConfigs', { value: options, enumerable: false });
 			let meta;
+			getMany.plain = fetchMany.bind(null, false);
+			getOne.plain = fetchOne.bind(null, false);
+			getById.plain = fetchById.bind(null, false);
 			let c = {
 				count,
 				getMany,
@@ -14700,7 +14723,11 @@ function requireClient () {
 				return _getMany.apply(null, arguments);
 			}
 
-			async function getMany(_, strategy) {
+			function getMany(...args) {
+				return fetchMany(true, ...args);
+			}
+
+			async function fetchMany(tracked, _, strategy, ...rest) {
 				let metaPromise = getMeta();
 				if (looksLikeFetchStrategy(_) && (strategy === undefined || !looksLikeFetchStrategy(strategy))) {
 					let meta = await metaPromise;
@@ -14712,9 +14739,9 @@ function requireClient () {
 				}
 				strategy = extractFetchingStrategy({}, strategy);
 				strategy = negotiateWhereSingle(strategy);
-				let args = [_, strategy].concat(Array.prototype.slice.call(arguments).slice(2));
+				let args = [_, strategy, ...rest];
 				const [rows] = await Promise.all([getManyCore.apply(null, args), metaPromise]);
-				return proxify(rows, strategy, true);
+				return tracked ? proxify(rows, strategy, true) : rows;
 			}
 
 			async function groupBy(strategy) {
@@ -14803,7 +14830,11 @@ function requireClient () {
 				return { filter, strategy };
 			}
 
-			async function getOne(filter, strategy) {
+			function getOne(...args) {
+				return fetchOne(true, ...args);
+			}
+
+			async function fetchOne(tracked, filter, strategy, ...rest) {
 				let metaPromise = getMeta();
 				let meta = await metaPromise;
 				let normalized = normalizeGetOneArgs(meta, filter, strategy);
@@ -14811,25 +14842,29 @@ function requireClient () {
 				strategy = extractFetchingStrategy({}, normalized.strategy);
 				strategy = negotiateWhereSingle(strategy);
 				let _strategy = { ...strategy, ...{ limit: 1 } };
-				let args = [filter, _strategy].concat(Array.prototype.slice.call(arguments).slice(2));
+				let args = [filter, _strategy, ...rest];
 				let rows = await getManyCore.apply(null, args);
 				if (rows.length === 0)
 					return;
-				return proxify(rows[0], strategy, true);
+				return tracked ? proxify(rows[0], strategy, true) : rows[0];
 			}
 
-			async function getById() {
-				if (arguments.length === 0)
+			function getById(...args) {
+				return fetchById(true, ...args);
+			}
+
+			async function fetchById(tracked, ...idArgs) {
+				if (idArgs.length === 0)
 					return;
 				let meta = await getMeta();
 				let keyFilter = client.filter;
 				for (let i = 0; i < meta.keys.length; i++) {
 					let keyName = meta.keys[i].name;
-					let keyValue = arguments[i];
+					let keyValue = idArgs[i];
 					keyFilter = keyFilter.and(_table[keyName].eq(keyValue));
 				}
-				let args = [keyFilter].concat(Array.prototype.slice.call(arguments).slice(meta.keys.length));
-				return getOne.apply(null, args);
+				let args = [keyFilter, ...idArgs.slice(meta.keys.length)];
+				return fetchOne(tracked, ...args);
 			}
 
 			async function syncById(...args) {

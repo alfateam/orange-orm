@@ -44,6 +44,48 @@ const unknown: ExpressConfig = { missingTable: {} };
 			.map(diagnostic => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'));
 		expect(errors).toEqual([]);
 	});
+
+	test('types plain reads without active record methods in generated clients', () => {
+		const source = `
+import type { OrderTable, CompositeOrderTable } from './generated-plain';
+declare const order: OrderTable;
+declare const composite: CompositeOrderTable;
+async function check() {
+	const rows = await order.getMany.plain({ lines: true });
+	// @ts-expect-error Plain arrays have no saveChanges method.
+	rows.saveChanges();
+	// @ts-expect-error Plain rows have no saveChanges method.
+	rows[0].saveChanges();
+	const one = await order.getOne.plain({ lines: true });
+	// @ts-expect-error The row may be undefined.
+	one.id;
+	if (one) {
+		const id: number | null | undefined = one.id;
+		// @ts-expect-error Plain rows have no delete method.
+		one.delete();
+	}
+	const byId = await order.getById.plain(1, {
+		matching: (_, { db }) => db.orderLine.many({})
+	});
+	const product: string | null | undefined = byId?.matching[0].product;
+	// @ts-expect-error Plain results have no tracking methods.
+	byId?.clearChanges();
+	await composite.getById.plain('A', 1);
+	await composite.getById.plain('A', 1, {});
+	// @ts-expect-error Composite keys require all primary-key arguments.
+	composite.getById.plain('A');
+	await (await order.getMany()).saveChanges();
+	await (await order.getOne()).saveChanges();
+	await (await order.getById(1)).saveChanges();
+}
+`;
+		const errors = compile(source, 'plain-usage.ts', {
+			'generated-plain.d.ts': getTSDefinition(tableConfigs, { isHttp: true })
+		})
+			.filter(diagnostic => diagnostic.category === ts.DiagnosticCategory.Error)
+			.map(diagnostic => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'));
+		expect(errors).toEqual([]);
+	});
 });
 
 function compile(source, fileName, extraSources = {}) {

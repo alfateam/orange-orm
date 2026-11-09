@@ -18,6 +18,7 @@
 2. [Connecting to a Database](#connecting-to-a-database)
 3. [Inserting Rows](#inserting-rows)
 4. [Fetching Rows](#fetching-rows)
+   - [Plain reads without change tracking](#plain-reads-without-change-tracking)
 5. [Filtering (where)](#filtering-where)
 6. [Ordering, Limit, Offset](#ordering-limit-offset)
 7. [Updating Rows (saveChanges)](#updating-rows-savechanges)
@@ -314,6 +315,59 @@ const orders = await db.order.getMany({
   }
 });
 ```
+
+---
+
+## Plain reads without change tracking
+
+Use `db.table.getMany.plain()`, `db.table.getOne.plain()` and `db.table.getById.plain()` when the caller needs data without active record behavior. `.plain` is a method on the fetch function: call `getMany.plain(strategy)`, not `getMany(strategy).plain()`.
+
+| Method | Result | No match |
+| --- | --- | --- |
+| `getMany.plain(strategy?)` | Array of untracked rows | `[]` |
+| `getOne.plain(strategy?)` | First matching untracked row | `undefined` |
+| `getById.plain(...keys, strategy?)` | Untracked row matching the primary key | `undefined` |
+
+### getMany.plain
+
+```ts
+const orders = await db.order.getMany.plain({
+  where: x => x.customerId.eq(42),
+  orderBy: 'id',
+  limit: 20,
+  lines: { packages: true }
+});
+```
+
+### getOne.plain
+
+```ts
+const firstOrder = await db.order.getOne.plain({
+  where: x => x.customerId.eq(42),
+  orderBy: 'id',
+  lines: true
+});
+```
+
+This selects at most one row. Use `orderBy` when several rows can match and the choice must be deterministic. Handle `undefined` before accessing the row.
+
+### getById.plain
+
+```ts
+const order = await db.order.getById.plain(123, { lines: true });
+```
+
+For composite keys, supply all key values in the order of the primary columns in the mapping, followed by an optional strategy. For example, a table keyed by `orderType`, `orderNo`, `lineNo` accepts `db.orderLine.getById.plain('typeA', 100, 1)`.
+
+### Result behavior, types and HTTP
+
+- The arguments, filters and fetching strategies match the corresponding tracked methods. Column selection, mapped relations, ad-hoc relations and pagination still work.
+- The complete result graph has no change-tracking proxies or snapshots. `.plain()` also skips the configured `db.reactive(...)` wrapper.
+- Objects and arrays remain mutable. Local edits are not persisted. Results have no `saveChanges`, `save`, `refresh`, `delete`, `acceptChanges` or `clearChanges` methods. Use tracked reads when the caller needs to save edits through active record methods.
+- TypeScript infers the selected data without active record methods; single-row return types include `undefined`.
+- Local transaction clients expose the same methods, for example `tx.order.getMany.plain()`.
+- Through Express or Hono, `.plain()` uses the existing read operation. Authentication middleware, transaction hooks, server-side `baseFilter`, table exposure and query validation still apply. Primary-key reads cannot bypass a root table's `baseFilter`; ad-hoc targets must be exposed and retain their target `baseFilter`.
+- Keep using the filter DSL over HTTP. `.plain()` does not enable raw SQL queries or raw SQL filters.
 
 ---
 
@@ -761,7 +815,7 @@ await db.transaction(async (tx) => {
 
 ## acceptChanges and clearChanges
 
-These are **synchronous** Active Record methods available on both individual rows and arrays returned by `getMany`, `getById`, `insert`, etc.
+These are **synchronous** Active Record methods available on tracked results returned by `getMany`, `getById`, `insert`, etc. They are not available on `.plain()` results.
 
 ### acceptChanges()
 
@@ -1127,6 +1181,8 @@ const orders = await db.order.getMany({
 
 ### Interceptors (authentication)
 
+The same interceptors apply when using `getMany.plain()`, `getOne.plain()` or `getById.plain()` through the HTTP client. See [plain reads](#plain-reads-without-change-tracking) for their result and security behavior.
+
 ```ts
 db.interceptors.request.use((config) => {
   config.headers.Authorization = 'Bearer <token>';
@@ -1380,7 +1436,7 @@ JSON.stringify(george); // '{"id":1,"name":"George"}'
 
 ## Quick Reference: Active Record Methods
 
-Methods available on rows returned by `getMany`, `getById`, `getOne`, `insert`:
+Methods available on tracked rows or arrays returned by `getMany`, `getById`, `getOne`, `insert`. Results returned by `getMany.plain()`, `getOne.plain()` and `getById.plain()` have none of these methods:
 
 | Method | On row | On array | Description |
 |--------|--------|----------|-------------|
@@ -1403,6 +1459,9 @@ Methods available on `db.<tableName>`:
 | `getMany(strategy?)` | Fetch multiple rows with optional filter/strategy |
 | `getOne(strategy?)` | Fetch first matching row |
 | `getById(...keys, strategy?)` | Fetch by primary key |
+| `getMany.plain(strategy?)` | Fetch an untracked array; returns `[]` if no rows match |
+| `getOne.plain(strategy?)` | Fetch the first matching untracked row, or `undefined` |
+| `getById.plain(...keys, strategy?)` | Fetch an untracked row by primary key, or `undefined` |
 | `insert(row, strategy?)` | Insert one row |
 | `insert(rows, strategy?)` | Insert multiple rows |
 | `insertAndForget(row)` | Insert without returning |

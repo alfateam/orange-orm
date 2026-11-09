@@ -918,9 +918,15 @@ export type SyncTableClient<M extends Record<string, TableDefinition<M>>, K exte
 
 export type TableClient<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
   // Array methods - return arrays with array-level active record methods, but individual items are plain
-  getMany<const strategy extends FetchStrategy<M, K>>(
-    strategy?: strategy & ValidateAdHocPropertyNames<M, K, strategy>
-  ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
+  getMany: {
+    <const strategy extends FetchStrategy<M, K>>(
+      strategy?: strategy & ValidateAdHocPropertyNames<M, K, strategy>
+    ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
+    /** Fetch plain data without change tracking or active record methods. */
+    plain<const strategy extends FetchStrategy<M, K>>(
+      strategy?: strategy & ValidateAdHocPropertyNames<M, K, strategy>
+    ): Promise<Array<DeepExpand<Selection<M, K, strategy>>>>;
+  };
 
   // Aggregate methods - return plain objects (no active record methods)
   aggregate<const strategy extends Record<string, unknown>>(
@@ -931,17 +937,27 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
   ): Promise<Array<DeepExpand<AggregateCustomSelectorProperties<M, K, strategy>>>>;
 
   // Single item methods - return individual objects with individual active record methods
-  getOne<strategy extends FetchStrategy<M, K>>(
-    strategy?: strategy & ValidateAdHocPropertyNames<M, K, strategy>
-  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K> | undefined>;
+  getOne: {
+    <strategy extends FetchStrategy<M, K>>(
+      strategy?: strategy & ValidateAdHocPropertyNames<M, K, strategy>
+    ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K> | undefined>;
+    /** Fetch plain data, or undefined when no row matches. */
+    plain<const strategy extends FetchStrategy<M, K>>(
+      strategy?: strategy & ValidateAdHocPropertyNames<M, K, strategy>
+    ): Promise<DeepExpand<Selection<M, K, strategy>> | undefined>;
+  };
 
-  getById<strategy extends FetchStrategy<M, K>>(
-    ...args: [...PrimaryKeyArgs<M, K>, strategy: strategy]
-  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K> | undefined>;
-
-  getById(
-    ...args: [...PrimaryKeyArgs<M, K>]
-  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, {}>>, M, K>  | undefined>;
+  getById: {
+    <strategy extends FetchStrategy<M, K>>(
+      ...args: [...PrimaryKeyArgs<M, K>, strategy: strategy]
+    ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K> | undefined>;
+    (...args: [...PrimaryKeyArgs<M, K>]): Promise<WithActiveRecord<DeepExpand<Selection<M, K, {}>>, M, K> | undefined>;
+    /** Fetch plain data by primary key, or undefined when not found. */
+    plain<const strategy extends FetchStrategy<M, K>>(
+      ...args: [...PrimaryKeyArgs<M, K>, strategy: strategy & ValidateAdHocPropertyNames<M, K, strategy>]
+    ): Promise<DeepExpand<Selection<M, K, strategy>> | undefined>;
+    plain(...args: [...PrimaryKeyArgs<M, K>]): Promise<DeepExpand<Selection<M, K, {}>> | undefined>;
+  };
 
   // UPDATED: Bulk update methods with relations support
   update(

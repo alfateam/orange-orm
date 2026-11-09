@@ -1,4 +1,13 @@
 ## Changelog
+
+__Unreleased__
+
+Add `getMany.plain()`, `getOne.plain()` and `getById.plain()` to fetch data without
+change tracking, reactive wrapping or active record methods. Fetching strategies,
+relations and HTTP access controls use the same read path as tracked reads.
+Includes TypeScript support and generated HTTP client declarations. See
+[plain results](../README.md#plain-results) for examples and return values.
+
 __5.6.0-beta-16__
 
 Add optional `lifecycle.suspendWhenHidden` for `sqliteOPFS` with `opfs-sahpool`.

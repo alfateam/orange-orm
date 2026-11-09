@@ -550,6 +550,8 @@ function _executePath(context, ...rest) {
 				const target = strategy[name];
 				if (isAdHocRelation(target))
 					continue;
+				if (isHttp && name === 'where')
+					validateArgs(target);
 				if (isFilter(target))
 					strategy[name] = await parseFilter(strategy[name], filterTable, scope);
 				else
@@ -572,7 +574,7 @@ function _executePath(context, ...rest) {
 	}
 
 	function validateStrategy(table, strategy, tables) {
-		if (!strategy || !table)
+		if (!strategy || typeof strategy !== 'object' || !table)
 			return;
 
 		for (let p in strategy) {

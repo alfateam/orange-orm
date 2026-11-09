@@ -1001,6 +1001,40 @@ async function getRows() {
 }
 ```
 
+<a name="plain-results"> </a>
+__Plain results without change tracking__
+
+Use `getMany.plain()`, `getOne.plain()` or `getById.plain()` to fetch ordinary objects and arrays without change tracking or active record methods:
+
+```typescript
+const orders = await db.order.getMany.plain({
+  where: x => x.customerId.eq(42),
+  lines: true,
+  orderBy: 'id'
+});
+
+const firstOrder = await db.order.getOne.plain({
+  where: x => x.customerId.eq(42),
+  orderBy: 'id'
+});
+
+const order = await db.order.getById.plain(123, { lines: true });
+```
+
+These variants accept the same arguments and fetching strategies as their tracked counterparts, including mapped and ad-hoc relations. The entire result graph is untracked and can be changed locally. Results have no `saveChanges`, `refresh`, `delete`, `acceptChanges` or `clearChanges` methods. `getMany.plain()` returns an empty array when no rows match; `getOne.plain()` and `getById.plain()` return `undefined`.
+
+| Method | Result | No matching row |
+| --- | --- | --- |
+| `getMany.plain(strategy?)` | Array of untracked rows | `[]` |
+| `getOne.plain(strategy?)` | First matching untracked row | `undefined` |
+| `getById.plain(...keys, strategy?)` | Untracked row matching the primary key | `undefined` |
+
+Use `orderBy` with `getOne.plain()` when the choice of first row matters. `getById.plain()` accepts composite key values in the same order as the primary columns in the mapping, followed by an optional strategy. These methods also work on transaction clients, such as `tx.order.getMany.plain()`.
+
+TypeScript infers the selected columns and relations without active record methods. `.plain()` also skips the configured `db.reactive(...)` wrapper. Local edits are not persisted; use the regular tracked fetch methods when you need `saveChanges()`.
+
+Over HTTP, `.plain()` uses the same read operation as the tracked methods. Authentication middleware, transaction hooks, server-side `baseFilter`, table exposure restrictions and query validation still apply. The choice of plain results only changes client-side result wrapping; it grants no additional access.
+
 __Single row by primary key__
 
 ```javascript

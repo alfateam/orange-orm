@@ -51,6 +51,21 @@ beforeAll(async () => {
 });
 
 describe('hono adapter', () => {
+	test.each(['getMany', 'getOne', 'getById'])('%s.plain respects authentication and returns plain data', async method => {
+		const db = getHttpDb();
+		const args = method === 'getById' ? [2] : [{ where: x => x.id.eq(2) }];
+		await expect(db.order[method].plain(...args)).rejects.toThrow('401');
+		db.interceptors.request.use(config => {
+			config.headers.Authorization = 'Bearer 2';
+			return config;
+		});
+		const result = await db.order[method].plain(...args);
+		expect(result.saveChanges).toBeUndefined();
+		const row = method === 'getMany' ? result[0] : result;
+		expect(row.id).toBe(2);
+		expect(row.saveChanges).toBeUndefined();
+	});
+
 	test('returns unauthorized when token is missing', async () => {
 		const db = getHttpDb();
 
