@@ -27,7 +27,7 @@ function fixture() {
 test('reclaims a native handle surviving its JS session, preserves committed rows and rolls back unfinished work', async () => {
 	const { plugin, open, orphan } = fixture();
 	const args = await orphan('app');
-	await plugin.execute({ ...args, statements: "PRAGMA journal_mode=WAL; CREATE TABLE draft(id INTEGER); INSERT INTO draft VALUES(1); BEGIN; INSERT INTO draft VALUES(2)", transaction: false });
+	await plugin.execute({ ...args, statements: 'PRAGMA journal_mode=WAL; CREATE TABLE draft(id INTEGER); INSERT INTO draft VALUES(1); BEGIN; INSERT INTO draft VALUES(2)', transaction: false });
 	const other = open('other');
 	await other.query('CREATE TABLE retained(id INTEGER)');
 	await other.query('INSERT INTO retained VALUES(7)');
@@ -61,8 +61,7 @@ test('a second live pool cannot reclaim the first pool, even before it opens', a
 	expect(plugin.calls).not.toContain('CLOSE CONNECTION app');
 });
 
-test.each(['CreateConnection: permission denied', 'CreateConnection: Connection other already exists'])
-('unrelated create failure does not close any connection: %s', async message => {
+test.each(['CreateConnection: permission denied', 'CreateConnection: Connection other already exists'])('unrelated create failure does not close any connection: %s', async message => {
 	const { plugin, open } = fixture();
 	plugin.createConnection = async () => { throw new Error(message); };
 	await expect(open('app').query('SELECT 1')).rejects.toThrow(message);

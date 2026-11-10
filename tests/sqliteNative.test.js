@@ -36,7 +36,7 @@ test('iOS column metadata restores UUID, text, numeric and null fields for reads
 	await editable.save();
 	expect((await db.item.getById(expected[0].id)).title).toBe('Edited');
 	expect(await db.item.getMany(db.item.title.equal('Missing'))).toEqual([]);
-	const returned = await db.query("UPDATE item SET score=score+1 RETURNING id, title, optional_id, score");
+	const returned = await db.query('UPDATE item SET score=score+1 RETURNING id, title, optional_id, score');
 	expect(returned.map(row => Object.keys(row))).toEqual(expected.map(() => ['id', 'title', 'optional_id', 'score']));
 	expect(returned.map(row => row.score)).toEqual([3.5, 8]);
 });
@@ -73,8 +73,8 @@ test('clones WAL data, schema, blobs and autoincrement; failed clone rolls back 
 	const a = open('a'), b = open('b');
 	await a.query('PRAGMA wal_autocheckpoint=0');
 	await a.query('CREATE TABLE item(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, data BLOB, len INT GENERATED ALWAYS AS (length(title)) STORED)');
-	await a.query("INSERT INTO item(title,data) VALUES ('keep',X'010203')");
-	await a.query("INSERT INTO item(id,title) VALUES (90,'removed')");
+	await a.query('INSERT INTO item(title,data) VALUES (\'keep\',X\'010203\')');
+	await a.query('INSERT INTO item(id,title) VALUES (90,\'removed\')');
 	await a.query('DELETE FROM item WHERE id=90');
 	await a.query('CREATE INDEX title_index ON item(title)');
 	await a.query('CREATE VIEW titles AS SELECT title FROM item');
@@ -86,11 +86,11 @@ test('clones WAL data, schema, blobs and autoincrement; failed clone rolls back 
 	}
 	plugin.failWhen(sql => sql.startsWith('INSERT INTO orange_clone."item"'));
 	await expect(clone()).rejects.toThrow('Injected native failure');
-	expect(await b.query("SELECT name FROM sqlite_master WHERE type='table'")).toEqual([{ name: 'obsolete' }]);
+	expect(await b.query('SELECT name FROM sqlite_master WHERE type=\'table\'')).toEqual([{ name: 'obsolete' }]);
 	plugin.failWhen(null); await clone();
 	expect(await b.query('SELECT id,title,hex(data) AS data,len FROM item')).toEqual([{ id: 1, title: 'keep', data: '010203', len: 4 }]);
 	expect(await b.query('SELECT * FROM titles')).toEqual([{ title: 'keep' }]);
-	await b.query("INSERT INTO item(title) VALUES ('next')");
+	await b.query('INSERT INTO item(title) VALUES (\'next\')');
 	expect(await b.query('SELECT max(id) AS id FROM item')).toEqual([{ id: 91 }]);
 	expect(await a.query('PRAGMA foreign_keys')).toEqual([{ foreign_keys: 1 }]);
 	expect(await b.query('PRAGMA journal_mode')).toEqual([{ journal_mode: 'wal' }]);

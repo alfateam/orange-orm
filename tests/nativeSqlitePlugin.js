@@ -58,6 +58,6 @@ module.exports = function nativeSqlitePlugin(directory) {
 			before(statements); connection(database).exec(statements); return { changes: {} };
 		}
 	};
-	Object.defineProperty(plugin, "calls", { value: calls });
+	Object.defineProperty(plugin, 'calls', { value: calls });
 	return plugin;
 };

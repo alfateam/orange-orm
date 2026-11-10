@@ -30,7 +30,7 @@ test('worker commands retain affected-row counts for saving and detecting stale 
 	row.title = 'Saved';
 	await row.save();
 	expect(await host.query('SELECT title FROM item')).toEqual([{ title: 'Saved' }]);
-	await host.query("UPDATE item SET title='Changed elsewhere' WHERE id=1");
+	await host.query('UPDATE item SET title=\'Changed elsewhere\' WHERE id=1');
 	row.title = 'Stale edit';
 	await expect(row.save()).rejects.toThrow(/concurrency|changed|conflict/i);
 	expect(await host.query('SELECT title FROM item')).toEqual([{ title: 'Changed elsewhere' }]);
@@ -47,7 +47,7 @@ test('lost worker rolls back an abandoned transaction and releases the GUI conne
 	expect(await read).toEqual([]);
 	resume.resolve();
 	expect(await outcome).toBeInstanceOf(Error);
-	await host.query("INSERT INTO item VALUES (2, 'GUI write')");
+	await host.query('INSERT INTO item VALUES (2, \'GUI write\')');
 	expect(await host.query('SELECT id FROM item')).toEqual([{ id: 2 }]);
 });
 
@@ -84,7 +84,7 @@ test('worker construction failure releases lazy native pools instead of silently
 
 test('worker ports reserve the target and clone committed WAL state through the host', async () => {
 	const { plugin, host, db } = await fixture();
-	await host.query("INSERT INTO item VALUES (1, 'Clone me')");
+	await host.query('INSERT INTO item VALUES (1, \'Clone me\')');
 	const targetHost = createNative('capacitor:target', { capacitorSQLite: plugin });
 	cleanup.push(() => targetHost.end());
 	const bridge = targetHost.poolFactory.__orangeConnectNativeWorker();

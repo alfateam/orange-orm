@@ -12,6 +12,7 @@ other.db
 pglite.db*
 coverage
 /tests/.tmp/
+/codex.md
 .env
 deno.lock
 *.tgz

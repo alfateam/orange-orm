@@ -118,16 +118,16 @@ function newPool(connectionString, options) {
 		try {
 			await open();
 			foreignKeys = Number((await run('PRAGMA foreign_keys'))[0].foreign_keys);
-			const schema = await run("SELECT type, name, sql FROM main.sqlite_master WHERE name NOT LIKE 'sqlite_%' AND sql IS NOT NULL ORDER BY type, name");
+			const schema = await run('SELECT type, name, sql FROM main.sqlite_master WHERE name NOT LIKE \'sqlite_%\' AND sql IS NOT NULL ORDER BY type, name');
 			if (schema.some(row => /^CREATE\s+VIRTUAL\s/i.test(row.sql)))
 				throw new Error('Native replica cloning does not support virtual tables.');
 			const path = await target.clonePath();
-			await run(`ATTACH DATABASE '${path.replace(/'/g, "''")}' AS orange_clone`);
+			await run(`ATTACH DATABASE '${path.replace(/'/g, '\'\'')}' AS orange_clone`);
 			attached = true;
 			await run('PRAGMA foreign_keys=OFF');
 			await run('BEGIN IMMEDIATE');
 			transaction = true;
-			const old = await run("SELECT type, name FROM orange_clone.sqlite_master WHERE name NOT LIKE 'sqlite_%' AND type IN ('view', 'trigger', 'table') ORDER BY CASE type WHEN 'view' THEN 0 WHEN 'trigger' THEN 1 ELSE 2 END");
+			const old = await run('SELECT type, name FROM orange_clone.sqlite_master WHERE name NOT LIKE \'sqlite_%\' AND type IN (\'view\', \'trigger\', \'table\') ORDER BY CASE type WHEN \'view\' THEN 0 WHEN \'trigger\' THEN 1 ELSE 2 END');
 			for (const row of old) await run(`DROP ${row.type.toUpperCase()} IF EXISTS orange_clone.${quote(row.name)}`);
 			for (const row of schema.filter(row => row.type === 'table')) {
 				await run(qualifySchema(row));
@@ -135,7 +135,7 @@ function newPool(connectionString, options) {
 				const names = columns.filter(column => !column.hidden).map(column => quote(column.name)).join(',');
 				await run(`INSERT INTO orange_clone.${quote(row.name)} (${names}) SELECT ${names} FROM main.${quote(row.name)}`);
 			}
-			if ((await run("SELECT name FROM main.sqlite_master WHERE name='sqlite_sequence'")).length) {
+			if ((await run('SELECT name FROM main.sqlite_master WHERE name=\'sqlite_sequence\'')).length) {
 				await run('DELETE FROM orange_clone.sqlite_sequence');
 				await run('INSERT INTO orange_clone.sqlite_sequence SELECT * FROM main.sqlite_sequence');
 			}

@@ -34,15 +34,15 @@ function initialize(message) {
 				__orangeNativePorts: portByConnectionString
 			})
 			: con.sqliteOPFS(message.connectionString, {
-			...(message.sqliteOptions || {}),
-			createWorker(connectionString) {
-				const port = portByConnectionString.get(connectionString);
-				if (!port)
-					throw new Error(`Managed sync worker has no SQLite connection for "${connectionString}".`);
-				return port;
-			},
-			closeDbOnClose: false
-		})
+				...(message.sqliteOptions || {}),
+				createWorker(connectionString) {
+					const port = portByConnectionString.get(connectionString);
+					if (!port)
+						throw new Error(`Managed sync worker has no SQLite connection for "${connectionString}".`);
+					return port;
+				},
+				closeDbOnClose: false
+			})
 	});
 	handler = rdb.createSyncWorkerHandler(db.syncClient);
 	while (pendingEvents.length > 0)
