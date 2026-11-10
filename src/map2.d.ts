@@ -893,9 +893,15 @@ type AggregateCustomSelectorProperties<M extends Record<string, TableDefinition<
 
 export type TableClient<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
   // Array methods - return arrays with array-level active record methods, but individual items are plain
-  getMany<const strategy extends FetchStrategy<M, K>>(
-    strategy?: strategy & ValidateAdHocPropertyNames<M, K, strategy>
-  ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
+  getMany: {
+    <const strategy extends FetchStrategy<M, K>>(
+      strategy?: strategy & ValidateAdHocPropertyNames<M, K, strategy>
+    ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
+    /** Fetch plain data without change tracking or active record methods. */
+    plain<const strategy extends FetchStrategy<M, K>>(
+      strategy?: strategy & ValidateAdHocPropertyNames<M, K, strategy>
+    ): Promise<Array<DeepExpand<Selection<M, K, strategy>>>>;
+  };
 
   // Aggregate methods - return plain objects (no active record methods)
   aggregate<const strategy extends Record<string, unknown>>(
@@ -906,17 +912,27 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
   ): Promise<Array<DeepExpand<AggregateCustomSelectorProperties<M, K, strategy>>>>;
 
   // Single item methods - return individual objects with individual active record methods
-  getOne<strategy extends FetchStrategy<M, K>>(
-    strategy?: strategy & ValidateAdHocPropertyNames<M, K, strategy>
-  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K> | undefined>;
+  getOne: {
+    <strategy extends FetchStrategy<M, K>>(
+      strategy?: strategy & ValidateAdHocPropertyNames<M, K, strategy>
+    ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K> | undefined>;
+    /** Fetch plain data, or undefined when no row matches. */
+    plain<const strategy extends FetchStrategy<M, K>>(
+      strategy?: strategy & ValidateAdHocPropertyNames<M, K, strategy>
+    ): Promise<DeepExpand<Selection<M, K, strategy>> | undefined>;
+  };
 
-  getById<strategy extends FetchStrategy<M, K>>(
-    ...args: [...PrimaryKeyArgs<M, K>, strategy: strategy]
-  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K> | undefined>;
-
-  getById(
-    ...args: [...PrimaryKeyArgs<M, K>]
-  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, {}>>, M, K>  | undefined>;
+  getById: {
+    <strategy extends FetchStrategy<M, K>>(
+      ...args: [...PrimaryKeyArgs<M, K>, strategy: strategy]
+    ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K> | undefined>;
+    (...args: [...PrimaryKeyArgs<M, K>]): Promise<WithActiveRecord<DeepExpand<Selection<M, K, {}>>, M, K> | undefined>;
+    /** Fetch plain data by primary key, or undefined when not found. */
+    plain<const strategy extends FetchStrategy<M, K>>(
+      ...args: [...PrimaryKeyArgs<M, K>, strategy: strategy & ValidateAdHocPropertyNames<M, K, strategy>]
+    ): Promise<DeepExpand<Selection<M, K, strategy>> | undefined>;
+    plain(...args: [...PrimaryKeyArgs<M, K>]): Promise<DeepExpand<Selection<M, K, {}>> | undefined>;
+  };
 
   // UPDATED: Bulk update methods with relations support
   update(
@@ -1080,7 +1096,7 @@ interface WithInterceptors {
 }
 
 interface Connectors {
-  http(url: string): Pool;
+  http(url: string): HttpPool;
   d1(database: D1Database): Pool;
   postgres(connectionString: string, options?: PoolOptions): Pool;
   pglite(config?: PGliteOptions | string | undefined, options?: PoolOptions): Pool;
@@ -1094,7 +1110,7 @@ interface Connectors {
 }
 
 type DbConnectable<M extends Record<string, TableDefinition<M>>> = {
-  http(url: string): DBClient<M>;
+  http(url: string): HttpDBClient<M>;
   d1(database: D1Database): DBClient<M>;
   postgres(connectionString: string, options?: PoolOptions): DBClient<M>;
   pglite(config?: PGliteOptions | string | undefined, options?: PoolOptions): DBClient<M>;
@@ -1112,9 +1128,24 @@ export interface Pool {
   end(): Promise<void>;
 }
 
+declare const httpPoolBrand: unique symbol;
+export interface HttpPool extends Pool {
+  readonly [httpPoolBrand]: true;
+}
+
 export interface PoolOptions {
   size?: number;
 }
+
+/** A local transaction. Locks are held until commit or rollback. */
+export type TransactionClient<M extends Record<string, TableDefinition<M>>> = DBClient<M> & {
+  /** SQLite reserves write access to the entire main database using a mapped table. */
+  advisoryLock(key: string): Promise<void>;
+};
+
+export type HttpDBClient<M extends Record<string, TableDefinition<M>>> = Omit<DBClient<M>, 'transaction'> & {
+  (config?: DbOptions<M>): HttpDBClient<M>;
+};
 
 export type DBClient<M extends Record<string, TableDefinition<M>>> = {
   [TableName in keyof M]: RootTableRefs<M, TableName> & TableClient<M, TableName>;
@@ -1132,11 +1163,10 @@ export type DBClient<M extends Record<string, TableDefinition<M>>> = {
   query<T>(filter: RawFilter | string): Promise<T[]>;
   createPatch(original: any[], modified: any[]): JsonPatch;
   createPatch(original: any, modified: any): JsonPatch;
-  (
-    config?: DbOptions<M>
-  ): DBClient<M>;
+  <O extends DbOptions<M>>(config: O): O extends { db: HttpPool | ((...args: any[]) => HttpPool | Promise<HttpPool>) } ? HttpDBClient<M> : DBClient<M>;
+  (): DBClient<M>;
   transaction<TR = unknown>(
-    fn: (db: DBClient<M>) => Promise<TR> | TR
+    fn: (db: TransactionClient<M>) => Promise<TR> | TR
   ): Promise<TR>;
   express(): import('express').RequestHandler;
   express(config: ExpressConfig<M>): import('express').RequestHandler;

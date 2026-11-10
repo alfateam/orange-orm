@@ -266,6 +266,30 @@ await db.product.insertAndForget({ name: 'Bicycle', price: 250 });
 
 ## Fetching Rows
 
+### With change tracking
+
+By default, fetched rows include change tracking and methods such as `saveChanges()`. Modify the returned objects, then call `saveChanges()` to persist your changes.
+
+```ts
+const order = await db.order.getById(123, { lines: true });
+if (order) {
+  order.orderDate = new Date();
+  await order.saveChanges();
+}
+```
+
+### Plain results
+
+```ts
+const rows = await db.order.getMany.plain({ lines: true });
+const first = await db.order.getOne.plain({ orderBy: 'id' });
+const order = await db.order.getById.plain(123);
+```
+
+Same arguments and selection as ordinary fetches, without change tracking, reactive wrapping or active record methods. Empty results are `[]` for `getMany.plain()` and `undefined` for the single-row methods. Works locally and over HTTP with the same server access rules.
+
+For read-only workloads, plain results offer better performance and lower memory overhead by skipping change-tracking snapshots and proxy wrapping. This is especially useful for large result sets, reports and API responses where you do not need to call `saveChanges()` on the returned rows.
+
 ### Get all rows
 
 ```ts
@@ -728,6 +752,19 @@ await db.transaction(async (tx) => {
   // If anything throws here, both inserts are rolled back
 });
 ```
+
+### Advisory locks
+
+```ts
+await db.transaction(async tx => {
+  await tx.advisoryLock('invoice:123');
+  // Read and update after acquiring the lock.
+});
+```
+
+Local transactions only; never exposed over HTTP. Locks are held until commit/rollback. Supported by PostgreSQL/PGlite, MySQL/MariaDB, SQL Server and Oracle 12.1+ (requires `DBMS_LOCK` permission). MySQL/MariaDB locks are released by Orange before returning the connection to the pool. SAP ASE and D1 are unsupported.
+
+**SQLite:** automatically runs a zero-row `UPDATE` on an existing mapped ordinary table. It reserves write access to the entire main database, regardless of key; no helper table is needed. Throws if no suitable table exists. Acquire before reading; on `SQLITE_BUSY`/`SQLITE_BUSY_SNAPSHOT`, retry the whole transaction when appropriate.
 
 ### Transaction with saveChanges
 
@@ -1403,6 +1440,9 @@ Methods available on `db.<tableName>`:
 | `getMany(strategy?)` | Fetch multiple rows with optional filter/strategy |
 | `getOne(strategy?)` | Fetch first matching row |
 | `getById(...keys, strategy?)` | Fetch by primary key |
+| `getMany.plain(...)` | Same arguments as `getMany`, without change tracking |
+| `getOne.plain(...)` | Same arguments as `getOne`, without change tracking |
+| `getById.plain(...)` | Same arguments as `getById`, without change tracking |
 | `insert(row, strategy?)` | Insert one row |
 | `insert(rows, strategy?)` | Insert multiple rows |
 | `insertAndForget(row)` | Insert without returning |

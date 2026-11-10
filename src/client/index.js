@@ -13,6 +13,7 @@ const flags = require('../flags');
 const { isAdHocRelation, newAdHocRelation, ownerScopeMarker } = require('../adHocRelation');
 const adHocFactoryMarker = '__rdbAdHocFactory';
 const columnScopeMarker = '__rdbColumnScope';
+const { advisoryLock: acquireAdvisoryLock } = require('../advisoryLock');
 
 function rdbClient(options = {}) {
 	flags.useLazyDefaults = false;
@@ -56,6 +57,8 @@ function rdbClient(options = {}) {
 	client.query = query;
 	client.function = sqliteFunction;
 	client.transaction = runInTransaction;
+	if (transaction && typeof baseUrl !== 'string')
+		client.advisoryLock = advisoryLock;
 	client.db = baseUrl;
 	client.mssql = onProvider.bind(null, 'mssql');
 	client.mssqlNative = onProvider.bind(null, 'mssqlNative');
@@ -92,6 +95,8 @@ function rdbClient(options = {}) {
 	// else {
 	let handler = {
 		get(_target, property,) {
+			if (property === 'advisoryLock')
+				return client.advisoryLock;
 			if (property in client)
 				return Reflect.get(...arguments);
 			else {
@@ -151,6 +156,15 @@ function rdbClient(options = {}) {
 		return adapter.sqliteFunction.apply(null, arguments);
 	}
 
+	async function advisoryLock(key) {
+		if (!transaction || transaction.done)
+			throw new Error('advisoryLock requires an active local transaction');
+		const db = await getDb();
+		if (!db || typeof db === 'string' || !db.createTransaction)
+			throw new Error('advisoryLock is not supported through http');
+		await transaction(context => acquireAdvisoryLock(context, key, options.tables));
+	}
+
 	function express(arg) {
 		if (providers.express) {
 			return providers.express(client, { ...options, ...arg });
@@ -207,6 +221,9 @@ function rdbClient(options = {}) {
 		catch (e) {
 			await transaction(transaction.rollback.bind(null, e));
 		}
+		finally {
+			transaction.done = true;
+		}
 	}
 
 	function table(url, tableName, tableOptions) {
@@ -215,6 +232,9 @@ function rdbClient(options = {}) {
 		Object.defineProperty(tableOptions, 'tables', { value: options.tables, enumerable: false });
 		Object.defineProperty(tableOptions, 'tableConfigs', { value: options, enumerable: false });
 		let meta;
+		getMany.plain = fetchMany.bind(null, false);
+		getOne.plain = fetchOne.bind(null, false);
+		getById.plain = fetchById.bind(null, false);
 		let c = {
 			count,
 			getMany,
@@ -290,7 +310,11 @@ function rdbClient(options = {}) {
 			return _getMany.apply(null, arguments);
 		}
 
-		async function getMany(_, strategy) {
+		function getMany(...args) {
+			return fetchMany(true, ...args);
+		}
+
+		async function fetchMany(tracked, _, strategy, ...rest) {
 			let metaPromise = getMeta();
 			if (looksLikeFetchStrategy(_) && (strategy === undefined || !looksLikeFetchStrategy(strategy))) {
 				let meta = await metaPromise;
@@ -302,10 +326,9 @@ function rdbClient(options = {}) {
 			}
 			strategy = extractFetchingStrategy({}, strategy);
 			strategy = negotiateWhereSingle(strategy);
-			let args = [_, strategy].concat(Array.prototype.slice.call(arguments).slice(2));
-			let rows = await getManyCore.apply(null, args);
-			await metaPromise;
-			return proxify(rows, strategy, true);
+			let args = [_, strategy, ...rest];
+			const [rows] = await Promise.all([getManyCore.apply(null, args), metaPromise]);
+			return tracked ? proxify(rows, strategy, true) : rows;
 		}
 
 		async function groupBy(strategy) {
@@ -392,7 +415,11 @@ function rdbClient(options = {}) {
 			return { filter, strategy };
 		}
 
-		async function getOne(filter, strategy) {
+		function getOne(...args) {
+			return fetchOne(true, ...args);
+		}
+
+		async function fetchOne(tracked, filter, strategy, ...rest) {
 			let metaPromise = getMeta();
 			let meta = await metaPromise;
 			let normalized = normalizeGetOneArgs(meta, filter, strategy);
@@ -400,25 +427,29 @@ function rdbClient(options = {}) {
 			strategy = extractFetchingStrategy({}, normalized.strategy);
 			strategy = negotiateWhereSingle(strategy);
 			let _strategy = { ...strategy, ...{ limit: 1 } };
-			let args = [filter, _strategy].concat(Array.prototype.slice.call(arguments).slice(2));
+			let args = [filter, _strategy, ...rest];
 			let rows = await getManyCore.apply(null, args);
 			if (rows.length === 0)
 				return;
-			return proxify(rows[0], strategy, true);
+			return tracked ? proxify(rows[0], strategy, true) : rows[0];
 		}
 
-		async function getById() {
-			if (arguments.length === 0)
+		function getById(...args) {
+			return fetchById(true, ...args);
+		}
+
+		async function fetchById(tracked, ...idArgs) {
+			if (idArgs.length === 0)
 				return;
 			let meta = await getMeta();
 			let keyFilter = client.filter;
 			for (let i = 0; i < meta.keys.length; i++) {
 				let keyName = meta.keys[i].name;
-				let keyValue = arguments[i];
+				let keyValue = idArgs[i];
 				keyFilter = keyFilter.and(_table[keyName].eq(keyValue));
 			}
-			let args = [keyFilter].concat(Array.prototype.slice.call(arguments).slice(meta.keys.length));
-			return getOne.apply(null, args);
+			let args = [keyFilter, ...idArgs.slice(meta.keys.length)];
+			return fetchOne(tracked, ...args);
 		}
 
 		async function getManyCore() {

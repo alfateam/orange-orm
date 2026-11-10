@@ -4,10 +4,16 @@ let executeChanges = require('./executeQueries/executeChanges');
 let releaseDbClient = require('./releaseDbClient');
 let popChanges = require('./popChanges');
 const getSessionSingleton = require('./getSessionSingleton');
+const setSessionSingleton = require('./setSessionSingleton');
+const { releaseAdvisoryLocks } = require('../advisoryLock');
 
 function _commit(context, result) {
 	let hookError;
 	return popAndPushChanges()
+		.then(() => {
+			setSessionSingleton(context, 'transactionActive', false);
+			return releaseAdvisoryLocks(context);
+		})
 		.then(callAfterCommit)
 		.then(releaseDbClient.bind(null, context))
 		.then(onReleased)

@@ -48,13 +48,18 @@ function newGenericPool(connectionString, poolOptions) {
 	pool.connect = function(cb) {
 		pool.acquire(function(err, client) {
 			if(err)  return cb(err, null, function() {/*NOOP*/});
-			client.poolCount++;
-			cb(null, client, function(err) {
-				if(err) {
-					pool.destroy(client);
-				} else {
+			client.getConnection(function(err, connection) {
+				if (err) {
 					pool.release(client);
+					return cb(err, null, function() {});
 				}
+				cb(null, connection, function(err) {
+					if (err)
+						connection.destroy();
+					else
+						connection.release();
+					pool.release(client);
+				});
 			});
 		});
 	};

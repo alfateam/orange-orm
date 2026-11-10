@@ -1,4 +1,9 @@
 ## Changelog
+
+__5.6.0__  
+Add `getMany.plain()`, `getOne.plain()` and `getById.plain()` for reads without change tracking or active record methods, locally and over HTTP. Skipping tracking snapshots and proxy wrapping increases performance due to reduced processing and memory overhead.  
+Add `tx.advisoryLock(key)` for local transactions on PostgreSQL/PGlite, MySQL/MariaDB, SQL Server and Oracle 12.1+ (requires `DBMS_LOCK` permission). Locks are held until commit or rollback. SQLite reserves write access to the entire main database using an existing mapped table. HTTP, SAP ASE and D1 are unsupported.  
+Pin MySQL/MariaDB transactions to a physical connection and release advisory locks before returning it to the pool.  
 __5.5.1__  
 Add support for Tedious 20 (requires Node.js 22 or newer), while retaining support for earlier Tedious versions.  
 __5.5.0__  

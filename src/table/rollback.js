@@ -6,12 +6,18 @@ const newThrow = require('./newThrow');
 const resultToPromise = require('./resultToPromise');
 const conflictId = '12345678-1234-1234-1234-123456789012';
 const getSessionSingleton = require('./getSessionSingleton');
+const setSessionSingleton = require('./setSessionSingleton');
+const { releaseAdvisoryLocks } = require('../advisoryLock');
 
 function _rollback(context, e) {
 	let hookError;
 	var chain = resultToPromise()
 		.then(() => popChanges(context))
 		.then(executeRollback)
+		.then(() => {
+			setSessionSingleton(context, 'transactionActive', false);
+			return releaseAdvisoryLocks(context);
+		})
 		.then(callAfterRollback)
 		.then(() => releaseDbClient(context))
 		.then(throwHookErrorIfAny);

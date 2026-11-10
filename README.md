@@ -10,7 +10,7 @@ The ultimate Object Relational Mapper for Node.js, Bun and Deno, offering seamle
 [![Github](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/lroal/1ccb2b79abbe0258d636e9b5e4630a1a/raw/rdb__heads_master.json)](https://github.com/alfateam/orange-orm)
 [![GitHub Discussions](https://img.shields.io/github/discussions/alfateam/orange-orm)](https://github.com/alfateam/orange-orm/discussions)
 [![Discord](https://badgen.net/discord/online-members/QjuEgvQXzd?icon=discord&label=Discord)](https://discord.gg/QjuEgvQXzd)
-[![YouTube Video Views](https://img.shields.io/youtube/views/1IwwjPr2lMs)](https://youtu.be/1IwwjPr2lMs)
+[![YouTube tutorial](https://img.shields.io/badge/YouTube-Watch%20tutorial-FF0000?logo=youtube&logoColor=white)](https://youtu.be/1IwwjPr2lMs)
 
 ## Key Features 
 
@@ -591,6 +591,31 @@ async function insertRows() {
 </details>
 
 <details><summary><strong>Fetching rows</strong></summary>
+
+### With change tracking
+
+By default, fetched rows include change tracking and methods such as `saveChanges()`. Modify the returned objects, then call `saveChanges()` to persist your changes.
+
+```ts
+const order = await db.order.getById(123, { lines: true });
+if (order) {
+  order.orderDate = new Date();
+  await order.saveChanges();
+}
+```
+
+### Plain results
+
+```ts
+const rows = await db.order.getMany.plain({ lines: true });
+const first = await db.order.getOne.plain({ orderBy: 'id' });
+const order = await db.order.getById.plain(123);
+```
+
+Same arguments and selection as ordinary fetches, without change tracking, reactive wrapping or active record methods. Empty results are `[]` for `getMany.plain()` and `undefined` for the single-row methods. Works locally and over HTTP with the same server access rules.
+
+For read-only workloads, plain results offer better performance and lower memory overhead by skipping change-tracking snapshots and proxy wrapping. This is especially useful for large result sets, reports and API responses where you do not need to call `saveChanges()` on the returned rows.
+
 <p>Orange has a rich querying model. As you navigate through, you'll learn about the various methods available to retrieve data from your tables, whether you want to fetch all rows, many rows with specific criteria, or a single row based on a primary key.  
 
 The fetching strategy in Orange is optional, and its use is influenced by your specific needs. You can define the fetching strategy either on the table level or the column level. This granularity gives you the freedom to decide how much related data you want to pull along with your primary request.</p>
@@ -1921,7 +1946,6 @@ An error is deliberately thrown to demonstrate a rollback, ensuring all previous
 Always use the provided tx object for operations within the transaction to maintain data integrity.</p>
 <p>(NOTE: Transactions are not supported for Cloudflare D1)</p>
 
-
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
@@ -1938,6 +1962,19 @@ async function execute() {
 }
 
 ```
+
+### Advisory locks
+
+```ts
+await db.transaction(async tx => {
+  await tx.advisoryLock('invoice:123');
+  // Read and update after acquiring the lock.
+});
+```
+
+Local transactions only; never exposed over HTTP. Locks are held until commit/rollback. Supported by PostgreSQL/PGlite, MySQL/MariaDB, SQL Server and Oracle 12.1+ (requires `DBMS_LOCK` permission). MySQL/MariaDB locks are released by Orange before returning the connection to the pool. SAP ASE and D1 are unsupported.
+
+**SQLite:** automatically runs a zero-row `UPDATE` on an existing mapped ordinary table. It reserves write access to the entire main database, regardless of key; no helper table is needed. Throws if no suitable table exists. Acquire before reading; on `SQLITE_BUSY`/`SQLITE_BUSY_SNAPSHOT`, retry the whole transaction when appropriate.
 
 </details>
 

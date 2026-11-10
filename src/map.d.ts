@@ -3,7 +3,7 @@ import type { PGliteOptions } from './pglite.d.ts';
 import type { ConnectionConfiguration } from 'tedious';
 import type { D1Database } from '@cloudflare/workers-types';
 import type { PoolAttributes } from 'oracledb';
-import type { DBClient } from './map2';
+import type { DBClient, HttpDBClient, HttpPool } from './map2';
 
 export type MergeProperties<T, V> = {
 	[K in keyof T | keyof V]:
@@ -31,7 +31,7 @@ type MappedDb<T> = {
 } & DbConnectable<T>;
 
 type DbConnectable<T> = {
-	http(url: string): DBClient<SchemaFromMappedDb<T>>;
+	http(url: string): HttpDBClient<SchemaFromMappedDb<T>>;
 	d1(database: D1Database): DBClient<SchemaFromMappedDb<T>>;
 	postgres(connectionString: string, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
 	pglite(config?: PGliteOptions| string | undefined, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
@@ -46,7 +46,9 @@ type DbConnectable<T> = {
 };
 
 type NegotiateDbInstance<T, C> = C extends WithDb
-	? DBClient<SchemaFromMappedDb<T>>
+	? C extends { db: HttpPool | ((...args: any[]) => HttpPool | Promise<HttpPool>) }
+		? HttpDBClient<SchemaFromMappedDb<T>>
+		: DBClient<SchemaFromMappedDb<T>>
 	: MappedDb<T>;
 
 type WithDb = {
@@ -64,7 +66,7 @@ type DbOptions<T> = {
 };
 
 interface Connectors {
-	http(url: string): Pool;
+	http(url: string): HttpPool;
 	d1(database: D1Database): Pool;
 	postgres(connectionString: string, options?: PoolOptions): Pool;
 	pglite(config?: PGliteOptions| string | undefined, options?: PoolOptions): Pool;

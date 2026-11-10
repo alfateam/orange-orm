@@ -7,7 +7,8 @@ function begin(context, transactionLess) {
 		setSessionSingleton(context, 'transactionLess', true);
 		return Promise.resolve();
 	}
-	return executeQuery(context, beginCommand(context));
+	return executeQuery(context, beginCommand(context))
+		.then(() => setSessionSingleton(context, 'transactionActive', true));
 }
 
 module.exports = begin;

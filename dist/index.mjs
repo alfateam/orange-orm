@@ -65,20 +65,38 @@ function requireGetTSDefinition () {
 			return `
 export interface ${Name}Table {
 	count(filter?: RawFilter): Promise<number>;
-	getMany<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<${Name}AdHocArray<Strategy>>;
 	getAll(): Promise<${Name}Array>;
 	getAll(fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
-	getMany(filter?: RawFilter): Promise<${Name}Array>;
-	getMany(filter: RawFilter, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
-	getMany(${name}s: Array<${Name}>): Promise<${Name}Array>;
-	getMany(${name}s: Array<${Name}>, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
-	getOne<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<${Name}AdHocRow<Strategy>>;
-	getOne(filter?: RawFilter): Promise<${Name}Row>;
-	getOne(filter?: RawFilter, fetchingStrategy?: ${Name}Strategy): Promise<${Name}Row>;
-	getOne(${name}: ${Name}): Promise<${Name}Row>;
-	getOne(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
-	getById(${getIdArgs(table)}): Promise<${Name}Row>;
-	getById(${getIdArgs(table)}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+	getMany: {
+		<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<${Name}AdHocArray<Strategy>>;
+		(filter?: RawFilter): Promise<${Name}Array>;
+		(filter: RawFilter, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+		(${name}s: Array<${Name}>): Promise<${Name}Array>;
+		(${name}s: Array<${Name}>, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+		plain<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<Array<${Name} & AdHocProperties<Strategy>>>;
+		plain(filter?: RawFilter): Promise<${Name}[]>;
+		plain<Strategy extends ${Name}Strategy>(filter: RawFilter, fetchingStrategy: Strategy): Promise<Array<${Name} & AdHocProperties<Strategy>>>;
+		plain(${name}s: Array<${Name}>): Promise<${Name}[]>;
+		plain<Strategy extends ${Name}Strategy>(${name}s: Array<${Name}>, fetchingStrategy: Strategy): Promise<Array<${Name} & AdHocProperties<Strategy>>>;
+	};
+	getOne: {
+		<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<${Name}AdHocRow<Strategy>>;
+		(filter?: RawFilter): Promise<${Name}Row>;
+		(filter?: RawFilter, fetchingStrategy?: ${Name}Strategy): Promise<${Name}Row>;
+		(${name}: ${Name}): Promise<${Name}Row>;
+		(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+		plain<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<(${Name} & AdHocProperties<Strategy>) | undefined>;
+		plain(filter?: RawFilter): Promise<${Name} | undefined>;
+		plain<Strategy extends ${Name}Strategy>(filter: RawFilter | undefined, fetchingStrategy: Strategy): Promise<(${Name} & AdHocProperties<Strategy>) | undefined>;
+		plain(${name}: ${Name}): Promise<${Name} | undefined>;
+		plain<Strategy extends ${Name}Strategy>(${name}: ${Name}, fetchingStrategy: Strategy): Promise<(${Name} & AdHocProperties<Strategy>) | undefined>;
+	};
+	getById: {
+		(${getIdArgs(table)}): Promise<${Name}Row>;
+		(${getIdArgs(table)}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+		plain(${getIdArgs(table)}): Promise<${Name} | undefined>;
+		plain<Strategy extends ${Name}Strategy>(${getIdArgs(table)}, fetchingStrategy: Strategy): Promise<(${Name} & AdHocProperties<Strategy>) | undefined>;
+	};
 
 	replace(${name}s: ${Name}[] | ${Name}): Promise<void>;
 	replace(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
@@ -533,10 +551,10 @@ declare namespace r {${getTables(isHttp)}
 	function and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
 	function or(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
 	function not(): Filter;
-	function transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
+	function transaction(fn: (transaction: RdbTransaction) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
 	function query(filter: RawFilter | string): Promise<unknown[]>;
 	function query<T>(filter: RawFilter | string): Promise<T[]>;
-	function transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
+	function transaction(fn: (transaction: RdbTransaction) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
 	const filter: Filter;
 	function express(): Express;
 	function express(config: ExpressConfig): Express;
@@ -564,6 +582,12 @@ declare namespace r {${getTables(isHttp)}
 		return `
 export interface RdbClient  {${getTables(isHttp)}
 }
+${isHttp ? '' : `
+export interface RdbTransaction extends RdbClient {
+	/** Held until transaction end. SQLite reserves write access to the entire main database. */
+	advisoryLock(key: string): Promise<void>;
+}
+`}
 
 export interface RdbConfig {
 	db?: Pool | (() => Pool);
@@ -680,7 +704,6 @@ export interface HonoTables {${getHonoTables()}
 	and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
 	or(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
 	not(): Filter;
-	transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
 	filter: Filter;
     createPatch(original: any[], modified: any[]): JsonPatch;
     createPatch(original: any, modified: any): JsonPatch;`;
@@ -692,7 +715,7 @@ export interface HonoTables {${getHonoTables()}
 	not(): Filter;
 	query(filter: RawFilter | string): Promise<unknown[]>;
 	query<T>(filter: RawFilter | string): Promise<T[]>;
-	transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
+	transaction(fn: (transaction: RdbTransaction) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
 	filter: Filter;
 	createPatch(original: any[], modified: any[]): JsonPatch;
 	createPatch(original: any, modified: any): JsonPatch;
@@ -4857,6 +4880,8 @@ function requireExecutePath () {
 					const target = strategy[name];
 					if (isAdHocRelation(target))
 						continue;
+					if (isHttp && name === 'where')
+						validateArgs(target);
 					if (isFilter(target))
 						strategy[name] = await parseFilter(strategy[name], filterTable, scope);
 					else
@@ -4879,7 +4904,7 @@ function requireExecutePath () {
 		}
 
 		function validateStrategy(table, strategy, tables) {
-			if (!strategy || !table)
+			if (!strategy || typeof strategy !== 'object' || !table)
 				return;
 
 			for (let p in strategy) {
@@ -5899,6 +5924,122 @@ function requireFlags () {
 	return flags_1;
 }
 
+var advisoryLock_1;
+var hasRequiredAdvisoryLock;
+
+function requireAdvisoryLock () {
+	if (hasRequiredAdvisoryLock) return advisoryLock_1;
+	hasRequiredAdvisoryLock = 1;
+	const getSessionContext = requireGetSessionContext();
+	const executeQuery = requireExecuteQuery();
+	const parameterized = requireNewParameterized();
+
+	async function advisoryLock(context, key, tables) {
+		if (typeof key !== 'string' || key.length === 0 || key.includes('\0'))
+			throw new TypeError('advisoryLock requires a non-empty string key without null characters');
+		const session = getSessionContext(context);
+		if (!session.transactionActive || session.transactionLess)
+			throw new Error('advisoryLock requires an active local transaction');
+		// ASCII keeps key encoding consistent across drivers, including VARCHAR bindings.
+		const name = 'orange-orm:advisory:' + encodeURIComponent(key);
+		switch (session.engine) {
+		case 'pg':
+			await query(context, 'SELECT pg_advisory_xact_lock((\'x\' || substr(md5(?), 1, 16))::bit(64)::bigint)', [name]);
+			return;
+		case 'mysql':
+		case 'mariadb': {
+			// Avoid stacking session locks, including concurrent calls for the same key.
+			const locks = session.advisoryLockNames || (session.advisoryLockNames = new Map());
+			if (!locks.has(name)) {
+				const pending = query(context, 'SELECT GET_LOCK(SHA2(?, 256), 31536000) AS acquired', [name])
+					.then(rows => {
+						if (Number(rows[0]?.acquired) !== 1)
+							throw new Error('Could not acquire advisory lock');
+					});
+				locks.set(name, pending);
+			}
+			await locks.get(name);
+			return;
+		}
+		case 'mssql':
+		case 'mssqlNative': {
+			const rows = await query(context, `DECLARE @resource varchar(64), @result int;
+SET @resource = CONVERT(varchar(64), HASHBYTES('SHA2_256', CONVERT(nvarchar(max), ?)), 2);
+EXEC @result = sys.sp_getapplock @Resource = @resource, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = -1;
+SELECT @result AS acquired;`, [name]);
+			// Native and tedious drivers may return multiple result sets for a batch.
+			const result = rows.flat().find(row => row?.acquired != null)?.acquired;
+			if (result == null || Number(result) < 0)
+				throw new Error('Could not acquire advisory lock (SQL Server result: ' + result + ')');
+			return;
+		}
+		case 'oracle':
+			await query(context, `DECLARE
+  lock_name VARCHAR2(64);
+  lock_handle VARCHAR2(128);
+  lock_result INTEGER;
+BEGIN
+  SELECT RAWTOHEX(STANDARD_HASH(?, 'SHA256')) INTO lock_name FROM dual;
+  DBMS_LOCK.ALLOCATE_UNIQUE_AUTONOMOUS(lock_name, lock_handle);
+  lock_result := DBMS_LOCK.REQUEST(lock_handle, DBMS_LOCK.X_MODE, DBMS_LOCK.MAXWAIT, TRUE);
+  IF lock_result NOT IN (0, 4) THEN
+    RAISE_APPLICATION_ERROR(-20001, 'Could not acquire advisory lock (Oracle result: ' || lock_result || ')');
+  END IF;
+END;`, [name]);
+			return;
+		case 'sqlite':
+			await lockSqlite(context, tables);
+			return;
+		default:
+			throw new Error('advisoryLock is not supported by ' + session.engine);
+		}
+	}
+
+	async function lockSqlite(context, tables = {}) {
+		const physicalTables = await query(context, 'PRAGMA main.table_list');
+		for (const table of Object.values(tables)) {
+			if (!table?._columns?.length || typeof table._dbName !== 'string')
+				continue;
+			// Restrict the fallback to real tables in main, never temp tables or views.
+			if (!physicalTables.some(actual => actual.schema === 'main' && actual.name === table._dbName && actual.type === 'table') || /^sqlite_/i.test(table._dbName))
+				continue;
+			const columns = await query(context, 'PRAGMA main.table_xinfo(' + quote(table._dbName) + ')');
+			const column = table._columns.find(mapped => columns.some(actual => actual.name === mapped._dbName && actual.hidden === 0));
+			if (!column)
+				continue;
+			const columnName = quote(column._dbName);
+			await query(context, 'UPDATE main.' + quote(table._dbName) + ' SET ' + columnName + ' = ' + columnName + ' WHERE 0');
+			return;
+		}
+		throw new Error('SQLite advisoryLock requires an existing mapped table with a writable column in the main database');
+	}
+
+	function quote(name) {
+		return '"' + name.replace(/"/g, '""') + '"';
+	}
+
+	function query(context, sql, parameters) {
+		return executeQuery(context, parameterized(sql, parameters));
+	}
+
+	async function releaseAdvisoryLocks(context) {
+		const session = getSessionContext(context);
+		const locks = session.advisoryLockNames;
+		if (!locks)
+			return;
+		for (const [name, pending] of locks) {
+			await pending;
+			const rows = await query(context, 'SELECT RELEASE_LOCK(SHA2(?, 256)) AS released', [name]);
+			if (Number(rows[0]?.released) !== 1)
+				throw new Error('Could not release advisory lock');
+			locks.delete(name);
+		}
+	}
+
+	advisoryLock_1 = { advisoryLock, releaseAdvisoryLocks };
+	return advisoryLock_1;
+}
+
 var client;
 var hasRequiredClient;
 
@@ -5920,6 +6061,7 @@ function requireClient () {
 	const { isAdHocRelation, newAdHocRelation, ownerScopeMarker } = requireAdHocRelation();
 	const adHocFactoryMarker = '__rdbAdHocFactory';
 	const columnScopeMarker = '__rdbColumnScope';
+	const { advisoryLock: acquireAdvisoryLock } = requireAdvisoryLock();
 
 	function rdbClient(options = {}) {
 		flags.useLazyDefaults = false;
@@ -5963,6 +6105,8 @@ function requireClient () {
 		client.query = query;
 		client.function = sqliteFunction;
 		client.transaction = runInTransaction;
+		if (transaction && typeof baseUrl !== 'string')
+			client.advisoryLock = advisoryLock;
 		client.db = baseUrl;
 		client.mssql = onProvider.bind(null, 'mssql');
 		client.mssqlNative = onProvider.bind(null, 'mssqlNative');
@@ -5999,6 +6143,8 @@ function requireClient () {
 		// else {
 		let handler = {
 			get(_target, property,) {
+				if (property === 'advisoryLock')
+					return client.advisoryLock;
 				if (property in client)
 					return Reflect.get(...arguments);
 				else {
@@ -6058,6 +6204,15 @@ function requireClient () {
 			return adapter.sqliteFunction.apply(null, arguments);
 		}
 
+		async function advisoryLock(key) {
+			if (!transaction || transaction.done)
+				throw new Error('advisoryLock requires an active local transaction');
+			const db = await getDb();
+			if (!db || typeof db === 'string' || !db.createTransaction)
+				throw new Error('advisoryLock is not supported through http');
+			await transaction(context => acquireAdvisoryLock(context, key, options.tables));
+		}
+
 		function express(arg) {
 			if (providers.express) {
 				return providers.express(client, { ...options, ...arg });
@@ -6114,6 +6269,9 @@ function requireClient () {
 			catch (e) {
 				await transaction(transaction.rollback.bind(null, e));
 			}
+			finally {
+				transaction.done = true;
+			}
 		}
 
 		function table(url, tableName, tableOptions) {
@@ -6122,6 +6280,9 @@ function requireClient () {
 			Object.defineProperty(tableOptions, 'tables', { value: options.tables, enumerable: false });
 			Object.defineProperty(tableOptions, 'tableConfigs', { value: options, enumerable: false });
 			let meta;
+			getMany.plain = fetchMany.bind(null, false);
+			getOne.plain = fetchOne.bind(null, false);
+			getById.plain = fetchById.bind(null, false);
 			let c = {
 				count,
 				getMany,
@@ -6197,7 +6358,11 @@ function requireClient () {
 				return _getMany.apply(null, arguments);
 			}
 
-			async function getMany(_, strategy) {
+			function getMany(...args) {
+				return fetchMany(true, ...args);
+			}
+
+			async function fetchMany(tracked, _, strategy, ...rest) {
 				let metaPromise = getMeta();
 				if (looksLikeFetchStrategy(_) && (strategy === undefined || !looksLikeFetchStrategy(strategy))) {
 					let meta = await metaPromise;
@@ -6209,10 +6374,9 @@ function requireClient () {
 				}
 				strategy = extractFetchingStrategy({}, strategy);
 				strategy = negotiateWhereSingle(strategy);
-				let args = [_, strategy].concat(Array.prototype.slice.call(arguments).slice(2));
-				let rows = await getManyCore.apply(null, args);
-				await metaPromise;
-				return proxify(rows, strategy, true);
+				let args = [_, strategy, ...rest];
+				const [rows] = await Promise.all([getManyCore.apply(null, args), metaPromise]);
+				return tracked ? proxify(rows, strategy, true) : rows;
 			}
 
 			async function groupBy(strategy) {
@@ -6299,7 +6463,11 @@ function requireClient () {
 				return { filter, strategy };
 			}
 
-			async function getOne(filter, strategy) {
+			function getOne(...args) {
+				return fetchOne(true, ...args);
+			}
+
+			async function fetchOne(tracked, filter, strategy, ...rest) {
 				let metaPromise = getMeta();
 				let meta = await metaPromise;
 				let normalized = normalizeGetOneArgs(meta, filter, strategy);
@@ -6307,25 +6475,29 @@ function requireClient () {
 				strategy = extractFetchingStrategy({}, normalized.strategy);
 				strategy = negotiateWhereSingle(strategy);
 				let _strategy = { ...strategy, ...{ limit: 1 } };
-				let args = [filter, _strategy].concat(Array.prototype.slice.call(arguments).slice(2));
+				let args = [filter, _strategy, ...rest];
 				let rows = await getManyCore.apply(null, args);
 				if (rows.length === 0)
 					return;
-				return proxify(rows[0], strategy, true);
+				return tracked ? proxify(rows[0], strategy, true) : rows[0];
 			}
 
-			async function getById() {
-				if (arguments.length === 0)
+			function getById(...args) {
+				return fetchById(true, ...args);
+			}
+
+			async function fetchById(tracked, ...idArgs) {
+				if (idArgs.length === 0)
 					return;
 				let meta = await getMeta();
 				let keyFilter = client.filter;
 				for (let i = 0; i < meta.keys.length; i++) {
 					let keyName = meta.keys[i].name;
-					let keyValue = arguments[i];
+					let keyValue = idArgs[i];
 					keyFilter = keyFilter.and(_table[keyName].eq(keyValue));
 				}
-				let args = [keyFilter].concat(Array.prototype.slice.call(arguments).slice(meta.keys.length));
-				return getOne.apply(null, args);
+				let args = [keyFilter, ...idArgs.slice(meta.keys.length)];
+				return fetchOne(tracked, ...args);
 			}
 
 			async function getManyCore() {
@@ -15713,9 +15885,10 @@ function requireReleaseDbClient () {
 	function release(context) {
 		var done = getSessionSingleton(context, 'dbClientDone');
 		var pool = getSessionSingleton(context, 'pool');
+		var locks = getSessionSingleton(context, 'advisoryLockNames');
 		deleteSessionContext(context);
 		if (done)
-			done();
+			done(locks?.size ? new Error('Discarding connection with unreleased advisory locks') : undefined);
 		if (pool)
 			return pool.end();
 
@@ -15737,10 +15910,16 @@ function requireCommit () {
 	let releaseDbClient = requireReleaseDbClient();
 	let popChanges = requirePopChanges();
 	const getSessionSingleton = requireGetSessionSingleton();
+	const setSessionSingleton = requireSetSessionSingleton();
+	const { releaseAdvisoryLocks } = requireAdvisoryLock();
 
 	function _commit(context, result) {
 		let hookError;
 		return popAndPushChanges()
+			.then(() => {
+				setSessionSingleton(context, 'transactionActive', false);
+				return releaseAdvisoryLocks(context);
+			})
 			.then(callAfterCommit)
 			.then(releaseDbClient.bind(null, context))
 			.then(onReleased)
@@ -15865,12 +16044,18 @@ function requireRollback () {
 	const resultToPromise = requireResultToPromise();
 	const conflictId = '12345678-1234-1234-1234-123456789012';
 	const getSessionSingleton = requireGetSessionSingleton();
+	const setSessionSingleton = requireSetSessionSingleton();
+	const { releaseAdvisoryLocks } = requireAdvisoryLock();
 
 	function _rollback(context, e) {
 		let hookError;
 		var chain = resultToPromise()
 			.then(() => popChanges(context))
 			.then(executeRollback)
+			.then(() => {
+				setSessionSingleton(context, 'transactionActive', false);
+				return releaseAdvisoryLocks(context);
+			})
 			.then(callAfterRollback)
 			.then(() => releaseDbClient(context))
 			.then(throwHookErrorIfAny);
@@ -16897,7 +17082,8 @@ function requireBegin () {
 			setSessionSingleton(context, 'transactionLess', true);
 			return Promise.resolve();
 		}
-		return executeQuery(context, beginCommand(context));
+		return executeQuery(context, beginCommand(context))
+			.then(() => setSessionSingleton(context, 'transactionActive', true));
 	}
 
 	begin_1 = begin;
@@ -17650,13 +17836,18 @@ function requireNewGenericPool$7 () {
 		pool.connect = function(cb) {
 			pool.acquire(function(err, client) {
 				if(err)  return cb(err, null, function() {/*NOOP*/});
-				client.poolCount++;
-				cb(null, client, function(err) {
-					if(err) {
-						pool.destroy(client);
-					} else {
+				client.getConnection(function(err, connection) {
+					if (err) {
 						pool.release(client);
+						return cb(err, null, function() {});
 					}
+					cb(null, connection, function(err) {
+						if (err)
+							connection.destroy();
+						else
+							connection.release();
+						pool.release(client);
+					});
 				});
 			});
 		};

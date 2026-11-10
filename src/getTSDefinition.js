@@ -42,20 +42,38 @@ function getTSDefinition(tableConfigs, {isNamespace = false, isHttp = false} = {
 		return `
 export interface ${Name}Table {
 	count(filter?: RawFilter): Promise<number>;
-	getMany<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<${Name}AdHocArray<Strategy>>;
 	getAll(): Promise<${Name}Array>;
 	getAll(fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
-	getMany(filter?: RawFilter): Promise<${Name}Array>;
-	getMany(filter: RawFilter, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
-	getMany(${name}s: Array<${Name}>): Promise<${Name}Array>;
-	getMany(${name}s: Array<${Name}>, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
-	getOne<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<${Name}AdHocRow<Strategy>>;
-	getOne(filter?: RawFilter): Promise<${Name}Row>;
-	getOne(filter?: RawFilter, fetchingStrategy?: ${Name}Strategy): Promise<${Name}Row>;
-	getOne(${name}: ${Name}): Promise<${Name}Row>;
-	getOne(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
-	getById(${getIdArgs(table)}): Promise<${Name}Row>;
-	getById(${getIdArgs(table)}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+	getMany: {
+		<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<${Name}AdHocArray<Strategy>>;
+		(filter?: RawFilter): Promise<${Name}Array>;
+		(filter: RawFilter, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+		(${name}s: Array<${Name}>): Promise<${Name}Array>;
+		(${name}s: Array<${Name}>, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+		plain<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<Array<${Name} & AdHocProperties<Strategy>>>;
+		plain(filter?: RawFilter): Promise<${Name}[]>;
+		plain<Strategy extends ${Name}Strategy>(filter: RawFilter, fetchingStrategy: Strategy): Promise<Array<${Name} & AdHocProperties<Strategy>>>;
+		plain(${name}s: Array<${Name}>): Promise<${Name}[]>;
+		plain<Strategy extends ${Name}Strategy>(${name}s: Array<${Name}>, fetchingStrategy: Strategy): Promise<Array<${Name} & AdHocProperties<Strategy>>>;
+	};
+	getOne: {
+		<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<${Name}AdHocRow<Strategy>>;
+		(filter?: RawFilter): Promise<${Name}Row>;
+		(filter?: RawFilter, fetchingStrategy?: ${Name}Strategy): Promise<${Name}Row>;
+		(${name}: ${Name}): Promise<${Name}Row>;
+		(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+		plain<Strategy extends ${Name}Strategy>(fetchingStrategy: Strategy): Promise<(${Name} & AdHocProperties<Strategy>) | undefined>;
+		plain(filter?: RawFilter): Promise<${Name} | undefined>;
+		plain<Strategy extends ${Name}Strategy>(filter: RawFilter | undefined, fetchingStrategy: Strategy): Promise<(${Name} & AdHocProperties<Strategy>) | undefined>;
+		plain(${name}: ${Name}): Promise<${Name} | undefined>;
+		plain<Strategy extends ${Name}Strategy>(${name}: ${Name}, fetchingStrategy: Strategy): Promise<(${Name} & AdHocProperties<Strategy>) | undefined>;
+	};
+	getById: {
+		(${getIdArgs(table)}): Promise<${Name}Row>;
+		(${getIdArgs(table)}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+		plain(${getIdArgs(table)}): Promise<${Name} | undefined>;
+		plain<Strategy extends ${Name}Strategy>(${getIdArgs(table)}, fetchingStrategy: Strategy): Promise<(${Name} & AdHocProperties<Strategy>) | undefined>;
+	};
 
 	replace(${name}s: ${Name}[] | ${Name}): Promise<void>;
 	replace(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
@@ -510,10 +528,10 @@ declare namespace r {${getTables(isHttp)}
 	function and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
 	function or(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
 	function not(): Filter;
-	function transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
+	function transaction(fn: (transaction: RdbTransaction) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
 	function query(filter: RawFilter | string): Promise<unknown[]>;
 	function query<T>(filter: RawFilter | string): Promise<T[]>;
-	function transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
+	function transaction(fn: (transaction: RdbTransaction) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
 	const filter: Filter;
 	function express(): Express;
 	function express(config: ExpressConfig): Express;
@@ -541,6 +559,12 @@ function getRdbClientTs(tables, isHttp) {
 	return `
 export interface RdbClient  {${getTables(isHttp)}
 }
+${isHttp ? '' : `
+export interface RdbTransaction extends RdbClient {
+	/** Held until transaction end. SQLite reserves write access to the entire main database. */
+	advisoryLock(key: string): Promise<void>;
+}
+`}
 
 export interface RdbConfig {
 	db?: Pool | (() => Pool);
@@ -657,7 +681,6 @@ export interface HonoTables {${getHonoTables()}
 	and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
 	or(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
 	not(): Filter;
-	transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
 	filter: Filter;
     createPatch(original: any[], modified: any[]): JsonPatch;
     createPatch(original: any, modified: any): JsonPatch;`;
@@ -669,7 +692,7 @@ export interface HonoTables {${getHonoTables()}
 	not(): Filter;
 	query(filter: RawFilter | string): Promise<unknown[]>;
 	query<T>(filter: RawFilter | string): Promise<T[]>;
-	transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
+	transaction(fn: (transaction: RdbTransaction) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
 	filter: Filter;
 	createPatch(original: any[], modified: any[]): JsonPatch;
 	createPatch(original: any, modified: any): JsonPatch;
